@@ -1285,10 +1285,12 @@ git commit -m "feat: add login/logout routes and login page"
 
 ---
 
-## Task 10: Add password-gate middleware
+## Task 10: Add password-gate proxy
 
 **Files:**
-- Create: `src/middleware.ts`
+- Create: `src/proxy.ts`
+
+> Next.js 16 renamed `middleware` → `proxy`. The file convention is `src/proxy.ts` (not `src/middleware.ts`), the exported function is `proxy` (not `middleware`), and `export const runtime = "nodejs"` is no longer needed — proxy always runs on Node.js.
 
 - [ ] **Step 1: Write the middleware**
 
@@ -1397,7 +1399,7 @@ Expected: prints a `$2b$12$...` hash.
 
 - [ ] **Step 2: Update `.env`**
 
-Replace the `APP_PASSWORD_HASH=...` line in `.env` with the generated hash.
+Replace the `APP_PASSWORD_HASH=...` line in `.env` with the generated hash. **IMPORTANT:** escape every `$` in the hash as `\$` before pasting it into `.env`, otherwise Next.js's `dotenv-expand` will interpret `$2b`, `$12`, etc. as shell-variable references and corrupt the hash. So `$2b$12$abc...` becomes `\$2b\$12\$abc...` — dotenv-expand will convert `\$` back to `$` after expansion, and `bcryptjs` receives the correct 60-character hash.
 
 - [ ] **Step 3: Also generate a real cookie secret**
 
