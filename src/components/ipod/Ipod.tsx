@@ -13,6 +13,7 @@ import {
   getAllSongs,
   getArtists,
 } from "@/server/actions/views";
+import { startPlay, updatePlayProgress } from "@/server/actions/playback";
 
 const HOLD_MENU_MS = 600;
 
@@ -62,13 +63,40 @@ export function Ipod() {
     getEngine().setVolume(player.volume);
   }, [player.volume]);
 
-  // Time tick → store
+  // Playback recording — start a new history row on track change while playing
+  const historyIdRef = useRef<string | null>(null);
+  const lastReportedSecondRef = useRef(0);
+
+  useEffect(() => {
+    const track = player.queue[player.currentIndex];
+    if (!track || !player.isPlaying) return;
+    let cancelled = false;
+    void startPlay(track.id).then((id) => {
+      if (cancelled) return;
+      historyIdRef.current = id;
+      lastReportedSecondRef.current = 0;
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [player.currentIndex, player.isPlaying]);
+
+  // Time tick → store + throttled history update
   useEffect(() => {
     const engine = getEngine();
     return engine.on("timeupdate", () => {
-      usePlayerStore.getState().setPosition(engine.getCurrentTime());
+      const t = engine.getCurrentTime();
+      usePlayerStore.getState().setPosition(t);
+      const track = player.queue[player.currentIndex];
+      if (historyIdRef.current && track && track.duration > 0) {
+        if (Math.floor(t) - lastReportedSecondRef.current >= 5) {
+          const completed = t / track.duration >= 0.8;
+          void updatePlayProgress(historyIdRef.current, t, completed);
+          lastReportedSecondRef.current = Math.floor(t);
+        }
+      }
     });
-  }, []);
+  }, [player.currentIndex, player.queue]);
 
   // Auto-advance on end
   useEffect(() => {
