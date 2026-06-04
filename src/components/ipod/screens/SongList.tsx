@@ -5,9 +5,8 @@ import { VirtualizedList, type Row } from "./VirtualizedList";
 import { getAllSongs } from "@/server/actions/views";
 import { formatDuration } from "@/lib/format-duration";
 
-export function SongList() {
+export function SongList({ selected = 0 }: { selected?: number }) {
   const [rows, setRows] = useState<Row[]>([]);
-  const [selected] = useState(0);
 
   useEffect(() => {
     let cancelled = false;

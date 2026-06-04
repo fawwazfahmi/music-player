@@ -153,7 +153,7 @@ export function Ipod() {
   return (
     <main className="grid min-h-dvh place-items-center bg-zinc-950 p-4">
       <div data-selected={selected} data-row-count={rowCount}>
-        <Chassis screen={<Screen />} wheel={<ClickWheel onEvent={handleEvent} />} />
+        <Chassis screen={<Screen selected={selected} />} wheel={<ClickWheel onEvent={handleEvent} />} />
       </div>
       <p className="mt-3 text-[11px] text-zinc-500">
         Selected: {selected} / {Math.max(0, rowCount - 1)}

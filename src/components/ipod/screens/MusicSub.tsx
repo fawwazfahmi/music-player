@@ -1,15 +1,12 @@
 "use client";
 
-import { useState } from "react";
-
 const items = [
   { label: "Artists" },
   { label: "Albums" },
   { label: "Songs" },
 ];
 
-export function MusicSub() {
-  const [selected] = useState(0);
+export function MusicSub({ selected = 0 }: { selected?: number }) {
   return (
     <div className="h-full">
       <div className="bg-gradient-to-b from-[#b9c6dc] to-[#5f7aa6] px-2 py-1 text-center text-[10px] font-bold text-white">

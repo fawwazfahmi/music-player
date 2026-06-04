@@ -4,9 +4,8 @@ import { useEffect, useState } from "react";
 import { VirtualizedList, type Row } from "./VirtualizedList";
 import { getAllAlbums } from "@/server/actions/views";
 
-export function AlbumList() {
+export function AlbumList({ selected = 0 }: { selected?: number }) {
   const [rows, setRows] = useState<Row[]>([]);
-  const [selected] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
