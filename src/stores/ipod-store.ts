@@ -8,7 +8,9 @@ export type ScreenState =
   | { name: "albumList" }
   | { name: "albumDetail"; albumId: string }
   | { name: "songList" }
-  | { name: "nowPlaying" };
+  | { name: "nowPlaying" }
+  | { name: "search" }
+  | { name: "ytPicker"; query: string };
 
 interface IpodState {
   navStack: ScreenState[];

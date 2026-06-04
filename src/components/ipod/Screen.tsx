@@ -7,6 +7,8 @@ import { ArtistList } from "./screens/ArtistList";
 import { AlbumList } from "./screens/AlbumList";
 import { SongList } from "./screens/SongList";
 import { NowPlaying } from "./screens/NowPlaying";
+import { Search } from "./screens/Search";
+import { YtPicker } from "./screens/YtPicker";
 
 export interface ScreenProps {
   selected: number;
@@ -27,6 +29,10 @@ export function Screen({ selected }: ScreenProps) {
       return <SongList selected={selected} />;
     case "nowPlaying":
       return <NowPlaying />;
+    case "search":
+      return <Search selected={selected} />;
+    case "ytPicker":
+      return <YtPicker query={current.query} selected={selected} />;
     default:
       return null;
   }
