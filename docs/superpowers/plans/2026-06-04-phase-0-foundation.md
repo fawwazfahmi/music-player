@@ -1397,7 +1397,7 @@ Expected: prints a `$2b$12$...` hash.
 
 - [ ] **Step 2: Update `.env`**
 
-Replace the `APP_PASSWORD_HASH=...` line in `.env` with the generated hash.
+Replace the `APP_PASSWORD_HASH=...` line in `.env` with the generated hash. **IMPORTANT:** escape every `$` in the hash as `\$` before pasting it into `.env`, otherwise Next.js's `dotenv-expand` will interpret `$2b`, `$12`, etc. as shell-variable references and corrupt the hash. So `$2b$12$abc...` becomes `\$2b\$12\$abc...` — dotenv-expand will convert `\$` back to `$` after expansion, and `bcryptjs` receives the correct 60-character hash.
 
 - [ ] **Step 3: Also generate a real cookie secret**
 
