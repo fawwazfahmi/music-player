@@ -21,16 +21,23 @@ export function Search({ selected = 0 }: SearchProps) {
   const [results, setResults] = useState<SearchResults>({ tracks: [], artists: [], albums: [] });
   const inputRef = useRef<HTMLInputElement>(null);
   const push = useIpodStore((s) => s.push);
+  const [lastQuery, setLastQuery] = useState(query);
 
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
 
-  useEffect(() => {
+  // Reset results synchronously when query is cleared (state-compare pattern)
+  if (lastQuery !== query) {
+    setLastQuery(query);
     if (query.trim().length === 0) {
       setResults({ tracks: [], artists: [], albums: [] });
-      return;
     }
+  }
+
+  // Debounced async fetch on non-empty query
+  useEffect(() => {
+    if (query.trim().length === 0) return;
     const handle = setTimeout(() => {
       void searchLibrary(query).then(setResults);
     }, 200);
