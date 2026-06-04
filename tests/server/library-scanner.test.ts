@@ -7,15 +7,17 @@ const RUN = !!process.env.DATABASE_URL;
 
 describe.skipIf(!RUN)("library-scanner", () => {
   let tmp: string;
+
   beforeEach(async () => {
     tmp = await fs.mkdtemp(path.join(os.tmpdir(), "mu-scan-"));
   });
+
   afterEach(async () => {
     await fs.rm(tmp, { recursive: true, force: true });
+    // Only delete tracks this test created (by filePath prefix).
+    // Leave Artists/Albums alone — even "Unknown Artist" may belong to real user data.
     const { db } = await import("@/server/db");
-    await db.track.deleteMany({});
-    await db.album.deleteMany({});
-    await db.artist.deleteMany({});
+    await db.track.deleteMany({ where: { filePath: { startsWith: tmp } } });
   });
 
   it("ingests a fake file into Artist→Album→Track", async () => {
@@ -25,7 +27,10 @@ describe.skipIf(!RUN)("library-scanner", () => {
     const report = await scanOnce(tmp);
     expect(report.added).toBe(1);
     const { db } = await import("@/server/db");
-    const tracks = await db.track.findMany({ include: { primaryArtist: true, album: true } });
+    const tracks = await db.track.findMany({
+      where: { filePath: { startsWith: tmp } },
+      include: { primaryArtist: true, album: true },
+    });
     expect(tracks.length).toBe(1);
     expect(tracks[0]?.title).toBe("Test");
     expect(tracks[0]?.primaryArtist.name).toBe("Unknown Artist");
