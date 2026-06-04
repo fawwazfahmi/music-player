@@ -84,6 +84,9 @@ importers:
       '@vitest/ui':
         specifier: ^4.1.8
         version: 4.1.8(vitest@4.1.8)
+      dotenv:
+        specifier: ^17.4.2
+        version: 17.4.2
       eslint:
         specifier: ^9
         version: 9.39.4(jiti@2.7.0)
