@@ -1285,10 +1285,12 @@ git commit -m "feat: add login/logout routes and login page"
 
 ---
 
-## Task 10: Add password-gate middleware
+## Task 10: Add password-gate proxy
 
 **Files:**
-- Create: `src/middleware.ts`
+- Create: `src/proxy.ts`
+
+> Next.js 16 renamed `middleware` → `proxy`. The file convention is `src/proxy.ts` (not `src/middleware.ts`), the exported function is `proxy` (not `middleware`), and `export const runtime = "nodejs"` is no longer needed — proxy always runs on Node.js.
 
 - [ ] **Step 1: Write the middleware**
 
