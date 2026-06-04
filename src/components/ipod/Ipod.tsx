@@ -27,18 +27,29 @@ export function Ipod() {
   const [selected, setSelected] = useState(0);
   const [rowCount, setRowCount] = useState(0);
   const menuDownAt = useRef<number | null>(null);
+  const [lastScreenName, setLastScreenName] = useState(current.name);
 
-  // Reset selection + recompute row count when screen changes
-  useEffect(() => {
+  // Reset selection synchronously when screen changes (state-compare pattern)
+  if (lastScreenName !== current.name) {
+    setLastScreenName(current.name);
     setSelected(0);
+  }
+
+  // Recompute row count when screen changes (async work belongs in effect)
+  useEffect(() => {
+    let cancelled = false;
     void (async () => {
-      if (current.name === "home") setRowCount(2);
-      else if (current.name === "musicSub") setRowCount(3);
-      else if (current.name === "artistList") setRowCount((await getArtists()).length);
-      else if (current.name === "albumList") setRowCount((await getAllAlbums()).length);
-      else if (current.name === "songList") setRowCount((await getAllSongs()).length);
-      else setRowCount(0);
+      let count = 0;
+      if (current.name === "home") count = 2;
+      else if (current.name === "musicSub") count = 3;
+      else if (current.name === "artistList") count = (await getArtists()).length;
+      else if (current.name === "albumList") count = (await getAllAlbums()).length;
+      else if (current.name === "songList") count = (await getAllSongs()).length;
+      if (!cancelled) setRowCount(count);
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [current.name]);
 
   // Audio engine: load track when currentIndex changes
@@ -49,7 +60,7 @@ export function Ipod() {
     engine.loadTrack(track.id);
     updateMediaMetadata(track);
     if (player.isPlaying) void engine.play();
-  }, [player.currentIndex, player.queue]);
+  }, [player.currentIndex, player.queue, player.isPlaying]);
 
   // Play/pause sync
   useEffect(() => {
@@ -79,7 +90,7 @@ export function Ipod() {
     return () => {
       cancelled = true;
     };
-  }, [player.currentIndex, player.isPlaying]);
+  }, [player.currentIndex, player.isPlaying, player.queue]);
 
   // Time tick → store + throttled history update
   useEffect(() => {
