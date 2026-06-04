@@ -1,0 +1,202 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { Chassis } from "./Chassis";
+import { ClickWheel, type WheelEventOut } from "./ClickWheel";
+import { Screen } from "./Screen";
+import { useIpodStore } from "@/stores/ipod-store";
+import { usePlayerStore } from "@/stores/player-store";
+import { getEngine } from "@/audio/engine";
+import { bindMediaSession, updateMediaMetadata } from "@/audio/media-session";
+import {
+  getAllAlbums,
+  getAllSongs,
+  getArtists,
+} from "@/server/actions/views";
+import { startPlay, updatePlayProgress } from "@/server/actions/playback";
+
+const HOLD_MENU_MS = 600;
+
+export function Ipod() {
+  const current = useIpodStore((s) => s.current());
+  const push = useIpodStore((s) => s.push);
+  const pop = useIpodStore((s) => s.pop);
+  const toRoot = useIpodStore((s) => s.toRoot);
+
+  const player = usePlayerStore();
+  const [selected, setSelected] = useState(0);
+  const [rowCount, setRowCount] = useState(0);
+  const menuDownAt = useRef<number | null>(null);
+  const [lastScreenName, setLastScreenName] = useState(current.name);
+
+  // Reset selection synchronously when screen changes (state-compare pattern)
+  if (lastScreenName !== current.name) {
+    setLastScreenName(current.name);
+    setSelected(0);
+  }
+
+  // Recompute row count when screen changes (async work belongs in effect)
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      let count = 0;
+      if (current.name === "home") count = 2;
+      else if (current.name === "musicSub") count = 3;
+      else if (current.name === "artistList") count = (await getArtists()).length;
+      else if (current.name === "albumList") count = (await getAllAlbums()).length;
+      else if (current.name === "songList") count = (await getAllSongs()).length;
+      if (!cancelled) setRowCount(count);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [current.name]);
+
+  // Audio engine: load track when currentIndex changes
+  useEffect(() => {
+    const engine = getEngine();
+    const track = player.queue[player.currentIndex];
+    if (!track) return;
+    engine.loadTrack(track.id);
+    updateMediaMetadata(track);
+    if (player.isPlaying) void engine.play();
+  }, [player.currentIndex, player.queue, player.isPlaying]);
+
+  // Play/pause sync
+  useEffect(() => {
+    const engine = getEngine();
+    if (player.isPlaying) void engine.play();
+    else engine.pause();
+  }, [player.isPlaying]);
+
+  // Volume sync
+  useEffect(() => {
+    getEngine().setVolume(player.volume);
+  }, [player.volume]);
+
+  // Playback recording — start a new history row on track change while playing
+  const historyIdRef = useRef<string | null>(null);
+  const lastReportedSecondRef = useRef(0);
+
+  useEffect(() => {
+    const track = player.queue[player.currentIndex];
+    if (!track || !player.isPlaying) return;
+    let cancelled = false;
+    void startPlay(track.id).then((id) => {
+      if (cancelled) return;
+      historyIdRef.current = id;
+      lastReportedSecondRef.current = 0;
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [player.currentIndex, player.isPlaying, player.queue]);
+
+  // Time tick → store + throttled history update
+  useEffect(() => {
+    const engine = getEngine();
+    return engine.on("timeupdate", () => {
+      const t = engine.getCurrentTime();
+      usePlayerStore.getState().setPosition(t);
+      const track = player.queue[player.currentIndex];
+      if (historyIdRef.current && track && track.duration > 0) {
+        if (Math.floor(t) - lastReportedSecondRef.current >= 5) {
+          const completed = t / track.duration >= 0.8;
+          void updatePlayProgress(historyIdRef.current, t, completed);
+          lastReportedSecondRef.current = Math.floor(t);
+        }
+      }
+    });
+  }, [player.currentIndex, player.queue]);
+
+  // Auto-advance on end
+  useEffect(() => {
+    return getEngine().on("ended", () => {
+      usePlayerStore.getState().next();
+    });
+  }, []);
+
+  // Media session
+  useEffect(() => {
+    return bindMediaSession({
+      onPlay: () => usePlayerStore.setState({ isPlaying: true }),
+      onPause: () => usePlayerStore.setState({ isPlaying: false }),
+      onPrev: () => usePlayerStore.getState().prev(),
+      onNext: () => usePlayerStore.getState().next(),
+      onSeekTo: (s) => {
+        getEngine().seek(s);
+        usePlayerStore.setState({ position: s });
+      },
+    });
+  }, []);
+
+  async function handleSelect() {
+    const sel = selected;
+    if (current.name === "home") {
+      if (sel === 0) push({ name: "musicSub" });
+      else if (sel === 1) push({ name: "nowPlaying" });
+    } else if (current.name === "musicSub") {
+      if (sel === 0) push({ name: "artistList" });
+      else if (sel === 1) push({ name: "albumList" });
+      else if (sel === 2) push({ name: "songList" });
+    } else if (current.name === "songList") {
+      const songs = await getAllSongs();
+      const queue = songs.map((s) => ({
+        id: s.id,
+        title: s.title,
+        duration: s.duration,
+        artist: s.primaryArtist.name,
+        album: s.album?.title ?? "",
+        coverArtPath: s.album?.coverArtPath ?? null,
+      }));
+      usePlayerStore.getState().setQueue(queue, sel);
+      push({ name: "nowPlaying" });
+    }
+  }
+
+  function handleEvent(e: WheelEventOut) {
+    switch (e.type) {
+      case "scroll":
+        if (rowCount > 0) {
+          setSelected((s) => Math.max(0, Math.min(rowCount - 1, s + e.delta)));
+        }
+        break;
+      case "select":
+        void handleSelect();
+        break;
+      case "menu":
+        if (menuDownAt.current === null) {
+          menuDownAt.current = Date.now();
+          setTimeout(() => {
+            if (menuDownAt.current !== null && Date.now() - menuDownAt.current >= HOLD_MENU_MS) {
+              toRoot();
+              menuDownAt.current = null;
+            }
+          }, HOLD_MENU_MS);
+        }
+        pop();
+        menuDownAt.current = null;
+        break;
+      case "playPause":
+        usePlayerStore.getState().togglePlay();
+        break;
+      case "next":
+        usePlayerStore.getState().next();
+        break;
+      case "prev":
+        usePlayerStore.getState().prev();
+        break;
+    }
+  }
+
+  return (
+    <main className="grid min-h-dvh place-items-center bg-zinc-950 p-4">
+      <div data-selected={selected} data-row-count={rowCount}>
+        <Chassis screen={<Screen selected={selected} />} wheel={<ClickWheel onEvent={handleEvent} />} />
+      </div>
+      <p className="mt-3 text-[11px] text-zinc-500">
+        Selected: {selected} / {Math.max(0, rowCount - 1)}
+      </p>
+    </main>
+  );
+}

@@ -9,33 +9,33 @@ datasource db {
 // ===== Core music entities =====
 
 model Artist {
-  id              String   @id @default(cuid())
-  name            String
+  id              String    @id @default(cuid())
+  name            String    @unique
   sortName        String?
   bio             String?
   photoUrl        String?
   discoveredAt    DateTime?
-  mbid            String?  @unique
+  mbid            String?   @unique
   metadataFetched DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  albums          Album[]
-  tracks          Track[]              @relation("TrackPrimaryArtist")
-  trackArtists    TrackArtist[]
-  genres          ArtistGenre[]
-  tags            ArtistTag[]
-  externalIds     ExternalIdentifier[] @relation("ArtistIds")
-  favoritedBy     FavoriteArtist[]
-  relatedFrom     RelatedArtist[]      @relation("ArtistFrom")
-  relatedTo       RelatedArtist[]      @relation("ArtistTo")
+  albums       Album[]
+  tracks       Track[]              @relation("TrackPrimaryArtist")
+  trackArtists TrackArtist[]
+  genres       ArtistGenre[]
+  tags         ArtistTag[]
+  externalIds  ExternalIdentifier[] @relation("ArtistIds")
+  favoritedBy  FavoriteArtist[]
+  relatedFrom  RelatedArtist[]      @relation("ArtistFrom")
+  relatedTo    RelatedArtist[]      @relation("ArtistTo")
 
   @@index([name])
   @@index([sortName])
 }
 
 model Album {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   title           String
   sortTitle       String?
   releaseDate     DateTime?
@@ -43,17 +43,17 @@ model Album {
   coverArtHash    String?
   totalDuration   Int?
   artistId        String
-  mbid            String?  @unique
+  mbid            String?   @unique
   metadataFetched DateTime?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  artist          Artist               @relation(fields: [artistId], references: [id], onDelete: Cascade)
-  tracks          Track[]
-  genres          AlbumGenre[]
-  tags            AlbumTag[]
-  externalIds     ExternalIdentifier[] @relation("AlbumIds")
-  favoritedBy     FavoriteAlbum[]
+  artist      Artist               @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  tracks      Track[]
+  genres      AlbumGenre[]
+  tags        AlbumTag[]
+  externalIds ExternalIdentifier[] @relation("AlbumIds")
+  favoritedBy FavoriteAlbum[]
 
   @@unique([artistId, title])
   @@index([title])
@@ -61,34 +61,34 @@ model Album {
 }
 
 model Track {
-  id                String        @id @default(cuid())
-  title             String
-  sortTitle         String?
-  duration          Int
-  trackNumber       Int?
-  discNumber        Int?
+  id          String  @id @default(cuid())
+  title       String
+  sortTitle   String?
+  duration    Int
+  trackNumber Int?
+  discNumber  Int?
 
-  filePath          String?       @unique
-  fileSize          BigInt?
-  fileFormat        String?
-  bitrate           Int?
-  sha256            String?       @unique
+  filePath   String? @unique
+  fileSize   BigInt?
+  fileFormat String?
+  bitrate    Int?
+  sha256     String? @unique
 
-  source            TrackSource   @default(LOCAL_SCAN)
-  ytVideoId         String?       @unique
-  playable          Boolean       @default(true)
+  source    TrackSource @default(LOCAL_SCAN)
+  ytVideoId String?     @unique
+  playable  Boolean     @default(true)
 
-  albumId           String?
-  primaryArtistId   String
-  mbid              String?       @unique
-  metadataFetched   DateTime?
-  discoveredAt      DateTime?
+  albumId         String?
+  primaryArtistId String
+  mbid            String?   @unique
+  metadataFetched DateTime?
+  discoveredAt    DateTime?
 
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  album             Album?        @relation(fields: [albumId], references: [id], onDelete: SetNull)
-  primaryArtist     Artist        @relation("TrackPrimaryArtist", fields: [primaryArtistId], references: [id])
+  album             Album?               @relation(fields: [albumId], references: [id], onDelete: SetNull)
+  primaryArtist     Artist               @relation("TrackPrimaryArtist", fields: [primaryArtistId], references: [id])
   additionalArtists TrackArtist[]
   tags              TrackTag[]
   notes             SongNote[]
@@ -114,8 +114,8 @@ model TrackArtist {
   trackId  String
   artistId String
   role     String?
-  track    Track  @relation(fields: [trackId], references: [id], onDelete: Cascade)
-  artist   Artist @relation(fields: [artistId], references: [id], onDelete: Cascade)
+  track    Track   @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  artist   Artist  @relation(fields: [artistId], references: [id], onDelete: Cascade)
 
   @@id([trackId, artistId])
 }
@@ -142,8 +142,8 @@ model ArtistGenre {
 model AlbumGenre {
   albumId String
   genreId String
-  album   Album @relation(fields: [albumId], references: [id], onDelete: Cascade)
-  genre   Genre @relation(fields: [genreId], references: [id])
+  album   Album  @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  genre   Genre  @relation(fields: [genreId], references: [id])
 
   @@id([albumId, genreId])
 }
@@ -160,8 +160,8 @@ model Tag {
 model TrackTag {
   trackId String
   tagId   String
-  track   Track @relation(fields: [trackId], references: [id], onDelete: Cascade)
-  tag     Tag   @relation(fields: [tagId], references: [id])
+  track   Track  @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  tag     Tag    @relation(fields: [tagId], references: [id])
 
   @@id([trackId, tagId])
 }
@@ -178,8 +178,8 @@ model ArtistTag {
 model AlbumTag {
   albumId String
   tagId   String
-  album   Album @relation(fields: [albumId], references: [id], onDelete: Cascade)
-  tag     Tag   @relation(fields: [tagId], references: [id])
+  album   Album  @relation(fields: [albumId], references: [id], onDelete: Cascade)
+  tag     Tag    @relation(fields: [tagId], references: [id])
 
   @@id([albumId, tagId])
 }
