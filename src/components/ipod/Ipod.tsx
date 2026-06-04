@@ -40,7 +40,7 @@ export function Ipod() {
     let cancelled = false;
     void (async () => {
       let count = 0;
-      if (current.name === "home") count = 2;
+      if (current.name === "home") count = 3;
       else if (current.name === "musicSub") count = 3;
       else if (current.name === "artistList") count = (await getArtists()).length;
       else if (current.name === "albumList") count = (await getAllAlbums()).length;
@@ -51,6 +51,15 @@ export function Ipod() {
       cancelled = true;
     };
   }, [current.name]);
+
+  // Listen for row-count updates published by self-managing screens (e.g. Search, YtPicker)
+  useEffect(() => {
+    function handler(e: Event) {
+      setRowCount((e as CustomEvent<{ count: number }>).detail.count);
+    }
+    window.addEventListener("ipod-row-count", handler as EventListener);
+    return () => window.removeEventListener("ipod-row-count", handler as EventListener);
+  }, []);
 
   // Audio engine: load track when currentIndex changes
   useEffect(() => {
@@ -134,7 +143,10 @@ export function Ipod() {
     const sel = selected;
     if (current.name === "home") {
       if (sel === 0) push({ name: "musicSub" });
-      else if (sel === 1) push({ name: "nowPlaying" });
+      else if (sel === 1) push({ name: "search" });
+      else if (sel === 2) push({ name: "nowPlaying" });
+    } else if (current.name === "search" || current.name === "ytPicker") {
+      window.dispatchEvent(new CustomEvent("ipod-select", { detail: { selected } }));
     } else if (current.name === "musicSub") {
       if (sel === 0) push({ name: "artistList" });
       else if (sel === 1) push({ name: "albumList" });

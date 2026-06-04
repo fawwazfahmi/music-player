@@ -2,6 +2,7 @@
 
 const items = [
   { label: "Music" },
+  { label: "Search" },
   { label: "Now Playing" },
 ];
 
