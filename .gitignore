@@ -1,0 +1,27 @@
+# Brainstorming visual companion artifacts (mockups, server state)
+.superpowers/
+
+# macOS
+.DS_Store
+
+# Node
+node_modules/
+.next/
+out/
+dist/
+build/
+*.log
+.env
+.env.local
+.env.*.local
+.turbo/
+
+# Prisma
+prisma/*.db
+prisma/*.db-journal
+
+# Music library cache (paths from env, but if ever local)
+*.m4a
+*.mp3
+*.flac
+*.opus
