@@ -35,14 +35,14 @@ describe("verifyPassword", () => {
   it("returns true for the correct password", async () => {
     const bcrypt = (await import("bcryptjs")).default;
     process.env.APP_PASSWORD_HASH = bcrypt.hashSync("hunter2", 4);
-    const { verifyPassword } = await import("@/server/auth?match");
+    const { verifyPassword } = await import("@/server/auth");
     expect(await verifyPassword("hunter2")).toBe(true);
   });
 
   it("returns false for the wrong password", async () => {
     const bcrypt = (await import("bcryptjs")).default;
     process.env.APP_PASSWORD_HASH = bcrypt.hashSync("hunter2", 4);
-    const { verifyPassword } = await import("@/server/auth?mismatch");
+    const { verifyPassword } = await import("@/server/auth");
     expect(await verifyPassword("wrong")).toBe(false);
   });
 });
