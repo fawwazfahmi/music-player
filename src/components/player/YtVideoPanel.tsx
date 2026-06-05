@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePlayerStore } from "@/stores/player-store";
 
 declare global {
@@ -20,6 +20,7 @@ declare global {
       loadVideoById(videoId: string, startSeconds?: number): void;
       cueVideoById(opts: { videoId: string; startSeconds?: number }): void;
       destroy(): void;
+      getIframe?(): HTMLIFrameElement | null;
     }
     interface PlayerOptions {
       videoId?: string;
@@ -53,6 +54,17 @@ function loadIframeAPI(): Promise<void> {
 
 const DRIFT_THRESHOLD = 1.0;
 
+// Returns true if the YT player object is still "live" — has an iframe in the DOM.
+function isPlayerAlive(p: YT.Player | null): boolean {
+  if (!p) return false;
+  try {
+    const iframe = p.getIframe?.();
+    return !!iframe && document.body.contains(iframe);
+  } catch {
+    return false;
+  }
+}
+
 export function YtVideoPanel() {
   const queue = usePlayerStore((s) => s.queue);
   const currentIndex = usePlayerStore((s) => s.currentIndex);
@@ -63,45 +75,65 @@ export function YtVideoPanel() {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YT.Player | null>(null);
-  const readyRef = useRef(false);
+  const [ready, setReady] = useState(false);
   const currentVideoRef = useRef<string | null>(null);
 
+  // Mount/teardown the player
   useEffect(() => {
     if (!ytVideoId || !containerRef.current) return;
+    const myContainer = containerRef.current;
 
     let cancelled = false;
+    let createdPlayer: YT.Player | null = null;
+
     void loadIframeAPI().then(() => {
-      if (cancelled || !containerRef.current) return;
+      if (cancelled) return;
+      if (!document.body.contains(myContainer)) return;
 
       const Ctor = (window.YT as unknown as { Player: YT.PlayerConstructor }).Player;
 
-      if (playerRef.current && currentVideoRef.current === ytVideoId) return;
+      // Already showing this video on a live player
+      if (
+        playerRef.current &&
+        isPlayerAlive(playerRef.current) &&
+        currentVideoRef.current === ytVideoId
+      ) {
+        return;
+      }
 
-      if (playerRef.current && currentVideoRef.current !== ytVideoId && readyRef.current) {
+      // Different video, live player → swap via cueVideoById
+      if (
+        playerRef.current &&
+        isPlayerAlive(playerRef.current) &&
+        currentVideoRef.current !== ytVideoId
+      ) {
         try {
+          setReady(false);
           playerRef.current.cueVideoById({ videoId: ytVideoId, startSeconds: position });
           currentVideoRef.current = ytVideoId;
+          // ready will flip back true via a fresh onStateChange BUFFERING/PLAYING event
+          // — we capture this via the onStateChange handler below
           return;
         } catch {
           /* fall through to recreate */
         }
       }
 
-      // Destroy any prior player + clear children
+      // Destroy stale player + recreate
       if (playerRef.current) {
         try {
           playerRef.current.destroy();
         } catch {}
         playerRef.current = null;
+        setReady(false);
       }
-      while (containerRef.current.firstChild) {
-        containerRef.current.removeChild(containerRef.current.firstChild);
+      while (myContainer.firstChild) {
+        myContainer.removeChild(myContainer.firstChild);
       }
       const mountEl = document.createElement("div");
-      containerRef.current.appendChild(mountEl);
+      myContainer.appendChild(mountEl);
 
-      readyRef.current = false;
-      playerRef.current = new Ctor(mountEl, {
+      createdPlayer = new Ctor(mountEl, {
         videoId: ytVideoId,
         playerVars: {
           autoplay: 0,
@@ -115,23 +147,30 @@ export function YtVideoPanel() {
         },
         events: {
           onReady: (e) => {
+            if (playerRef.current !== createdPlayer) return; // stale (strict-mode remount)
             try {
               e.target.mute();
               e.target.seekTo(position, true);
             } catch {}
-            readyRef.current = true;
+            setReady(true);
+          },
+          onStateChange: () => {
+            if (playerRef.current !== createdPlayer) return;
+            if (!ready) setReady(true);
           },
         },
       });
+      playerRef.current = createdPlayer;
       currentVideoRef.current = ytVideoId;
     });
 
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ytVideoId]);
 
-  // Destroy player on unmount
+  // Destroy on unmount
   useEffect(() => {
     return () => {
       if (playerRef.current) {
@@ -139,29 +178,32 @@ export function YtVideoPanel() {
           playerRef.current.destroy();
         } catch {}
         playerRef.current = null;
-        readyRef.current = false;
         currentVideoRef.current = null;
       }
     };
   }, []);
 
+  // Play/pause sync — guarded on ready + alive
   useEffect(() => {
-    if (!readyRef.current || !playerRef.current) return;
+    const p = playerRef.current;
+    if (!ready || !p || !isPlayerAlive(p)) return;
     try {
-      if (isPlaying) playerRef.current.playVideo();
-      else playerRef.current.pauseVideo();
+      if (isPlaying) p.playVideo();
+      else p.pauseVideo();
     } catch {}
-  }, [isPlaying]);
+  }, [isPlaying, ready]);
 
+  // Position sync — debounced via drift threshold
   useEffect(() => {
-    if (!readyRef.current || !playerRef.current) return;
+    const p = playerRef.current;
+    if (!ready || !p || !isPlayerAlive(p)) return;
     try {
-      const ytTime = playerRef.current.getCurrentTime();
+      const ytTime = p.getCurrentTime();
       if (Math.abs(ytTime - position) > DRIFT_THRESHOLD) {
-        playerRef.current.seekTo(position, true);
+        p.seekTo(position, true);
       }
     } catch {}
-  }, [position]);
+  }, [position, ready]);
 
   if (!track) {
     return (
@@ -192,7 +234,10 @@ export function YtVideoPanel() {
 
   return (
     <div className="relative h-full w-full overflow-hidden bg-black">
-      <div ref={containerRef} className="absolute inset-0 [&>div]:h-full [&>iframe]:h-full [&>iframe]:w-full" />
+      <div
+        ref={containerRef}
+        className="absolute inset-0 [&>div]:h-full [&>iframe]:h-full [&>iframe]:w-full"
+      />
       <div className="absolute inset-0" aria-hidden="true" />
     </div>
   );
