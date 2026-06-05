@@ -14,6 +14,7 @@ import {
   getArtists,
 } from "@/server/actions/views";
 import { startPlay, updatePlayProgress } from "@/server/actions/playback";
+import { isFavorited, toggleFavorite } from "@/server/actions/favorites";
 
 const HOLD_MENU_MS = 600;
 
@@ -222,14 +223,67 @@ export function Ipod() {
     }
   }
 
+  const currentTrack = player.queue[player.currentIndex] ?? null;
+  const showNowPlayingControls = current.name === "nowPlaying" && currentTrack;
+
   return (
     <main className="grid min-h-dvh place-items-center bg-zinc-950 p-4">
       <div data-selected={selected} data-row-count={rowCount}>
         <Chassis screen={<Screen selected={selected} />} wheel={<ClickWheel onEvent={handleEvent} />} />
       </div>
+      {showNowPlayingControls && (
+        <NowPlayingControls trackId={currentTrack.id} />
+      )}
       <p className="mt-3 text-[11px] text-zinc-500">
         Selected: {selected} / {Math.max(0, rowCount - 1)}
       </p>
     </main>
+  );
+}
+
+function NowPlayingControls({ trackId }: { trackId: string }) {
+  const [fav, setFav] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void isFavorited("TRACK", trackId).then((f) => {
+      if (!cancelled) setFav(f);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [trackId]);
+
+  useEffect(() => {
+    function handler() {
+      void isFavorited("TRACK", trackId).then(setFav);
+    }
+    window.addEventListener("ipod-fav-changed", handler);
+    return () => window.removeEventListener("ipod-fav-changed", handler);
+  }, [trackId]);
+
+  async function onToggle() {
+    const newFav = await toggleFavorite("TRACK", trackId);
+    setFav(newFav);
+    window.dispatchEvent(new CustomEvent("ipod-fav-changed"));
+  }
+
+  return (
+    <div className="mt-4 flex flex-col items-center gap-2">
+      <button
+        type="button"
+        onClick={onToggle}
+        className={
+          "rounded-full border px-4 py-1.5 text-[12px] font-medium transition " +
+          (fav
+            ? "border-red-600 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+            : "border-zinc-600 bg-zinc-800 text-zinc-300 hover:bg-zinc-700")
+        }
+        aria-label={fav ? "Unfavorite" : "Favorite"}
+      >
+        {fav ? "♥ Favorited" : "♡ Favorite"}
+      </button>
+      <p className="text-[10px] text-zinc-500">Center button → Notes</p>
+    </div>
   );
 }
