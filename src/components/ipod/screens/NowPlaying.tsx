@@ -27,11 +27,13 @@ export function NowPlaying() {
       <div className="bg-gradient-to-b from-[#b9c6dc] to-[#5f7aa6] px-2 py-1 text-center text-[10px] font-bold text-white">
         Now Playing
       </div>
-      <div className="flex flex-1 flex-col items-center justify-center gap-1 p-2">
-        <div className="h-16 w-16 rounded-sm bg-gradient-to-br from-[#5b7fb8] to-[#2a3a55] shadow-md" />
-        <div className="mt-1 truncate text-center font-semibold">{track.title}</div>
-        <div className="truncate text-center text-[10px] text-zinc-700">{track.artist}</div>
-        <div className="truncate text-center text-[9px] text-zinc-600">{track.album}</div>
+      <div className="flex min-w-0 flex-1 flex-col items-center justify-center gap-1 overflow-hidden p-2">
+        <div className="h-16 w-16 shrink-0 rounded-sm bg-gradient-to-br from-[#5b7fb8] to-[#2a3a55] shadow-md" />
+        <div className="mt-1 line-clamp-2 w-full break-words text-center text-[11px] font-semibold leading-tight">
+          {track.title}
+        </div>
+        <div className="w-full truncate text-center text-[10px] text-zinc-700">{track.artist}</div>
+        <div className="w-full truncate text-center text-[9px] text-zinc-600">{track.album}</div>
         <div className="mt-2 w-[95%]">
           <div className="h-1 w-full rounded bg-black/20">
             <div className="h-full rounded bg-black/70" style={{ width: `${progress * 100}%` }} />

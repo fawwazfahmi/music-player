@@ -91,11 +91,13 @@ export function YtPicker({ query, selected = 0 }: YtPickerProps) {
         <div className="bg-gradient-to-b from-[#b9c6dc] to-[#5f7aa6] px-2 py-1 text-center text-[10px] font-bold text-white">
           Downloading...
         </div>
-        <div className="flex flex-1 flex-col items-center justify-center gap-1 px-3 text-center">
+        <div className="flex min-w-0 flex-1 flex-col items-center justify-center gap-1 overflow-hidden px-3 text-center">
           <div className="h-10 w-10 animate-pulse rounded-sm bg-gradient-to-br from-[#5b7fb8] to-[#2a3a55]" />
-          <div className="mt-1 truncate font-semibold">{downloading.title}</div>
-          <div className="text-[9px] opacity-70">{downloading.uploader}</div>
-          <div className="mt-2 text-[10px] text-zinc-700">
+          <div className="mt-1 line-clamp-2 w-full break-words text-[10px] font-semibold leading-tight">
+            {downloading.title}
+          </div>
+          <div className="w-full truncate text-[9px] opacity-70">{downloading.uploader}</div>
+          <div className="mt-1 text-[10px] text-zinc-700">
             {elapsed}s — usually 15-30s
           </div>
         </div>
