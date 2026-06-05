@@ -77,7 +77,7 @@ export function YtVideoPanel() {
 
       if (playerRef.current && currentVideoRef.current === ytVideoId) return;
 
-      if (playerRef.current && currentVideoRef.current !== ytVideoId) {
+      if (playerRef.current && currentVideoRef.current !== ytVideoId && readyRef.current) {
         try {
           playerRef.current.cueVideoById({ videoId: ytVideoId, startSeconds: position });
           currentVideoRef.current = ytVideoId;
@@ -87,7 +87,13 @@ export function YtVideoPanel() {
         }
       }
 
-      // Safely clear existing children, then mount a fresh div
+      // Destroy any prior player + clear children
+      if (playerRef.current) {
+        try {
+          playerRef.current.destroy();
+        } catch {}
+        playerRef.current = null;
+      }
       while (containerRef.current.firstChild) {
         containerRef.current.removeChild(containerRef.current.firstChild);
       }
@@ -109,8 +115,8 @@ export function YtVideoPanel() {
         },
         events: {
           onReady: (e) => {
-            e.target.mute();
             try {
+              e.target.mute();
               e.target.seekTo(position, true);
             } catch {}
             readyRef.current = true;
@@ -124,6 +130,20 @@ export function YtVideoPanel() {
       cancelled = true;
     };
   }, [ytVideoId]);
+
+  // Destroy player on unmount
+  useEffect(() => {
+    return () => {
+      if (playerRef.current) {
+        try {
+          playerRef.current.destroy();
+        } catch {}
+        playerRef.current = null;
+        readyRef.current = false;
+        currentVideoRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (!readyRef.current || !playerRef.current) return;
