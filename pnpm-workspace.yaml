@@ -3,5 +3,8 @@ ignoredBuiltDependencies:
   - unrs-resolver
 
 onlyBuiltDependencies:
-  - "@prisma/engines"
+  - '@prisma/engines'
   - prisma
+
+patchedDependencies:
+  '@distube/ytsr': patches/@distube__ytsr.patch

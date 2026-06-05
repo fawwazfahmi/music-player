@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  '@distube/ytsr':
+    hash: 0a6cd64a8b9dad562ff1c73127472858d05e9f9e69621519a7eef6ad2c9f9f68
+    path: patches/@distube__ytsr.patch
+
 importers:
 
   .:
@@ -13,7 +18,7 @@ importers:
         version: 1.5.0(@types/react@19.2.16)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@distube/ytsr':
         specifier: ^2.0.4
-        version: 2.0.4
+        version: 2.0.4(patch_hash=0a6cd64a8b9dad562ff1c73127472858d05e9f9e69621519a7eef6ad2c9f9f68)
       '@prisma/adapter-pg':
         specifier: ^7.8.0
         version: 7.8.0
@@ -4520,7 +4525,7 @@ snapshots:
 
   '@csstools/css-tokenizer@4.0.0': {}
 
-  '@distube/ytsr@2.0.4':
+  '@distube/ytsr@2.0.4(patch_hash=0a6cd64a8b9dad562ff1c73127472858d05e9f9e69621519a7eef6ad2c9f9f68)':
     dependencies:
       undici: 6.26.0
 
