@@ -72,23 +72,28 @@ export async function selectYtResult(
     update: {},
   });
 
-  const trackId =
-    existing?.id ??
-    (
-      await db.track.create({
-        data: {
-          title: parsed.title,
-          duration: result.duration,
-          primaryArtistId: artist.id,
-          albumId: album.id,
-          ytVideoId: result.videoId,
-          source: "YT_STREAMING",
-          playable: true,
-          discoveredAt: new Date(),
-        },
-        select: { id: true },
-      })
-    ).id;
+  let trackId: string;
+  if (existing) {
+    trackId = existing.id;
+  } else {
+    const newTrack = await db.track.create({
+      data: {
+        title: parsed.title,
+        duration: result.duration,
+        primaryArtistId: artist.id,
+        albumId: album.id,
+        ytVideoId: result.videoId,
+        source: "YT_STREAMING",
+        playable: true,
+        discoveredAt: new Date(),
+      },
+      select: { id: true },
+    });
+    trackId = newTrack.id;
+    await db.metadataJob.create({
+      data: { entityType: "TRACK", trackId, status: "QUEUED" },
+    });
+  }
 
   await db.ytCacheEntry.upsert({
     where: { ytVideoId: result.videoId },
