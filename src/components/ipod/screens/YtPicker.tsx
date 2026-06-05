@@ -15,6 +15,8 @@ interface YtPickerProps {
 export function YtPicker({ query, selected = 0 }: YtPickerProps) {
   const [results, setResults] = useState<YtSearchResult[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<YtSearchResult | null>(null);
+  const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -30,41 +32,73 @@ export function YtPicker({ query, selected = 0 }: YtPickerProps) {
     };
   }, [query]);
 
-  // Publish row count to Ipod
+  // Publish row count to Ipod — 0 while downloading so Ipod ignores wheel scroll
   useEffect(() => {
-    const count = results?.length ?? 0;
+    const count = downloading ? 0 : (results?.length ?? 0);
     window.dispatchEvent(new CustomEvent("ipod-row-count", { detail: { count } }));
-  }, [results]);
+  }, [results, downloading]);
+
+  // Tick elapsed timer while downloading
+  useEffect(() => {
+    if (!downloading) return;
+    const t0 = Date.now();
+    const interval = setInterval(() => setElapsed(Math.floor((Date.now() - t0) / 1000)), 500);
+    return () => clearInterval(interval);
+  }, [downloading]);
 
   // Listen for ipod-select events
   useEffect(() => {
-    if (!results) return;
+    if (!results || downloading) return;
     function handler(e: Event) {
       const detail = (e as CustomEvent<{ selected: number }>).detail;
       const result = results![detail.selected];
       if (!result) return;
-      void selectYtResult(result).then(({ trackId }) => {
-        usePlayerStore.getState().setQueue(
-          [{
-            id: trackId,
-            title: result.title,
-            duration: result.duration,
-            artist: result.uploader,
-            album: "YouTube",
-          }],
-          0,
-        );
-        useIpodStore.getState().push({ name: "nowPlaying" });
-      });
+      setDownloading(result);
+      void selectYtResult(result)
+        .then(({ trackId }) => {
+          usePlayerStore.getState().setQueue(
+            [{
+              id: trackId,
+              title: result.title,
+              duration: result.duration,
+              artist: result.uploader,
+              album: "YouTube",
+            }],
+            0,
+          );
+          useIpodStore.getState().push({ name: "nowPlaying" });
+        })
+        .catch((err: unknown) => {
+          setError(err instanceof Error ? err.message : String(err));
+        })
+        .finally(() => setDownloading(null));
     }
     window.addEventListener("ipod-select", handler as EventListener);
     return () => window.removeEventListener("ipod-select", handler as EventListener);
-  }, [results]);
+  }, [results, downloading]);
 
   if (error) {
     return (
       <div className="grid h-full place-items-center px-2 text-center text-[10px] text-red-700">
-        YT error: {error}
+        Error: {error}
+      </div>
+    );
+  }
+
+  if (downloading) {
+    return (
+      <div className="flex h-full flex-col">
+        <div className="bg-gradient-to-b from-[#b9c6dc] to-[#5f7aa6] px-2 py-1 text-center text-[10px] font-bold text-white">
+          Downloading...
+        </div>
+        <div className="flex flex-1 flex-col items-center justify-center gap-1 px-3 text-center">
+          <div className="h-10 w-10 animate-pulse rounded-sm bg-gradient-to-br from-[#5b7fb8] to-[#2a3a55]" />
+          <div className="mt-1 truncate font-semibold">{downloading.title}</div>
+          <div className="text-[9px] opacity-70">{downloading.uploader}</div>
+          <div className="mt-2 text-[10px] text-zinc-700">
+            {elapsed}s — usually 15-30s
+          </div>
+        </div>
       </div>
     );
   }
