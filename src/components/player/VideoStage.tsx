@@ -34,12 +34,15 @@ function emitSlotMoved() {
 function getOrCreateContainer(): HTMLDivElement {
   if (_container) return _container;
   const div = document.createElement("div");
+  // Born offscreen but at a real video resolution so the YT iframe is created
+  // at a size it can actually render at. If we start at 1x1, YT's video never
+  // initializes and stays a black rectangle even after we resize the container.
   div.style.cssText = [
     "position:fixed",
     "top:-10000px",
-    "left:-10000px",
-    "width:1px",
-    "height:1px",
+    "left:0",
+    "width:640px",
+    "height:360px",
     "z-index:5",
     "overflow:hidden",
     "transition:top 200ms ease, left 200ms ease, width 200ms ease, height 200ms ease",
@@ -69,11 +72,12 @@ export function VideoStage() {
     function applyRect() {
       const slot = findActiveSlot();
       if (!slot) {
-        // No slot in DOM → park container offscreen
+        // No slot in DOM → park container offscreen at a real size so the
+        // iframe stays alive and renderable (don't shrink to 1x1).
         container.style.top = "-10000px";
-        container.style.left = "-10000px";
-        container.style.width = "1px";
-        container.style.height = "1px";
+        container.style.left = "0px";
+        container.style.width = "640px";
+        container.style.height = "360px";
         if (lastSlot !== null) {
           lastSlot = null;
           emitSlotMoved();
