@@ -57,7 +57,15 @@ export function FavoritesPage() {
             <p className="text-xs text-zinc-600">Heart a song to add it here</p>
           </div>
         ) : (
-          queue.map((t, i) => <SongRow key={t.id} track={t} index={i} onPlay={play} />)
+          queue.map((t, i) => (
+            <SongRow
+              key={t.id}
+              track={t}
+              index={i}
+              onPlay={play}
+              onDeleted={(id) => setRows((prev) => prev.filter((r) => r.track.id !== id))}
+            />
+          ))
         )}
       </div>
     </div>

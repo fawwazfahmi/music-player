@@ -29,6 +29,18 @@ interface PlayerState {
   playbackKey: number;
   currentTrack: () => QueueTrack | null;
   setQueue: (queue: QueueTrack[], startIndex?: number) => void;
+  /** Append a track to the end of the queue. If the queue is empty, starts
+      playing it immediately. */
+  addToQueue: (track: QueueTrack) => void;
+  /** Insert a track right after the currently playing one. If the queue is
+      empty, starts playing immediately. */
+  playNext: (track: QueueTrack) => void;
+  /** Remove the track at `index` from the queue. Adjusts currentIndex and
+      stops playback if the queue becomes empty. */
+  removeFromQueue: (index: number) => void;
+  /** Remove every occurrence of `trackId` from the queue. Used after the row
+      is deleted from the database so it can't be played. */
+  purgeTrack: (trackId: string) => void;
   next: () => void;
   prev: () => void;
   togglePlay: () => void;
@@ -68,6 +80,97 @@ export const usePlayerStore = create<PlayerState>()(
           playbackKey: get().playbackKey + 1,
           position: 0,
         });
+      },
+      addToQueue: (track) =>
+        set((s) => {
+          // Empty queue → treat as setQueue so playback actually starts.
+          if (s.queue.length === 0) {
+            return {
+              queue: [track],
+              currentIndex: 0,
+              isPlaying: true,
+              videoLoading: !!track.ytVideoId,
+              playbackKey: s.playbackKey + 1,
+              position: 0,
+            };
+          }
+          return { queue: [...s.queue, track] };
+        }),
+      playNext: (track) =>
+        set((s) => {
+          if (s.queue.length === 0) {
+            return {
+              queue: [track],
+              currentIndex: 0,
+              isPlaying: true,
+              videoLoading: !!track.ytVideoId,
+              playbackKey: s.playbackKey + 1,
+              position: 0,
+            };
+          }
+          const insertAt = s.currentIndex + 1;
+          const queue = [...s.queue.slice(0, insertAt), track, ...s.queue.slice(insertAt)];
+          return { queue };
+        }),
+      removeFromQueue: (index) =>
+        set((s) => {
+          if (index < 0 || index >= s.queue.length) return s;
+          const queue = [...s.queue.slice(0, index), ...s.queue.slice(index + 1)];
+          // Removing the currently playing track restarts playback on the next
+          // track (or stops if there isn't one).
+          if (index === s.currentIndex) {
+            if (queue.length === 0) {
+              return { queue, currentIndex: -1, isPlaying: false, position: 0 };
+            }
+            const newIdx = Math.min(s.currentIndex, queue.length - 1);
+            const next = queue[newIdx];
+            return {
+              queue,
+              currentIndex: newIdx,
+              position: 0,
+              videoLoading: !!next?.ytVideoId,
+              playbackKey: s.playbackKey + 1,
+            };
+          }
+          // Removing something before the current track shifts the index down.
+          if (index < s.currentIndex) {
+            return { queue, currentIndex: s.currentIndex - 1 };
+          }
+          // Removing something after the current track leaves the index alone.
+          return { queue };
+        }),
+      purgeTrack: (trackId) => {
+        // Walk the queue once, dropping any matches and tracking how it shifts
+        // the currentIndex / what the new active track is.
+        const s = get();
+        const queue: QueueTrack[] = [];
+        let newCurrent = s.currentIndex;
+        let activeRemoved = false;
+        s.queue.forEach((t, i) => {
+          if (t.id === trackId) {
+            if (i < s.currentIndex) newCurrent--;
+            else if (i === s.currentIndex) activeRemoved = true;
+            return;
+          }
+          queue.push(t);
+        });
+        if (queue.length === 0) {
+          set({ queue: [], currentIndex: -1, isPlaying: false, position: 0 });
+          return;
+        }
+        if (activeRemoved) {
+          newCurrent = Math.min(newCurrent, queue.length - 1);
+          const next = queue[newCurrent];
+          set({
+            queue,
+            currentIndex: newCurrent,
+            position: 0,
+            videoLoading: !!next?.ytVideoId,
+            playbackKey: s.playbackKey + 1,
+          });
+        } else {
+          set({ queue, currentIndex: newCurrent });
+        }
       },
       next: () =>
         set((s) => {

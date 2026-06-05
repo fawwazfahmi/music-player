@@ -89,7 +89,19 @@ export function PlaylistDetailPage({ playlistId }: Props) {
             <p className="text-xs text-zinc-600">Add tracks by hearting or via context menu (coming soon)</p>
           </div>
         ) : (
-          queue.map((t, i) => <SongRow key={t.id} track={t} index={i} onPlay={play} />)
+          queue.map((t, i) => (
+            <SongRow
+              key={t.id}
+              track={t}
+              index={i}
+              onPlay={play}
+              onDeleted={(id) =>
+                setPl((prev) =>
+                  prev ? { ...prev, tracks: prev.tracks.filter((x) => x.id !== id) } : prev,
+                )
+              }
+            />
+          ))
         )}
       </div>
     </div>

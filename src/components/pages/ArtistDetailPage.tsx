@@ -93,7 +93,15 @@ export function ArtistDetailPage({ artistId }: Props) {
         {queue.length === 0 ? (
           <p className="px-3 py-12 text-center text-sm text-zinc-500">No tracks.</p>
         ) : (
-          queue.map((t, i) => <SongRow key={t.id} track={t} index={i} onPlay={play} />)
+          queue.map((t, i) => (
+            <SongRow
+              key={t.id}
+              track={t}
+              index={i}
+              onPlay={play}
+              onDeleted={(id) => setTracks((prev) => prev.filter((x) => x.id !== id))}
+            />
+          ))
         )}
       </div>
     </div>

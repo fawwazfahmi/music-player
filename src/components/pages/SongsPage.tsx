@@ -42,7 +42,15 @@ export function SongsPage() {
             No songs yet. Drop m4a/mp3 files into your music folder or use Search → YouTube.
           </p>
         ) : (
-          queue.map((t, i) => <SongRow key={t.id} track={t} index={i} onPlay={play} />)
+          queue.map((t, i) => (
+            <SongRow
+              key={t.id}
+              track={t}
+              index={i}
+              onPlay={play}
+              onDeleted={(id) => setSongs((prev) => prev.filter((x) => x.id !== id))}
+            />
+          ))
         )}
       </div>
     </div>

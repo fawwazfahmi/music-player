@@ -3,15 +3,19 @@
 import { usePlayerStore, type QueueTrack } from "@/stores/player-store";
 import { formatDuration } from "@/lib/format-duration";
 import { PlayIcon } from "@/components/icons";
+import { TrackMenu } from "@/components/player/TrackMenu";
 
 interface SongRowProps {
   track: QueueTrack;
   index: number;
   onPlay: (index: number) => void;
+  /** Called after the track has been removed from the library so the parent
+      page can drop it from its local list. */
+  onDeleted?: (trackId: string) => void;
   showAlbum?: boolean;
 }
 
-export function SongRow({ track, index, onPlay, showAlbum = true }: SongRowProps) {
+export function SongRow({ track, index, onPlay, onDeleted, showAlbum = true }: SongRowProps) {
   const currentTrackId = usePlayerStore((s) => s.queue[s.currentIndex]?.id);
   const isPlaying = usePlayerStore((s) => s.isPlaying);
   const active = currentTrackId === track.id;
@@ -28,7 +32,7 @@ export function SongRow({ track, index, onPlay, showAlbum = true }: SongRowProps
         }
       }}
       className={
-        "group grid cursor-pointer grid-cols-[36px_36px_minmax(0,1fr)_minmax(0,1fr)_48px] items-center gap-3 rounded-md px-3 py-2 transition hover:bg-zinc-800/50 " +
+        "group grid cursor-pointer grid-cols-[36px_36px_minmax(0,1fr)_minmax(0,1fr)_48px_32px] items-center gap-3 rounded-md px-3 py-2 transition hover:bg-zinc-800/50 " +
         (active ? "bg-zinc-800/40 text-emerald-400" : "")
       }
     >
@@ -61,6 +65,11 @@ export function SongRow({ track, index, onPlay, showAlbum = true }: SongRowProps
       )}
       <div className="text-right text-xs text-zinc-500 tabular-nums">
         {formatDuration(track.duration)}
+      </div>
+      {/* Kebab menu — invisible until row hover or menu open. The menu component
+          handles its own click-stopPropagation so it doesn't trigger playback. */}
+      <div className="opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+        <TrackMenu track={track} onDeleted={onDeleted} />
       </div>
     </div>
   );

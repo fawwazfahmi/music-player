@@ -237,3 +237,19 @@ export function StatsIcon(props: IconProps) {
     </Icon>
   );
 }
+
+export function MoreIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z" />
+    </Icon>
+  );
+}
+
+export function QueueIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M3 10h11v2H3v-2zm0-4h11v2H3V6zm0 8h7v2H3v-2zm13-1v8l6-4-6-4z" />
+    </Icon>
+  );
+}
