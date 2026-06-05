@@ -8,6 +8,7 @@ export async function getArtists() {
     select: {
       id: true,
       name: true,
+      bio: true,
       _count: { select: { tracks: true, albums: true } },
     },
   });
@@ -17,7 +18,13 @@ export async function getAlbumsByArtist(artistId: string) {
   return db.album.findMany({
     where: { artistId },
     orderBy: { releaseDate: "asc" },
-    select: { id: true, title: true, coverArtPath: true, _count: { select: { tracks: true } } },
+    select: {
+      id: true,
+      title: true,
+      coverArtPath: true,
+      coverArtHash: true,
+      _count: { select: { tracks: true } },
+    },
   });
 }
 
@@ -28,6 +35,7 @@ export async function getAllAlbums() {
       id: true,
       title: true,
       coverArtPath: true,
+      coverArtHash: true,
       artist: { select: { id: true, name: true } },
     },
   });
@@ -43,7 +51,7 @@ export async function getAllSongs() {
       duration: true,
       source: true,
       primaryArtist: { select: { id: true, name: true } },
-      album: { select: { id: true, title: true, coverArtPath: true } },
+      album: { select: { id: true, title: true, coverArtPath: true, coverArtHash: true } },
     },
   });
 }
@@ -72,7 +80,7 @@ export async function getTracksByArtist(artistId: string) {
       title: true,
       duration: true,
       source: true,
-      album: { select: { id: true, title: true } },
+      album: { select: { id: true, title: true, coverArtHash: true } },
     },
   });
 }

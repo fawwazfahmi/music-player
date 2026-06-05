@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { rescanLibrary } from "@/server/actions/library";
+import { rescanLibrary, backfillMetadata } from "@/server/actions/library";
 
 interface SettingsProps {
   selected?: number;
@@ -9,12 +9,13 @@ interface SettingsProps {
 
 const items = [
   { label: "Rescan Library" },
+  { label: "Backfill Metadata" },
   { label: "Logout" },
 ];
 
 export function Settings({ selected = 0 }: SettingsProps) {
-  const [scanning, setScanning] = useState(false);
-  const [scanReport, setScanReport] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [report, setReport] = useState<string | null>(null);
 
   useEffect(() => {
     window.dispatchEvent(new CustomEvent("ipod-row-count", { detail: { count: items.length } }));
@@ -24,17 +25,26 @@ export function Settings({ selected = 0 }: SettingsProps) {
     function handler(e: Event) {
       const idx = (e as CustomEvent<{ selected: number }>).detail.selected;
       if (idx === 0) {
-        setScanning(true);
-        setScanReport(null);
+        setBusy("Scanning...");
+        setReport(null);
         void rescanLibrary()
           .then((r) =>
-            setScanReport(`+${r.added} added, ${r.skippedDuplicates} dupes, ${r.errors.length} errors`),
+            setReport(`+${r.added} added, ${r.skippedDuplicates} dupes, ${r.errors.length} errors`),
           )
           .catch((e: unknown) =>
-            setScanReport(`Error: ${e instanceof Error ? e.message : String(e)}`),
+            setReport(`Error: ${e instanceof Error ? e.message : String(e)}`),
           )
-          .finally(() => setScanning(false));
+          .finally(() => setBusy(null));
       } else if (idx === 1) {
+        setBusy("Enqueuing...");
+        setReport(null);
+        void backfillMetadata()
+          .then((r) => setReport(`Enqueued ${r.enqueued} track(s) for enrichment`))
+          .catch((e: unknown) =>
+            setReport(`Error: ${e instanceof Error ? e.message : String(e)}`),
+          )
+          .finally(() => setBusy(null));
+      } else if (idx === 2) {
         void fetch("/api/logout", { method: "POST" }).then(() => location.replace("/login"));
       }
     }
@@ -63,9 +73,9 @@ export function Settings({ selected = 0 }: SettingsProps) {
           </li>
         ))}
       </ul>
-      {(scanning || scanReport) && (
+      {(busy || report) && (
         <div className="px-2 py-2 text-center text-[10px] text-zinc-700">
-          {scanning ? "Scanning..." : scanReport}
+          {busy ?? report}
         </div>
       )}
     </div>

@@ -44,7 +44,7 @@ export async function ingestFile(filePath: string): Promise<"added" | "duplicate
       create: { title: meta.albumTitle, artistId: artist.id },
       update: {},
     });
-    await db.track.create({
+    const newTrack = await db.track.create({
       data: {
         title: meta.title,
         duration: meta.durationSec,
@@ -60,6 +60,10 @@ export async function ingestFile(filePath: string): Promise<"added" | "duplicate
         source: "LOCAL_SCAN",
         discoveredAt: new Date(),
       },
+      select: { id: true },
+    });
+    await db.metadataJob.create({
+      data: { entityType: "TRACK", trackId: newTrack.id, status: "QUEUED" },
     });
     return "added";
   } catch {

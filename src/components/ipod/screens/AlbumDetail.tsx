@@ -23,6 +23,7 @@ interface Row {
 export function AlbumDetail({ albumId, selected = 0 }: Props) {
   const [title, setTitle] = useState("");
   const [artistName, setArtistName] = useState("");
+  const [coverArtHash, setCoverArtHash] = useState<string | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [fav, setFav] = useState(false);
   const push = useIpodStore((s) => s.push);
@@ -38,6 +39,7 @@ export function AlbumDetail({ albumId, selected = 0 }: Props) {
       const album = albums.find((a) => a.id === albumId);
       setTitle(album?.title ?? "Unknown");
       setArtistName(album?.artist.name ?? "");
+      setCoverArtHash(album?.coverArtHash ?? null);
       setRows(
         tracks.map((t) => ({
           id: t.id,
@@ -92,6 +94,16 @@ export function AlbumDetail({ albumId, selected = 0 }: Props) {
       <div className="bg-gradient-to-b from-[#b9c6dc] to-[#5f7aa6] px-2 py-1 text-center text-[10px] font-bold text-white">
         {title || "Loading..."}
       </div>
+      {coverArtHash && (
+        <div className="flex justify-center border-b border-black/10 bg-white/40 py-1">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`/api/art/${coverArtHash}`}
+            alt=""
+            className="h-14 w-14 rounded-sm object-cover shadow"
+          />
+        </div>
+      )}
       <div className="flex-1 overflow-auto">
         <div
           className={

@@ -39,8 +39,8 @@ export function updateMediaMetadata(track: QueueTrack | null): void {
     title: track.title,
     artist: track.artist,
     album: track.album,
-    artwork: track.coverArtPath
-      ? [{ src: track.coverArtPath, sizes: "512x512", type: "image/jpeg" }]
+    artwork: track.coverArtHash
+      ? [{ src: `/api/art/${track.coverArtHash}`, sizes: "500x500", type: "image/jpeg" }]
       : [],
   });
 }
