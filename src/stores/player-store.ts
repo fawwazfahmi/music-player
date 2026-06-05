@@ -7,6 +7,7 @@ export interface QueueTrack {
   artist: string;
   album: string;
   coverArtHash?: string | null;
+  ytVideoId?: string | null;
 }
 
 export type RepeatMode = "off" | "one" | "all";

@@ -50,6 +50,7 @@ export async function getAllSongs() {
       title: true,
       duration: true,
       source: true,
+      ytVideoId: true,
       primaryArtist: { select: { id: true, name: true } },
       album: { select: { id: true, title: true, coverArtPath: true, coverArtHash: true } },
     },
@@ -66,6 +67,7 @@ export async function getTracksByAlbum(albumId: string) {
       duration: true,
       trackNumber: true,
       source: true,
+      ytVideoId: true,
       primaryArtist: { select: { id: true, name: true } },
     },
   });
@@ -80,6 +82,7 @@ export async function getTracksByArtist(artistId: string) {
       title: true,
       duration: true,
       source: true,
+      ytVideoId: true,
       album: { select: { id: true, title: true, coverArtHash: true } },
     },
   });

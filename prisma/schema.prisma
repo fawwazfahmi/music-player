@@ -84,6 +84,11 @@ model Track {
   metadataFetched DateTime?
   discoveredAt    DateTime?
 
+  // Lyrics (fetched from LRCLIB, lazy)
+  lyricsSynced  String?
+  lyricsPlain   String?
+  lyricsFetched DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
