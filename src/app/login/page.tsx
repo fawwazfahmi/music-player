@@ -2,7 +2,6 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Chassis } from "@/components/ipod/Chassis";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -27,39 +26,68 @@ export default function LoginPage() {
     router.replace("/");
   }
 
-  const screen = (
-    <div className="flex h-full flex-col">
-      <div className="bg-gradient-to-b from-[#b9c6dc] to-[#5f7aa6] px-2 py-1 text-center text-[10px] font-bold text-white">
-        iPod
-      </div>
-      <form onSubmit={onSubmit} className="flex flex-1 flex-col items-center justify-center gap-2 p-3">
-        <input
-          type="password"
-          autoFocus
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password"
-          className="w-full rounded border border-black/30 bg-white/60 px-2 py-1 text-[11px] text-black outline-none focus:bg-white"
-        />
-        {error && <p className="text-[9px] text-red-700">{error}</p>}
-        <button
-          type="submit"
-          disabled={pending || !password}
-          className="w-full rounded bg-gradient-to-b from-[#6a9af0] to-[#2a55b8] px-2 py-1 text-[11px] font-semibold text-white disabled:opacity-40"
-        >
-          {pending ? "…" : "Enter"}
-        </button>
-      </form>
-    </div>
-  );
-
-  const fakeWheel = (
-    <div className="mx-auto h-[220px] w-[220px] rounded-full bg-gradient-to-b from-zinc-100 to-zinc-300 opacity-40" />
-  );
-
   return (
-    <main className="grid min-h-dvh place-items-center bg-zinc-950 p-4">
-      <Chassis screen={screen} wheel={fakeWheel} />
+    <main className="relative grid min-h-dvh place-items-center overflow-hidden bg-zinc-950 px-4 text-zinc-100">
+      {/* Ambient gradient backdrop — matches the player's accent palette without
+          overpowering the card. */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 opacity-60"
+        style={{
+          background:
+            "radial-gradient(800px circle at 20% 20%, rgba(16,185,129,0.18), transparent 60%), radial-gradient(700px circle at 85% 80%, rgba(99,102,241,0.14), transparent 55%)",
+        }}
+      />
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent"
+      />
+
+      <div className="relative w-full max-w-sm">
+        <div className="mb-8 text-center">
+          <h1 className="text-4xl font-extrabold tracking-tight">
+            Music<span className="text-emerald-500">.</span>
+          </h1>
+          <p className="mt-2 text-sm text-zinc-500">A private universe of your favourite songs</p>
+        </div>
+
+        <form
+          onSubmit={onSubmit}
+          className="rounded-2xl border border-zinc-800/70 bg-zinc-900/60 p-6 shadow-2xl backdrop-blur"
+        >
+          <label htmlFor="password" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+            Password
+          </label>
+          <input
+            id="password"
+            type="password"
+            autoFocus
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            className="mt-2 w-full rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+          />
+
+          {error && (
+            <p className="mt-3 rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+              {error}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={pending || !password}
+            className="mt-5 w-full rounded-full bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {pending ? "Signing in…" : "Enter"}
+          </button>
+
+          <p className="mt-4 text-center text-[11px] text-zinc-600">
+            Private instance · two-person access
+          </p>
+        </form>
+      </div>
     </main>
   );
 }
