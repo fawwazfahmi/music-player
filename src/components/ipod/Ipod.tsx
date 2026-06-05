@@ -230,19 +230,15 @@ export function Ipod() {
     }
   }
 
-  const currentTrack = player.queue[player.currentIndex] ?? null;
-
   return (
     <main className="grid min-h-dvh place-items-center bg-zinc-950 p-4">
       <div className="flex flex-col items-center gap-6 md:flex-row md:items-start">
         <div data-selected={selected} data-row-count={rowCount}>
           <Chassis screen={<Screen selected={selected} />} wheel={<ClickWheel onEvent={handleEvent} />} />
         </div>
-        {currentTrack && (
-          <div className="md:pt-2">
-            <PersistentPlayerPanel />
-          </div>
-        )}
+        <div className="md:pt-2">
+          <PersistentPlayerPanel />
+        </div>
       </div>
       <p className="mt-3 text-[11px] text-zinc-500">
         Selected: {selected} / {Math.max(0, rowCount - 1)}
@@ -296,8 +292,6 @@ function PersistentPlayerPanel() {
     return () => window.removeEventListener("ipod-fav-changed", handler);
   }, [track]);
 
-  if (!track) return null;
-
   async function onToggleFav() {
     if (!track) return;
     const newFav = await toggleFavorite("TRACK", track.id);
@@ -306,17 +300,20 @@ function PersistentPlayerPanel() {
   }
 
   function seekTo(seconds: number) {
+    if (!track) return;
     getEngine().seek(seconds);
     usePlayerStore.setState({ position: seconds });
   }
 
-  const progress = track.duration > 0 ? position / track.duration : 0;
+  const dur = track?.duration ?? 0;
+  const pos = track ? position : 0;
+  const hasTrack = !!track;
 
   return (
     <aside className="flex w-72 flex-col gap-3 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 text-zinc-300 shadow-xl backdrop-blur">
       {/* Track header */}
       <div className="flex items-start gap-3">
-        {track.coverArtHash ? (
+        {track?.coverArtHash ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={`/api/art/${track.coverArtHash}`}
@@ -324,27 +321,39 @@ function PersistentPlayerPanel() {
             className="h-16 w-16 shrink-0 rounded object-cover shadow-lg"
           />
         ) : (
-          <div className="h-16 w-16 shrink-0 rounded bg-gradient-to-br from-[#5b7fb8] to-[#2a3a55] shadow-lg" />
+          <div className="h-16 w-16 shrink-0 rounded bg-gradient-to-br from-[#5b7fb8] to-[#2a3a55] opacity-60 shadow-lg" />
         )}
         <div className="min-w-0 flex-1">
-          <div className="truncate text-[13px] font-semibold text-zinc-100">{track.title}</div>
-          <div className="truncate text-[11px] text-zinc-400">{track.artist}</div>
-          <div className="truncate text-[10px] text-zinc-500">{track.album}</div>
+          {track ? (
+            <>
+              <div className="truncate text-[13px] font-semibold text-zinc-100">{track.title}</div>
+              <div className="truncate text-[11px] text-zinc-400">{track.artist}</div>
+              <div className="truncate text-[10px] text-zinc-500">{track.album}</div>
+            </>
+          ) : (
+            <>
+              <div className="truncate text-[13px] font-semibold text-zinc-500">Nothing playing</div>
+              <div className="truncate text-[11px] text-zinc-600">Pick a song to start</div>
+              <div className="truncate text-[10px] text-zinc-700">—</div>
+            </>
+          )}
         </div>
-        <button
-          type="button"
-          onClick={onToggleFav}
-          className={
-            "shrink-0 rounded-full p-1.5 text-[16px] leading-none transition " +
-            (fav
-              ? "text-red-500 hover:text-red-400"
-              : "text-zinc-500 hover:text-zinc-300")
-          }
-          aria-label={fav ? "Unfavorite" : "Favorite"}
-          title={fav ? "Unfavorite" : "Favorite"}
-        >
-          {fav ? "♥" : "♡"}
-        </button>
+        {hasTrack && (
+          <button
+            type="button"
+            onClick={onToggleFav}
+            className={
+              "shrink-0 rounded-full p-1.5 text-[16px] leading-none transition " +
+              (fav
+                ? "text-red-500 hover:text-red-400"
+                : "text-zinc-500 hover:text-zinc-300")
+            }
+            aria-label={fav ? "Unfavorite" : "Favorite"}
+            title={fav ? "Unfavorite" : "Favorite"}
+          >
+            {fav ? "♥" : "♡"}
+          </button>
+        )}
       </div>
 
       {/* Scrub bar */}
@@ -352,15 +361,16 @@ function PersistentPlayerPanel() {
         <input
           type="range"
           min={0}
-          max={Math.max(1, Math.floor(track.duration))}
-          value={Math.min(Math.floor(position), Math.floor(track.duration))}
+          max={Math.max(1, Math.floor(dur))}
+          value={Math.min(Math.floor(pos), Math.floor(dur))}
           onChange={(e) => seekTo(Number(e.target.value))}
-          className="w-full accent-zinc-200"
+          disabled={!hasTrack}
+          className="w-full accent-zinc-200 disabled:opacity-40"
           aria-label="seek"
         />
         <div className="mt-0.5 flex justify-between text-[10px] text-zinc-500">
-          <span>{formatTime(position)}</span>
-          <span>−{formatTime(Math.max(0, track.duration - position))}</span>
+          <span>{formatTime(pos)}</span>
+          <span>{hasTrack ? `−${formatTime(Math.max(0, dur - pos))}` : "—"}</span>
         </div>
       </div>
 
@@ -381,7 +391,8 @@ function PersistentPlayerPanel() {
         <button
           type="button"
           onClick={prev}
-          className="rounded p-1 text-[18px] text-zinc-300 hover:text-zinc-100"
+          disabled={!hasTrack}
+          className="rounded p-1 text-[18px] text-zinc-300 transition hover:text-zinc-100 disabled:opacity-30 disabled:hover:text-zinc-300"
           aria-label="Previous"
           title="Previous"
         >
@@ -390,7 +401,8 @@ function PersistentPlayerPanel() {
         <button
           type="button"
           onClick={togglePlay}
-          className="rounded-full bg-zinc-100 px-3 py-1 text-[18px] text-zinc-950 transition hover:bg-white"
+          disabled={!hasTrack}
+          className="rounded-full bg-zinc-100 px-3 py-1 text-[18px] text-zinc-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-zinc-100"
           aria-label={isPlaying ? "Pause" : "Play"}
           title={isPlaying ? "Pause" : "Play"}
         >
@@ -399,7 +411,8 @@ function PersistentPlayerPanel() {
         <button
           type="button"
           onClick={next}
-          className="rounded p-1 text-[18px] text-zinc-300 hover:text-zinc-100"
+          disabled={!hasTrack}
+          className="rounded p-1 text-[18px] text-zinc-300 transition hover:text-zinc-100 disabled:opacity-30 disabled:hover:text-zinc-300"
           aria-label="Next"
           title="Next"
         >
