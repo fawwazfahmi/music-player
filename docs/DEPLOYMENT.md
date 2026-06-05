@@ -14,7 +14,7 @@ they survive reboots.
 | Local origin  | `http://localhost:3000` (`next start`)                       |
 | Tunnel name   | `music-universe`                                             |
 | Tunnel UUID   | `29284152-420d-4bb1-93dc-7e0f49bc3344`                       |
-| Password      | `KyoCute` (gates the whole app; bcrypt hash in `.env`)       |
+| Password      | `Kyowo` (gates the whole app; bcrypt hash in `.env`)         |
 | DB            | PostgreSQL on `localhost:5433` (Homebrew service)            |
 | Audio source  | `~/Music/MusicUniverse` (`MUSIC_LIBRARY_PATH` in `.env`)     |
 
