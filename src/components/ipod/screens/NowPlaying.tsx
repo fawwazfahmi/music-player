@@ -52,7 +52,16 @@ export function NowPlaying() {
         Now Playing
       </div>
       <div className="flex min-w-0 flex-1 flex-col items-center justify-center gap-1 overflow-hidden p-2">
-        <div className="h-16 w-16 shrink-0 rounded-sm bg-gradient-to-br from-[#5b7fb8] to-[#2a3a55] shadow-md" />
+        {track.coverArtHash ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={`/api/art/${track.coverArtHash}`}
+            alt=""
+            className="h-16 w-16 shrink-0 rounded-sm object-cover shadow-md"
+          />
+        ) : (
+          <div className="h-16 w-16 shrink-0 rounded-sm bg-gradient-to-br from-[#5b7fb8] to-[#2a3a55] shadow-md" />
+        )}
         <div className="mt-1 line-clamp-2 w-full break-words text-center text-[11px] font-semibold leading-tight">
           {fav && <span className="mr-1 text-red-600">♥</span>}
           {track.title}

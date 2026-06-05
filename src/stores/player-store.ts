@@ -6,7 +6,7 @@ export interface QueueTrack {
   duration: number;
   artist: string;
   album: string;
-  coverArtPath?: string | null;
+  coverArtHash?: string | null;
 }
 
 export type RepeatMode = "off" | "one" | "all";

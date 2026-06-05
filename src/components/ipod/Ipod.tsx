@@ -181,7 +181,7 @@ export function Ipod() {
         duration: s.duration,
         artist: s.primaryArtist.name,
         album: s.album?.title ?? "",
-        coverArtPath: s.album?.coverArtPath ?? null,
+        coverArtHash: s.album?.coverArtHash ?? null,
       }));
       usePlayerStore.getState().setQueue(queue, sel);
       push({ name: "nowPlaying" });
