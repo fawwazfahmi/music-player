@@ -24,21 +24,22 @@ export function AppShell() {
   const lastReportedSecondRef = useRef(0);
 
   // Audio engine: load track when currentIndex changes
+  // (don't auto-play here — the videoLoading gate effect below handles that)
   useEffect(() => {
     const engine = getEngine();
     const track = player.queue[player.currentIndex];
     if (!track) return;
     engine.loadTrack(track.id);
     updateMediaMetadata(track);
-    if (player.isPlaying) void engine.play();
-  }, [player.currentIndex, player.queue, player.isPlaying]);
+  }, [player.currentIndex, player.queue]);
 
-  // Play/pause sync
+  // Play/pause sync — gated on videoLoading so audio waits for YT iframe
+  // to load before starting. Once videoLoading flips false, audio starts.
   useEffect(() => {
     const engine = getEngine();
-    if (player.isPlaying) void engine.play();
+    if (player.isPlaying && !player.videoLoading) void engine.play();
     else engine.pause();
-  }, [player.isPlaying]);
+  }, [player.isPlaying, player.videoLoading]);
 
   // Volume sync
   useEffect(() => {

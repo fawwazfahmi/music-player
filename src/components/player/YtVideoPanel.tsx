@@ -153,10 +153,15 @@ export function YtVideoPanel() {
               e.target.seekTo(position, true);
             } catch {}
             setReady(true);
+            // Release the audio gate so playback starts now that the video can keep up.
+            usePlayerStore.getState().setVideoLoading(false);
           },
           onStateChange: () => {
             if (playerRef.current !== createdPlayer) return;
-            if (!ready) setReady(true);
+            if (!ready) {
+              setReady(true);
+              usePlayerStore.getState().setVideoLoading(false);
+            }
           },
         },
       });
@@ -164,8 +169,15 @@ export function YtVideoPanel() {
       currentVideoRef.current = ytVideoId;
     });
 
+    // Safety net: don't make the user wait forever if YT iframe never loads
+    // (network issue, embedded blocked, etc). After 5s, release the audio gate.
+    const timeoutId = window.setTimeout(() => {
+      usePlayerStore.getState().setVideoLoading(false);
+    }, 5000);
+
     return () => {
       cancelled = true;
+      window.clearTimeout(timeoutId);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ytVideoId]);

@@ -29,6 +29,7 @@ export function PlayerBar() {
   const queue = usePlayerStore((s) => s.queue);
   const currentIndex = usePlayerStore((s) => s.currentIndex);
   const isPlaying = usePlayerStore((s) => s.isPlaying);
+  const videoLoading = usePlayerStore((s) => s.videoLoading);
   const position = usePlayerStore((s) => s.position);
   const volume = usePlayerStore((s) => s.volume);
   const shuffle = usePlayerStore((s) => s.shuffle);
@@ -98,7 +99,13 @@ export function PlayerBar() {
           {track ? (
             <>
               <div className="truncate text-sm font-medium text-zinc-100">{track.title}</div>
-              <div className="truncate text-xs text-zinc-400">{track.artist}</div>
+              <div className="truncate text-xs text-zinc-400">
+                {videoLoading ? (
+                  <span className="text-emerald-400">Loading video…</span>
+                ) : (
+                  track.artist
+                )}
+              </div>
             </>
           ) : (
             <>

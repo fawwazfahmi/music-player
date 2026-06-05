@@ -21,6 +21,9 @@ interface PlayerState {
   repeat: RepeatMode;
   volume: number;
   position: number;
+  // True while we're waiting for the YT iframe to load before starting playback.
+  // Transient; not persisted.
+  videoLoading: boolean;
   currentTrack: () => QueueTrack | null;
   setQueue: (queue: QueueTrack[], startIndex?: number) => void;
   next: () => void;
@@ -30,6 +33,7 @@ interface PlayerState {
   cycleRepeat: () => void;
   setVolume: (v: number) => void;
   setPosition: (p: number) => void;
+  setVideoLoading: (v: boolean) => void;
 }
 
 export const usePlayerStore = create<PlayerState>()(
@@ -42,17 +46,24 @@ export const usePlayerStore = create<PlayerState>()(
       repeat: "off",
       volume: 1,
       position: 0,
+      videoLoading: false,
       currentTrack: () => {
         const s = get();
         return s.queue[s.currentIndex] ?? null;
       },
-      setQueue: (queue, startIndex = 0) =>
+      setQueue: (queue, startIndex = 0) => {
+        const next = queue[Math.min(startIndex, queue.length - 1)];
+        // If the track has a YT video, gate playback on the iframe being ready.
+        // Without a video, no gate needed.
+        const hasVideo = !!next?.ytVideoId;
         set({
           queue,
           currentIndex: queue.length ? Math.min(startIndex, queue.length - 1) : -1,
           isPlaying: queue.length > 0,
+          videoLoading: hasVideo,
           position: 0,
-        }),
+        });
+      },
       next: () =>
         set((s) => {
           if (s.queue.length === 0) return s;
@@ -78,6 +89,7 @@ export const usePlayerStore = create<PlayerState>()(
         })),
       setVolume: (v) => set({ volume: Math.max(0, Math.min(1, v)) }),
       setPosition: (p) => set({ position: Math.max(0, p) }),
+      setVideoLoading: (v) => set({ videoLoading: v }),
     }),
     {
       // Per-device persistence: localStorage on the user's own machine.
