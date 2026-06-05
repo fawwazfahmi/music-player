@@ -24,16 +24,14 @@ export function Ipod() {
   const toRoot = useIpodStore((s) => s.toRoot);
 
   const player = usePlayerStore();
-  const [selected, setSelected] = useState(0);
+  const selected = useIpodStore((s) => s.getSelectionFor(current));
+  const setSelectionFor = useIpodStore((s) => s.setSelectionFor);
+  const setSelected = (n: number | ((prev: number) => number)) => {
+    const next = typeof n === "function" ? n(selected) : n;
+    setSelectionFor(current, next);
+  };
   const [rowCount, setRowCount] = useState(0);
   const menuDownAt = useRef<number | null>(null);
-  const [lastScreenName, setLastScreenName] = useState(current.name);
-
-  // Reset selection synchronously when screen changes (state-compare pattern)
-  if (lastScreenName !== current.name) {
-    setLastScreenName(current.name);
-    setSelected(0);
-  }
 
   // Recompute row count when screen changes (async work belongs in effect)
   useEffect(() => {
