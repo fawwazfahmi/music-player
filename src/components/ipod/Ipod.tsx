@@ -144,6 +144,9 @@ export function Ipod() {
       else if (sel === 1) push({ name: "search" });
       else if (sel === 2) push({ name: "nowPlaying" });
       else if (sel === 3) push({ name: "settings" });
+    } else if (current.name === "nowPlaying") {
+      const t = usePlayerStore.getState().currentTrack();
+      if (t) push({ name: "notes", trackId: t.id });
     } else if (
       current.name === "search" ||
       current.name === "ytPicker" ||

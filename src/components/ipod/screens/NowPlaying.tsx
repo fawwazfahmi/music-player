@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { usePlayerStore } from "@/stores/player-store";
 import { formatDuration } from "@/lib/format-duration";
+import { isFavorited } from "@/server/actions/favorites";
 
 export function NowPlaying() {
   const queue = usePlayerStore((s) => s.queue);
@@ -11,6 +13,28 @@ export function NowPlaying() {
   const repeat = usePlayerStore((s) => s.repeat);
   const shuffle = usePlayerStore((s) => s.shuffle);
   const track = queue[currentIndex] ?? null;
+
+  const [fav, setFav] = useState(false);
+  useEffect(() => {
+    if (!track) return;
+    let cancelled = false;
+    void isFavorited("TRACK", track.id).then((f) => {
+      if (!cancelled) setFav(f);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [track]);
+
+  // Listen for fav-changed events from Ipod (dispatched after Ipod toggles)
+  useEffect(() => {
+    function handler() {
+      if (!track) return;
+      void isFavorited("TRACK", track.id).then(setFav);
+    }
+    window.addEventListener("ipod-fav-changed", handler);
+    return () => window.removeEventListener("ipod-fav-changed", handler);
+  }, [track]);
 
   if (!track) {
     return (
@@ -30,6 +54,7 @@ export function NowPlaying() {
       <div className="flex min-w-0 flex-1 flex-col items-center justify-center gap-1 overflow-hidden p-2">
         <div className="h-16 w-16 shrink-0 rounded-sm bg-gradient-to-br from-[#5b7fb8] to-[#2a3a55] shadow-md" />
         <div className="mt-1 line-clamp-2 w-full break-words text-center text-[11px] font-semibold leading-tight">
+          {fav && <span className="mr-1 text-red-600">♥</span>}
           {track.title}
         </div>
         <div className="w-full truncate text-center text-[10px] text-zinc-700">{track.artist}</div>
@@ -47,6 +72,9 @@ export function NowPlaying() {
             </span>
             <span>−{formatDuration(Math.max(0, track.duration - position))}</span>
           </div>
+        </div>
+        <div className="mt-1 text-[9px] text-zinc-600">
+          ▶ Center for Notes
         </div>
       </div>
     </div>

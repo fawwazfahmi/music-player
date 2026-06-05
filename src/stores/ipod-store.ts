@@ -15,7 +15,8 @@ export type ScreenState =
   | { name: "playlistList" }
   | { name: "playlistDetail"; playlistId: string }
   | { name: "newPlaylist" }
-  | { name: "favoritesList" };
+  | { name: "favoritesList" }
+  | { name: "notes"; trackId: string };
 
 export function screenKey(s: ScreenState): string {
   switch (s.name) {
@@ -27,6 +28,8 @@ export function screenKey(s: ScreenState): string {
       return `ytPicker:${s.query}`;
     case "playlistDetail":
       return `playlistDetail:${s.playlistId}`;
+    case "notes":
+      return `notes:${s.trackId}`;
     default:
       return s.name;
   }
