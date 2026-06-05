@@ -24,6 +24,9 @@ interface PlayerState {
   // True while we're waiting for the YT iframe to load before starting playback.
   // Transient; not persisted.
   videoLoading: boolean;
+  // Increments whenever playback is intentionally restarted or moved to a new
+  // queue item, even if the YouTube video id is the same.
+  playbackKey: number;
   currentTrack: () => QueueTrack | null;
   setQueue: (queue: QueueTrack[], startIndex?: number) => void;
   next: () => void;
@@ -47,6 +50,7 @@ export const usePlayerStore = create<PlayerState>()(
       volume: 1,
       position: 0,
       videoLoading: false,
+      playbackKey: 0,
       currentTrack: () => {
         const s = get();
         return s.queue[s.currentIndex] ?? null;
@@ -61,24 +65,55 @@ export const usePlayerStore = create<PlayerState>()(
           currentIndex: queue.length ? Math.min(startIndex, queue.length - 1) : -1,
           isPlaying: queue.length > 0,
           videoLoading: hasVideo,
+          playbackKey: get().playbackKey + 1,
           position: 0,
         });
       },
       next: () =>
         set((s) => {
           if (s.queue.length === 0) return s;
-          if (s.currentIndex < s.queue.length - 1)
-            return { currentIndex: s.currentIndex + 1, position: 0 };
-          if (s.repeat === "all") return { currentIndex: 0, position: 0 };
+          if (s.currentIndex < s.queue.length - 1) {
+            const next = s.queue[s.currentIndex + 1];
+            return {
+              currentIndex: s.currentIndex + 1,
+              position: 0,
+              videoLoading: !!next?.ytVideoId,
+              playbackKey: s.playbackKey + 1,
+            };
+          }
+          if (s.repeat === "all") {
+            const next = s.queue[0];
+            return {
+              currentIndex: 0,
+              position: 0,
+              videoLoading: !!next?.ytVideoId,
+              playbackKey: s.playbackKey + 1,
+            };
+          }
           return { isPlaying: false };
         }),
       prev: () =>
         set((s) => {
           if (s.queue.length === 0) return s;
           if (s.position > 3) return { position: 0 };
-          if (s.currentIndex > 0) return { currentIndex: s.currentIndex - 1, position: 0 };
-          if (s.repeat === "all")
-            return { currentIndex: s.queue.length - 1, position: 0 };
+          if (s.currentIndex > 0) {
+            const next = s.queue[s.currentIndex - 1];
+            return {
+              currentIndex: s.currentIndex - 1,
+              position: 0,
+              videoLoading: !!next?.ytVideoId,
+              playbackKey: s.playbackKey + 1,
+            };
+          }
+          if (s.repeat === "all") {
+            const next = s.queue[s.queue.length - 1];
+            return {
+              currentIndex: s.queue.length - 1,
+              position: 0,
+              videoLoading: !!next?.ytVideoId,
+              playbackKey: s.playbackKey + 1,
+            };
+          }
           return { position: 0 };
         }),
       togglePlay: () => set((s) => ({ isPlaying: !s.isPlaying })),

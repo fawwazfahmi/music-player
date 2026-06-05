@@ -5,6 +5,7 @@ import { searchYt, selectYtResult } from "@/server/actions/search";
 import type { YtSearchResult } from "@/server/services/yt-service";
 import { useIpodStore } from "@/stores/ipod-store";
 import { usePlayerStore } from "@/stores/player-store";
+import { useDownloadStore } from "@/stores/download-store";
 import { formatDuration } from "@/lib/format-duration";
 import { PlayIcon } from "@/components/icons";
 import { buildQueueTrack } from "./_shared";
@@ -39,6 +40,13 @@ export function YtPickerPage({ query }: Props) {
 
   async function onPick(r: YtSearchResult) {
     setDownloading(r);
+    // Also publish to the global download store so the floating toast persists
+    // if the user navigates away from this page.
+    useDownloadStore.getState().start({
+      id: r.videoId,
+      title: r.title,
+      artist: r.uploader,
+    });
     try {
       const { trackId } = await selectYtResult(r);
       usePlayerStore.getState().setQueue(
@@ -58,6 +66,7 @@ export function YtPickerPage({ query }: Props) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setDownloading(null);
+      useDownloadStore.getState().finish();
     }
   }
 

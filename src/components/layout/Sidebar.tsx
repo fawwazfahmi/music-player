@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useIpodStore, type ScreenState } from "@/stores/ipod-store";
 import { getPlaylists } from "@/server/actions/playlists";
+import { usePlayerStore } from "@/stores/player-store";
 import {
   AddIcon,
   AlbumIcon,
@@ -10,6 +11,7 @@ import {
   HeartIcon,
   HomeIcon,
   MusicNoteIcon,
+  PlayIcon,
   PlaylistIcon,
   SearchIcon,
   SettingsIcon,
@@ -85,6 +87,7 @@ export function Sidebar() {
         target={{ name: "search" }}
         active={activeName === "search"}
       />
+      <NowPlayingNavItem activeName={activeName} />
 
       <div className="mt-4 px-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
         Library
@@ -163,5 +166,34 @@ export function Sidebar() {
         active={activeName === "settings"}
       />
     </nav>
+  );
+}
+
+function NowPlayingNavItem({ activeName }: { activeName: string }) {
+  const hasTrack = usePlayerStore((s) => s.currentIndex >= 0 && s.queue.length > 0);
+  const toRoot = useIpodStore((s) => s.toRoot);
+  const push = useIpodStore((s) => s.push);
+  const active = activeName === "nowPlayingFull";
+
+  return (
+    <button
+      type="button"
+      disabled={!hasTrack}
+      onClick={() => {
+        toRoot();
+        push({ name: "nowPlayingFull" });
+      }}
+      className={
+        "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-40 " +
+        (active
+          ? "bg-zinc-800 text-zinc-100"
+          : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100")
+      }
+    >
+      <span className="text-zinc-300">
+        <PlayIcon size={18} />
+      </span>
+      <span>Now Playing</span>
+    </button>
   );
 }

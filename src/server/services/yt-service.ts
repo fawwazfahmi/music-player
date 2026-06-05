@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import YouTube from "youtube-sr";
+import { Innertube } from "youtubei.js";
 import { env } from "@/lib/env";
 
 export interface YtSearchResult {
@@ -29,18 +29,92 @@ function runYtDlp(args: string[]): Promise<string> {
   });
 }
 
+type InnertubeVideo = {
+  type?: string;
+  video_id?: string;
+  id?: string;
+  title?: { toString(): string } | string;
+  author?: { name?: string };
+  duration?: { seconds?: number };
+  best_thumbnail?: { url?: string };
+  thumbnails?: { url?: string }[];
+};
+
+function titleText(title: InnertubeVideo["title"]): string {
+  if (!title) return "Unknown";
+  return typeof title === "string" ? title : title.toString();
+}
+
+function mapInnertubeVideo(video: InnertubeVideo): YtSearchResult | null {
+  const videoId = video.video_id ?? video.id ?? "";
+  if (!videoId) return null;
+  const thumbnail = video.best_thumbnail?.url ?? video.thumbnails?.at(-1)?.url ?? null;
+  return {
+    videoId,
+    title: titleText(video.title),
+    uploader: video.author?.name ?? "Unknown",
+    duration: Math.round(video.duration?.seconds ?? 0),
+    thumbnail,
+  };
+}
+
+type YtDlpEntry = {
+  id?: string;
+  title?: string;
+  uploader?: string;
+  channel?: string;
+  duration?: number;
+  thumbnail?: string;
+  thumbnails?: { url?: string }[];
+};
+
+function mapYtDlpEntry(entry: YtDlpEntry): YtSearchResult | null {
+  if (!entry.id) return null;
+  return {
+    videoId: entry.id,
+    title: entry.title ?? "Unknown",
+    uploader: entry.uploader ?? entry.channel ?? "Unknown",
+    duration: Math.round(entry.duration ?? 0),
+    thumbnail: entry.thumbnail ?? entry.thumbnails?.at(-1)?.url ?? null,
+  };
+}
+
+async function searchWithInnertube(query: string, limit: number): Promise<YtSearchResult[]> {
+  const youtube = await Innertube.create();
+  const search = await youtube.search(query, { type: "video" });
+  return (search.results as unknown as InnertubeVideo[])
+    .map(mapInnertubeVideo)
+    .filter((item): item is YtSearchResult => item !== null)
+    .slice(0, limit);
+}
+
+async function searchWithYtDlp(query: string, limit: number): Promise<YtSearchResult[]> {
+  const raw = await runYtDlp([
+    `ytsearch${limit}:${query}`,
+    "--dump-single-json",
+    "--flat-playlist",
+    "--no-warnings",
+  ]);
+  const parsed = JSON.parse(raw) as { entries?: YtDlpEntry[] } | YtDlpEntry[];
+  const entries = Array.isArray(parsed) ? parsed : parsed.entries ?? [];
+  return entries
+    .map(mapYtDlpEntry)
+    .filter((item): item is YtSearchResult => item !== null)
+    .slice(0, limit);
+}
+
 export async function searchYt(query: string, limit = 5): Promise<YtSearchResult[]> {
-  // Uses youtube-sr (hits YouTube's innertube API directly) — ~1-3s.
-  // yt-dlp's ytsearch is ~80s due to slow web-client-config fetch + bot detection.
-  // Was @distube/ytsr but YT changed response shape and it stopped working.
-  const items = await YouTube.search(query, { type: "video", limit });
-  return items.slice(0, limit).map((v) => ({
-    videoId: v.id ?? "",
-    title: v.title ?? "Unknown",
-    uploader: v.channel?.name ?? "Unknown",
-    duration: Math.round((v.duration ?? 0) / 1000), // YouTube returns ms; we want seconds
-    thumbnail: v.thumbnail?.url ?? null,
-  }));
+  const trimmed = query.trim();
+  if (!trimmed) return [];
+
+  try {
+    const results = await searchWithInnertube(trimmed, limit);
+    if (results.length > 0) return results;
+  } catch (err) {
+    console.warn("youtubei.js search failed; falling back to yt-dlp", err);
+  }
+
+  return searchWithYtDlp(trimmed, limit);
 }
 
 export async function resolveDirectUrl(videoId: string): Promise<string> {

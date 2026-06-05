@@ -63,6 +63,7 @@ export function YtPicker({ query, selected = 0 }: YtPickerProps) {
               duration: result.duration,
               artist: result.uploader,
               album: "YouTube",
+              ytVideoId: result.videoId,
             }],
             0,
           );

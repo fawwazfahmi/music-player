@@ -10,6 +10,8 @@ import { Sidebar } from "./Sidebar";
 import { RightPanel } from "./RightPanel";
 import { PlayerBar } from "@/components/player/PlayerBar";
 import { MainContent } from "@/components/pages/MainContent";
+import { VideoStage } from "@/components/player/VideoStage";
+import { DownloadIndicator } from "@/components/player/DownloadIndicator";
 import { ChevronLeftIcon, MenuIcon, CloseIcon } from "@/components/icons";
 
 export function AppShell() {
@@ -23,7 +25,7 @@ export function AppShell() {
   const historyIdRef = useRef<string | null>(null);
   const lastReportedSecondRef = useRef(0);
 
-  // Audio engine: load track when currentIndex changes
+  // Audio engine: load track when the selected playback attempt changes
   // (don't auto-play here — the videoLoading gate effect below handles that)
   useEffect(() => {
     const engine = getEngine();
@@ -31,7 +33,7 @@ export function AppShell() {
     if (!track) return;
     engine.loadTrack(track.id);
     updateMediaMetadata(track);
-  }, [player.currentIndex, player.queue]);
+  }, [player.currentIndex, player.playbackKey, player.queue]);
 
   // Play/pause sync — gated on videoLoading so audio waits for YT iframe
   // to load before starting. Once videoLoading flips false, audio starts.
@@ -98,8 +100,6 @@ export function AppShell() {
       },
     });
   }, []);
-
-  const hasTrack = !!player.queue[player.currentIndex];
 
   return (
     <div className="flex h-dvh flex-col bg-zinc-950 text-zinc-100">
@@ -186,6 +186,10 @@ export function AppShell() {
       </div>
 
       <PlayerBar />
+      {/* Single always-mounted YT iframe; positions itself over the active slot */}
+      <VideoStage />
+      {/* Floating "downloading…" toast that persists across nav */}
+      <DownloadIndicator />
     </div>
   );
 }

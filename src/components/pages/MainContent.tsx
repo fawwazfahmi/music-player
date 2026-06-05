@@ -14,6 +14,7 @@ import { SearchPage } from "./SearchPage";
 import { SettingsPage } from "./SettingsPage";
 import { YtPickerPage } from "./YtPickerPage";
 import { NotesPage } from "./NotesPage";
+import { NowPlayingFullPage } from "./NowPlayingFullPage";
 
 export function MainContent() {
   const current = useIpodStore((s) => s.current());
@@ -47,6 +48,8 @@ export function MainContent() {
       return <SettingsPage />;
     case "notes":
       return <NotesPage trackId={current.trackId} />;
+    case "nowPlayingFull":
+      return <NowPlayingFullPage />;
     case "nowPlaying":
       return <HomePage />; // now playing is the right panel; main shows home
     case "musicSub":

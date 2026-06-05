@@ -5,8 +5,8 @@ vi.mock("node:child_process", () => ({
   spawn: vi.fn(),
 }));
 
-vi.mock("youtube-sr", () => ({
-  default: { search: vi.fn() },
+vi.mock("youtubei.js", () => ({
+  Innertube: { create: vi.fn() },
 }));
 
 beforeEach(() => {
@@ -35,24 +35,28 @@ function makeFakeProc() {
 }
 
 describe("yt-service", () => {
-  it("searchYt maps youtube-sr Video[] to our YtSearchResult", async () => {
-    const yt = await import("youtube-sr");
-    vi.mocked(yt.default.search).mockResolvedValueOnce([
-      {
-        id: "vid1",
-        title: "From The Start",
-        channel: { name: "Laufey" },
-        duration: 196000, // milliseconds!
-        thumbnail: { url: "http://x/y.jpg" },
-      },
-      {
-        id: "vid2",
-        title: "From The Start (Live)",
-        channel: { name: "Laufey Live" },
-        duration: 200000,
-        thumbnail: null,
-      },
-    ] as never);
+  it("searchYt maps youtubei.js Video nodes to our YtSearchResult", async () => {
+    const yt = await import("youtubei.js");
+    vi.mocked(yt.Innertube.create).mockResolvedValueOnce({
+      search: vi.fn().mockResolvedValueOnce({
+        results: [
+          {
+            video_id: "vid1",
+            title: { toString: () => "From The Start" },
+            author: { name: "Laufey" },
+            duration: { seconds: 196 },
+            best_thumbnail: { url: "http://x/y.jpg" },
+          },
+          {
+            video_id: "vid2",
+            title: { toString: () => "From The Start (Live)" },
+            author: { name: "Laufey Live" },
+            duration: { seconds: 200 },
+            thumbnails: [],
+          },
+        ],
+      }),
+    } as never);
 
     const { searchYt } = await import("@/server/services/yt-service");
     const results = await searchYt("from the start", 2);
@@ -68,10 +72,12 @@ describe("yt-service", () => {
   });
 
   it("searchYt handles missing optional fields gracefully", async () => {
-    const yt = await import("youtube-sr");
-    vi.mocked(yt.default.search).mockResolvedValueOnce([
-      { id: "vidx", title: "Something" } as never,
-    ]);
+    const yt = await import("youtubei.js");
+    vi.mocked(yt.Innertube.create).mockResolvedValueOnce({
+      search: vi.fn().mockResolvedValueOnce({
+        results: [{ video_id: "vidx", title: { toString: () => "Something" } }],
+      }),
+    } as never);
 
     const { searchYt } = await import("@/server/services/yt-service");
     const results = await searchYt("x", 1);
@@ -82,6 +88,48 @@ describe("yt-service", () => {
       duration: 0,
       thumbnail: null,
     });
+  });
+
+  it("searchYt falls back to yt-dlp when youtubei.js throws", async () => {
+    const yt = await import("youtubei.js");
+    vi.mocked(yt.Innertube.create).mockRejectedValueOnce(
+      new TypeError("Cannot read properties of undefined (reading 'browseId')"),
+    );
+    const cp = await import("node:child_process");
+    const fakeProc = makeFakeProc();
+    vi.mocked(cp.spawn).mockReturnValueOnce(fakeProc as never);
+
+    const { searchYt } = await import("@/server/services/yt-service");
+    const promise = searchYt("from the start", 1);
+
+    await vi.waitFor(() => expect(cp.spawn).toHaveBeenCalled());
+    fakeProc.stdout.emit(
+      "data",
+      Buffer.from(
+        JSON.stringify({
+          entries: [
+            {
+              id: "vid-fallback",
+              title: "From The Start",
+              uploader: "Laufey",
+              duration: 196,
+              thumbnail: "http://x/fallback.jpg",
+            },
+          ],
+        }),
+      ),
+    );
+    fakeProc.emit("close", 0);
+
+    await expect(promise).resolves.toEqual([
+      {
+        videoId: "vid-fallback",
+        title: "From The Start",
+        uploader: "Laufey",
+        duration: 196,
+        thumbnail: "http://x/fallback.jpg",
+      },
+    ]);
   });
 
   it("resolveDirectUrl returns the first stdout line from yt-dlp", async () => {

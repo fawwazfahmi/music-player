@@ -13,6 +13,8 @@ describe("player-store", () => {
       repeat: "off",
       volume: 1,
       position: 0,
+      videoLoading: false,
+      playbackKey: 0,
     });
   });
 
@@ -22,12 +24,31 @@ describe("player-store", () => {
     expect(usePlayerStore.getState().currentIndex).toBe(1);
   });
 
+  it("setQueue increments playbackKey for same-track replays", () => {
+    const t = { ...track("a"), ytVideoId: "yt-a" };
+    usePlayerStore.getState().setQueue([t], 0);
+    expect(usePlayerStore.getState().videoLoading).toBe(true);
+    expect(usePlayerStore.getState().playbackKey).toBe(1);
+
+    usePlayerStore.getState().setQueue([t], 0);
+    expect(usePlayerStore.getState().videoLoading).toBe(true);
+    expect(usePlayerStore.getState().playbackKey).toBe(2);
+  });
+
   it("next/prev navigate within queue", () => {
     usePlayerStore.getState().setQueue([track("a"), track("b"), track("c")], 0);
     usePlayerStore.getState().next();
     expect(usePlayerStore.getState().currentIndex).toBe(1);
     usePlayerStore.getState().prev();
     expect(usePlayerStore.getState().currentIndex).toBe(0);
+  });
+
+  it("next enables video gate for YouTube tracks", () => {
+    usePlayerStore.getState().setQueue([track("a"), { ...track("b"), ytVideoId: "yt-b" }], 0);
+    usePlayerStore.getState().setVideoLoading(false);
+    usePlayerStore.getState().next();
+    expect(usePlayerStore.getState().currentIndex).toBe(1);
+    expect(usePlayerStore.getState().videoLoading).toBe(true);
   });
 
   it("next at end stops when repeat=off", () => {

@@ -3,43 +3,48 @@
 import { useEffect, useRef, useState } from "react";
 import { usePlayerStore } from "@/stores/player-store";
 
+interface YtPlayer {
+  playVideo(): void;
+  pauseVideo(): void;
+  seekTo(seconds: number, allowSeekAhead?: boolean): void;
+  mute(): void;
+  unMute(): void;
+  setSize(width: number | string, height: number | string): void;
+  getCurrentTime(): number;
+  getPlayerState(): number;
+  getVideoData?(): { video_id?: string };
+  loadVideoById(videoId: string, startSeconds?: number): void;
+  cueVideoById(opts: { videoId: string; startSeconds?: number }): void;
+  destroy(): void;
+  getIframe?(): HTMLIFrameElement | null;
+}
+
+interface YtPlayerOptions {
+  videoId?: string;
+  width?: string | number;
+  height?: string | number;
+  playerVars?: Record<string, string | number>;
+  events?: {
+    onReady?: (e: { target: YtPlayer }) => void;
+    onStateChange?: (e: { target: YtPlayer; data: number }) => void;
+  };
+}
+
+interface YtPlayerConstructor {
+  new (elementId: string | HTMLElement, opts: YtPlayerOptions): YtPlayer;
+}
+
 declare global {
   interface Window {
-    YT?: { Player: YT.PlayerConstructor };
+    YT?: { Player: YtPlayerConstructor };
     onYouTubeIframeAPIReady?: () => void;
-  }
-  namespace YT {
-    interface Player {
-      playVideo(): void;
-      pauseVideo(): void;
-      seekTo(seconds: number, allowSeekAhead?: boolean): void;
-      mute(): void;
-      unMute(): void;
-      getCurrentTime(): number;
-      getPlayerState(): number;
-      loadVideoById(videoId: string, startSeconds?: number): void;
-      cueVideoById(opts: { videoId: string; startSeconds?: number }): void;
-      destroy(): void;
-      getIframe?(): HTMLIFrameElement | null;
-    }
-    interface PlayerOptions {
-      videoId?: string;
-      playerVars?: Record<string, string | number>;
-      events?: {
-        onReady?: (e: { target: Player }) => void;
-        onStateChange?: (e: { target: Player; data: number }) => void;
-      };
-    }
-    interface PlayerConstructor {
-      new (elementId: string | HTMLElement, opts: PlayerOptions): Player;
-    }
   }
 }
 
 let apiPromise: Promise<void> | null = null;
 function loadIframeAPI(): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
-  if (window.YT && (window.YT as unknown as { Player?: YT.PlayerConstructor }).Player) {
+  if (window.YT && (window.YT as unknown as { Player?: YtPlayerConstructor }).Player) {
     return Promise.resolve();
   }
   if (apiPromise) return apiPromise;
@@ -54,8 +59,7 @@ function loadIframeAPI(): Promise<void> {
 
 const DRIFT_THRESHOLD = 1.0;
 
-// Returns true if the YT player object is still "live" — has an iframe in the DOM.
-function isPlayerAlive(p: YT.Player | null): boolean {
+function isPlayerAlive(p: YtPlayer | null): boolean {
   if (!p) return false;
   try {
     const iframe = p.getIframe?.();
@@ -65,76 +69,153 @@ function isPlayerAlive(p: YT.Player | null): boolean {
   }
 }
 
+// YT.PlayerState constants
+const YT_UNSTARTED = -1;
+const YT_ENDED = 0;
+const YT_PLAYING = 1;
+const YT_PAUSED = 2;
+const YT_BUFFERING = 3;
+const YT_CUED = 5;
+
 export function YtVideoPanel() {
   const queue = usePlayerStore((s) => s.queue);
   const currentIndex = usePlayerStore((s) => s.currentIndex);
   const isPlaying = usePlayerStore((s) => s.isPlaying);
   const position = usePlayerStore((s) => s.position);
+  const playbackKey = usePlayerStore((s) => s.playbackKey);
   const track = queue[currentIndex] ?? null;
   const ytVideoId = (track as { ytVideoId?: string | null } | null)?.ytVideoId;
 
   const containerRef = useRef<HTMLDivElement>(null);
-  const playerRef = useRef<YT.Player | null>(null);
+  const playerRef = useRef<YtPlayer | null>(null);
+  const readyRef = useRef(false);
   const [ready, setReady] = useState(false);
   const currentVideoRef = useRef<string | null>(null);
+  const positionRef = useRef(position);
 
-  // Mount/teardown the player
+  useEffect(() => {
+    positionRef.current = position;
+  }, [position]);
+
+  // When the iframe is moved between slots (small ↔ big), just resize the
+  // player — don't reload. The DOM node stays alive across appendChild.
+  useEffect(() => {
+    function handleSlotMoved() {
+      const p = playerRef.current;
+      if (!p || !isPlayerAlive(p)) return;
+      try {
+        const iframe = p.getIframe?.();
+        if (!iframe) return;
+        const parent = iframe.parentElement?.parentElement; // .container → .slot
+        if (!parent) return;
+        const rect = parent.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+          p.setSize(Math.round(rect.width), Math.round(rect.height));
+        }
+      } catch {}
+    }
+    window.addEventListener("music-video-slot-moved", handleSlotMoved);
+    return () => window.removeEventListener("music-video-slot-moved", handleSlotMoved);
+  }, []);
+
+  // Create / swap / destroy the YT player when track changes.
   useEffect(() => {
     if (!ytVideoId || !containerRef.current) return;
     const myContainer = containerRef.current;
 
     let cancelled = false;
-    let createdPlayer: YT.Player | null = null;
+    let createdPlayer: YtPlayer | null = null;
+    let releaseTimer: number | null = null;
 
     void loadIframeAPI().then(() => {
       if (cancelled) return;
       if (!document.body.contains(myContainer)) return;
 
-      const Ctor = (window.YT as unknown as { Player: YT.PlayerConstructor }).Player;
+      const Ctor = (window.YT as unknown as { Player: YtPlayerConstructor }).Player;
 
-      // Already showing this video on a live player
+      // Schedule a safety-net release of videoLoading in case YT doesn't
+      // fire a fresh PLAYING event (e.g. same-video replay where state was
+      // already PLAYING and stays PLAYING).
+      function scheduleRelease() {
+        if (releaseTimer !== null) window.clearTimeout(releaseTimer);
+        releaseTimer = window.setTimeout(() => {
+          const p = playerRef.current;
+          if (p && isPlayerAlive(p)) {
+            try {
+              const state = p.getPlayerState();
+              if (state === YT_PLAYING || state === YT_BUFFERING || state === YT_PAUSED) {
+                usePlayerStore.getState().setVideoLoading(false);
+              }
+            } catch {}
+          }
+          // Final fallback: always release after a short delay so audio doesn't
+          // hang on stuck "Loading video…"
+          usePlayerStore.getState().setVideoLoading(false);
+        }, 1200);
+      }
+
+      // ──── Same video, live player → seek + replay (no reload) ─────────────
       if (
         playerRef.current &&
         isPlayerAlive(playerRef.current) &&
         currentVideoRef.current === ytVideoId
       ) {
-        return;
+        try {
+          playerRef.current.mute();
+          playerRef.current.seekTo(positionRef.current, true);
+          if (usePlayerStore.getState().isPlaying) {
+            playerRef.current.playVideo();
+          }
+          scheduleRelease();
+          return;
+        } catch {
+          /* fall through to reload */
+        }
       }
 
-      // Different video, live player → swap via cueVideoById
-      if (
-        playerRef.current &&
-        isPlayerAlive(playerRef.current) &&
-        currentVideoRef.current !== ytVideoId
-      ) {
+      // ──── Different video, live player → loadVideoById (reload content) ───
+      if (playerRef.current && isPlayerAlive(playerRef.current)) {
         try {
+          readyRef.current = false;
           setReady(false);
-          playerRef.current.cueVideoById({ videoId: ytVideoId, startSeconds: position });
+          playerRef.current.mute();
+          playerRef.current.loadVideoById(ytVideoId, positionRef.current);
+          if (usePlayerStore.getState().isPlaying) {
+            playerRef.current.playVideo();
+          }
           currentVideoRef.current = ytVideoId;
-          // ready will flip back true via a fresh onStateChange BUFFERING/PLAYING event
-          // — we capture this via the onStateChange handler below
+          scheduleRelease();
           return;
         } catch {
           /* fall through to recreate */
         }
       }
 
-      // Destroy stale player + recreate
+      // ──── Fresh create ─────────────────────────────────────────────────────
       if (playerRef.current) {
         try {
           playerRef.current.destroy();
         } catch {}
         playerRef.current = null;
-        setReady(false);
       }
+      readyRef.current = false;
+      setReady(false);
       while (myContainer.firstChild) {
         myContainer.removeChild(myContainer.firstChild);
       }
       const mountEl = document.createElement("div");
       myContainer.appendChild(mountEl);
 
+      // Use the current container's real pixel size so YT renders at the
+      // correct resolution from the start (no black-until-resize bug).
+      const rect = myContainer.getBoundingClientRect();
+      const initialW = Math.max(1, Math.round(rect.width || 640));
+      const initialH = Math.max(1, Math.round(rect.height || 360));
+
       createdPlayer = new Ctor(mountEl, {
         videoId: ytVideoId,
+        width: initialW,
+        height: initialH,
         playerVars: {
           autoplay: 0,
           controls: 0,
@@ -147,19 +228,37 @@ export function YtVideoPanel() {
         },
         events: {
           onReady: (e) => {
-            if (playerRef.current !== createdPlayer) return; // stale (strict-mode remount)
+            if (playerRef.current !== createdPlayer) return; // stale
+            const { isPlaying: playing } = usePlayerStore.getState();
             try {
               e.target.mute();
-              e.target.seekTo(position, true);
-            } catch {}
+              e.target.seekTo(positionRef.current, true);
+              if (playing) {
+                e.target.playVideo();
+              } else {
+                usePlayerStore.getState().setVideoLoading(false);
+              }
+            } catch {
+              usePlayerStore.getState().setVideoLoading(false);
+            }
+            readyRef.current = true;
             setReady(true);
-            // Release the audio gate so playback starts now that the video can keep up.
-            usePlayerStore.getState().setVideoLoading(false);
           },
-          onStateChange: () => {
+          onStateChange: (e) => {
             if (playerRef.current !== createdPlayer) return;
-            if (!ready) {
-              setReady(true);
+            // Release the audio gate when YT is genuinely rendering frames.
+            // BUFFERING also indicates YT has started fetching data — release
+            // a hair earlier for snappier perceived sync.
+            if (e.data === YT_PLAYING || e.data === YT_BUFFERING) {
+              usePlayerStore.getState().setVideoLoading(false);
+              if (!readyRef.current) {
+                readyRef.current = true;
+                setReady(true);
+              }
+            }
+            // Edge case: YT cued the video but never auto-played (rare). Release
+            // anyway so audio can start.
+            if (e.data === YT_CUED || e.data === YT_UNSTARTED || e.data === YT_ENDED) {
               usePlayerStore.getState().setVideoLoading(false);
             }
           },
@@ -169,18 +268,18 @@ export function YtVideoPanel() {
       currentVideoRef.current = ytVideoId;
     });
 
-    // Safety net: don't make the user wait forever if YT iframe never loads
-    // (network issue, embedded blocked, etc). After 5s, release the audio gate.
-    const timeoutId = window.setTimeout(() => {
+    // Hard safety: if YT iframe never loads (network block, etc.), release
+    // the audio gate after 8 s so playback isn't blocked forever.
+    const hardTimeout = window.setTimeout(() => {
       usePlayerStore.getState().setVideoLoading(false);
-    }, 5000);
+    }, 8000);
 
     return () => {
       cancelled = true;
-      window.clearTimeout(timeoutId);
+      if (releaseTimer !== null) window.clearTimeout(releaseTimer);
+      window.clearTimeout(hardTimeout);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ytVideoId]);
+  }, [ytVideoId, playbackKey]);
 
   // Destroy on unmount
   useEffect(() => {
@@ -190,12 +289,13 @@ export function YtVideoPanel() {
           playerRef.current.destroy();
         } catch {}
         playerRef.current = null;
+        readyRef.current = false;
         currentVideoRef.current = null;
       }
     };
   }, []);
 
-  // Play/pause sync — guarded on ready + alive
+  // Play / pause sync
   useEffect(() => {
     const p = playerRef.current;
     if (!ready || !p || !isPlayerAlive(p)) return;
@@ -205,7 +305,7 @@ export function YtVideoPanel() {
     } catch {}
   }, [isPlaying, ready]);
 
-  // Position sync — debounced via drift threshold
+  // Position sync
   useEffect(() => {
     const p = playerRef.current;
     if (!ready || !p || !isPlayerAlive(p)) return;
@@ -248,9 +348,8 @@ export function YtVideoPanel() {
     <div className="relative h-full w-full overflow-hidden bg-black">
       <div
         ref={containerRef}
-        className="absolute inset-0 [&>div]:h-full [&>iframe]:h-full [&>iframe]:w-full"
+        className="absolute inset-0 [&>div]:h-full [&>div]:w-full [&_iframe]:h-full [&_iframe]:w-full [&_iframe]:!max-w-full [&_iframe]:object-cover"
       />
-      <div className="absolute inset-0" aria-hidden="true" />
     </div>
   );
 }
