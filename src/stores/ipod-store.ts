@@ -10,7 +10,8 @@ export type ScreenState =
   | { name: "songList" }
   | { name: "nowPlaying" }
   | { name: "search" }
-  | { name: "ytPicker"; query: string };
+  | { name: "ytPicker"; query: string }
+  | { name: "settings" };
 
 export function screenKey(s: ScreenState): string {
   switch (s.name) {

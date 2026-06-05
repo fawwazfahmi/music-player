@@ -38,7 +38,7 @@ export function Ipod() {
     let cancelled = false;
     void (async () => {
       let count = 0;
-      if (current.name === "home") count = 3;
+      if (current.name === "home") count = 4;
       else if (current.name === "musicSub") count = 3;
       else if (current.name === "artistList") count = (await getArtists()).length;
       else if (current.name === "albumList") count = (await getAllAlbums()).length;
@@ -143,6 +143,7 @@ export function Ipod() {
       if (sel === 0) push({ name: "musicSub" });
       else if (sel === 1) push({ name: "search" });
       else if (sel === 2) push({ name: "nowPlaying" });
+      else if (sel === 3) push({ name: "settings" });
     } else if (current.name === "search" || current.name === "ytPicker") {
       window.dispatchEvent(new CustomEvent("ipod-select", { detail: { selected } }));
     } else if (current.name === "musicSub") {

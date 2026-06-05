@@ -4,6 +4,7 @@ const items = [
   { label: "Music" },
   { label: "Search" },
   { label: "Now Playing" },
+  { label: "Settings" },
 ];
 
 export function HomeMenu({ selected = 0 }: { selected?: number }) {
