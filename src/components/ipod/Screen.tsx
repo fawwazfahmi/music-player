@@ -12,6 +12,9 @@ import { YtPicker } from "./screens/YtPicker";
 import { Settings } from "./screens/Settings";
 import { ArtistDetail } from "./screens/ArtistDetail";
 import { AlbumDetail } from "./screens/AlbumDetail";
+import { PlaylistList } from "./screens/PlaylistList";
+import { PlaylistDetail } from "./screens/PlaylistDetail";
+import { NewPlaylist } from "./screens/NewPlaylist";
 
 export interface ScreenProps {
   selected: number;
@@ -42,6 +45,12 @@ export function Screen({ selected }: ScreenProps) {
       return <ArtistDetail artistId={current.artistId} selected={selected} />;
     case "albumDetail":
       return <AlbumDetail albumId={current.albumId} selected={selected} />;
+    case "playlistList":
+      return <PlaylistList selected={selected} />;
+    case "playlistDetail":
+      return <PlaylistDetail playlistId={current.playlistId} selected={selected} />;
+    case "newPlaylist":
+      return <NewPlaylist />;
     default:
       return null;
   }
