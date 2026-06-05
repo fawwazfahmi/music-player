@@ -15,6 +15,7 @@ import { AlbumDetail } from "./screens/AlbumDetail";
 import { PlaylistList } from "./screens/PlaylistList";
 import { PlaylistDetail } from "./screens/PlaylistDetail";
 import { NewPlaylist } from "./screens/NewPlaylist";
+import { FavoritesList } from "./screens/FavoritesList";
 
 export interface ScreenProps {
   selected: number;
@@ -51,6 +52,8 @@ export function Screen({ selected }: ScreenProps) {
       return <PlaylistDetail playlistId={current.playlistId} selected={selected} />;
     case "newPlaylist":
       return <NewPlaylist />;
+    case "favoritesList":
+      return <FavoritesList selected={selected} />;
     default:
       return null;
   }

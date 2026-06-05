@@ -5,6 +5,7 @@ const items = [
   { label: "Albums" },
   { label: "Songs" },
   { label: "Playlists" },
+  { label: "Favorites" },
 ];
 
 export function MusicSub({ selected = 0 }: { selected?: number }) {
