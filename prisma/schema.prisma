@@ -116,6 +116,13 @@ enum TrackSource {
   UPLOAD
 }
 
+enum LyricsSource {
+  LRCLIB_SYNCED
+  LRCLIB_PLAIN
+  WHISPER
+  MANUAL
+}
+
 model TrackArtist {
   trackId  String
   artistId String
