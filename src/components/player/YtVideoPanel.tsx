@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { usePlayerStore } from "@/stores/player-store";
+import { useIpodStore } from "@/stores/ipod-store";
 
 interface YtPlayer {
   playVideo(): void;
@@ -350,6 +351,31 @@ export function YtVideoPanel() {
         ref={containerRef}
         className="absolute inset-0 [&>div]:h-full [&>div]:w-full [&_iframe]:h-full [&_iframe]:w-full [&_iframe]:!max-w-full [&_iframe]:object-cover"
       />
+      {/* Expand button — visible only when NOT already in fullscreen.
+          Lives inside the VideoStage container so it naturally paints ABOVE
+          the iframe (same stacking context). pointer-events:auto so it
+          captures clicks, even though the container itself has pe:none. */}
+      <ExpandOverlay />
     </div>
+  );
+}
+
+function ExpandOverlay() {
+  const current = useIpodStore((s) => s.current());
+  const push = useIpodStore((s) => s.push);
+  if (current.name === "nowPlayingFull") return null;
+  return (
+    <button
+      type="button"
+      onClick={() => push({ name: "nowPlayingFull" })}
+      title="Expand to fullscreen"
+      aria-label="Expand to fullscreen"
+      className="group absolute inset-0 flex items-start justify-end p-2"
+      style={{ pointerEvents: "auto" }}
+    >
+      <span className="rounded-full bg-black/70 px-2 py-1 text-[10px] font-medium text-zinc-200 opacity-0 backdrop-blur transition group-hover:opacity-100">
+        Expand ⛶
+      </span>
+    </button>
   );
 }

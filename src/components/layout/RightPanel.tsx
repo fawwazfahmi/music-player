@@ -30,19 +30,20 @@ export function RightPanel() {
           </button>
         ) : (
           <>
-            {/* The VideoStage will appendChild our iframe container into this div */}
-            <div
-              data-video-slot="small"
-              className="absolute inset-0 block"
-              style={{ display: "block" }}
-            />
+            {/* VideoStage positions the iframe (z-40) on top of this slot.
+                The iframe has pointer-events:none so clicks pass through. */}
+            <div data-video-slot="small" className="absolute inset-0" />
+            {/* Click anywhere on the tile to expand to fullscreen */}
             <button
               type="button"
               onClick={() => push({ name: "nowPlayingFull" })}
-              className="absolute right-2 top-2 z-10 rounded-full bg-black/60 px-2 py-1 text-[10px] font-medium text-zinc-200 backdrop-blur transition hover:bg-black/80"
+              className="group absolute inset-0 z-[45] flex items-start justify-end p-2"
               title="Expand to fullscreen"
+              aria-label="Expand to fullscreen"
             >
-              Expand ⛶
+              <span className="rounded-full bg-black/70 px-2 py-1 text-[10px] font-medium text-zinc-200 opacity-0 backdrop-blur transition group-hover:opacity-100">
+                Expand ⛶
+              </span>
             </button>
           </>
         )}

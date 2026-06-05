@@ -47,7 +47,10 @@ function getOrCreateContainer(): HTMLDivElement {
     "z-index:40", // above sidebar (z-30) + player bar; below mobile drawers' backdrop
     "overflow:hidden",
     "transition:top 220ms ease, left 220ms ease, width 220ms ease, height 220ms ease",
-    "pointer-events:auto",
+    // pointer-events:none → clicks pass through to whatever's beneath (the
+    // slot's Expand button, app controls, etc). The user controls playback
+    // via the player bar, not YT's native iframe controls.
+    "pointer-events:none",
     "background:black",
     "display:block",
     "visibility:visible",
@@ -133,17 +136,9 @@ export function VideoStage() {
     };
   }, [currentName]);
 
-  // Toggle pointer-events so the user can interact with the app behind the
-  // container when it's parked offscreen.
-  useEffect(() => {
-    if (!_initialized || !_container) return;
-    const id = window.setInterval(() => {
-      if (!_container) return;
-      const offscreen = _container.style.top.startsWith("-");
-      _container.style.pointerEvents = offscreen ? "none" : "auto";
-    }, 250);
-    return () => window.clearInterval(id);
-  }, []);
+  // Container stays pointer-events:none always so app controls (player bar,
+  // Expand button, sidebar nav) remain clickable through it. No periodic
+  // toggle needed.
 
   return null;
 }
