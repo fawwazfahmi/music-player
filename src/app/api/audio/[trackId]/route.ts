@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/server/db";
 import { parseRange } from "@/server/services/audio-stream";
-import { resolveDirectUrl } from "@/server/services/yt-service";
 import fs from "node:fs";
 import { stat } from "node:fs/promises";
 
@@ -14,37 +13,6 @@ const MIME_BY_EXT: Record<string, string> = {
   wav: "audio/wav",
 };
 
-async function streamFromYt(videoId: string, req: Request): Promise<Response> {
-  let directUrl: string;
-  try {
-    directUrl = await resolveDirectUrl(videoId);
-  } catch {
-    return NextResponse.json({ error: "yt_resolve_failed" }, { status: 502 });
-  }
-  if (!directUrl) {
-    return NextResponse.json({ error: "yt_resolve_empty" }, { status: 502 });
-  }
-  const range = req.headers.get("range");
-  const ytRes = await fetch(directUrl, {
-    headers: range ? { Range: range } : undefined,
-  });
-  if (!ytRes.ok && ytRes.status !== 206) {
-    return NextResponse.json(
-      { error: "yt_fetch_failed", status: ytRes.status },
-      { status: 502 },
-    );
-  }
-  const headers = new Headers();
-  headers.set("Content-Type", ytRes.headers.get("content-type") ?? "audio/mp4");
-  const cl = ytRes.headers.get("content-length");
-  if (cl) headers.set("Content-Length", cl);
-  const cr = ytRes.headers.get("content-range");
-  if (cr) headers.set("Content-Range", cr);
-  headers.set("Accept-Ranges", "bytes");
-  headers.set("Cache-Control", "private, no-store");
-  return new Response(ytRes.body, { status: ytRes.status, headers });
-}
-
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ trackId: string }> },
@@ -52,15 +20,18 @@ export async function GET(
   const { trackId } = await params;
   const track = await db.track.findUnique({
     where: { id: trackId },
-    select: { filePath: true, fileFormat: true, source: true, ytVideoId: true },
+    select: { filePath: true, fileFormat: true, source: true },
   });
   if (!track) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
   if (!track.filePath) {
-    if (track.source === "YT_STREAMING" && track.ytVideoId) {
-      return streamFromYt(track.ytVideoId, req);
-    }
-    return NextResponse.json({ error: "not_yet_supported", reason: track.source }, { status: 501 });
+    // YT downloads are now synchronous (await in selectYtResult), so a track
+    // reaching the audio engine without a filePath means the download didn't
+    // complete. Surfacing as 501 — user should re-search and pick again.
+    return NextResponse.json(
+      { error: "download_incomplete", source: track.source },
+      { status: 501 },
+    );
   }
 
   let stats;
