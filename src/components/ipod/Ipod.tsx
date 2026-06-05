@@ -231,7 +231,6 @@ export function Ipod() {
   }
 
   const currentTrack = player.queue[player.currentIndex] ?? null;
-  const showNowPlayingControls = current.name === "nowPlaying" && currentTrack;
 
   return (
     <main className="grid min-h-dvh place-items-center bg-zinc-950 p-4">
@@ -239,9 +238,9 @@ export function Ipod() {
         <div data-selected={selected} data-row-count={rowCount}>
           <Chassis screen={<Screen selected={selected} />} wheel={<ClickWheel onEvent={handleEvent} />} />
         </div>
-        {showNowPlayingControls && (
-          <div className="md:pt-12">
-            <NowPlayingControls trackId={currentTrack.id} />
+        {currentTrack && (
+          <div className="md:pt-2">
+            <PersistentPlayerPanel />
           </div>
         )}
       </div>
@@ -252,103 +251,190 @@ export function Ipod() {
   );
 }
 
-function NowPlayingControls({ trackId }: { trackId: string }) {
-  const [fav, setFav] = useState(false);
+function formatTime(s: number): string {
+  if (!Number.isFinite(s) || s < 0) return "0:00";
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return `${m}:${sec.toString().padStart(2, "0")}`;
+}
+
+function PersistentPlayerPanel() {
+  const queue = usePlayerStore((s) => s.queue);
+  const currentIndex = usePlayerStore((s) => s.currentIndex);
+  const isPlaying = usePlayerStore((s) => s.isPlaying);
+  const position = usePlayerStore((s) => s.position);
   const volume = usePlayerStore((s) => s.volume);
   const shuffle = usePlayerStore((s) => s.shuffle);
   const repeat = usePlayerStore((s) => s.repeat);
   const setShuffle = usePlayerStore((s) => s.setShuffle);
   const cycleRepeat = usePlayerStore((s) => s.cycleRepeat);
   const setVolume = usePlayerStore((s) => s.setVolume);
+  const togglePlay = usePlayerStore((s) => s.togglePlay);
+  const next = usePlayerStore((s) => s.next);
+  const prev = usePlayerStore((s) => s.prev);
+
+  const track = queue[currentIndex] ?? null;
+  const [fav, setFav] = useState(false);
 
   useEffect(() => {
+    if (!track) return;
     let cancelled = false;
-    void isFavorited("TRACK", trackId).then((f) => {
+    void isFavorited("TRACK", track.id).then((f) => {
       if (!cancelled) setFav(f);
     });
     return () => {
       cancelled = true;
     };
-  }, [trackId]);
+  }, [track]);
 
   useEffect(() => {
     function handler() {
-      void isFavorited("TRACK", trackId).then(setFav);
+      if (!track) return;
+      void isFavorited("TRACK", track.id).then(setFav);
     }
     window.addEventListener("ipod-fav-changed", handler);
     return () => window.removeEventListener("ipod-fav-changed", handler);
-  }, [trackId]);
+  }, [track]);
+
+  if (!track) return null;
 
   async function onToggleFav() {
-    const newFav = await toggleFavorite("TRACK", trackId);
+    if (!track) return;
+    const newFav = await toggleFavorite("TRACK", track.id);
     setFav(newFav);
     window.dispatchEvent(new CustomEvent("ipod-fav-changed"));
   }
 
-  return (
-    <div className="flex flex-col items-start gap-3 text-zinc-300">
-      <button
-        type="button"
-        onClick={onToggleFav}
-        className={
-          "rounded-full border px-4 py-1.5 text-[12px] font-medium transition " +
-          (fav
-            ? "border-red-600 bg-red-500/10 text-red-400 hover:bg-red-500/20"
-            : "border-zinc-600 bg-zinc-800 text-zinc-300 hover:bg-zinc-700")
-        }
-        aria-label={fav ? "Unfavorite" : "Favorite"}
-      >
-        {fav ? "♥ Favorited" : "♡ Favorite"}
-      </button>
+  function seekTo(seconds: number) {
+    getEngine().seek(seconds);
+    usePlayerStore.setState({ position: seconds });
+  }
 
-      <div className="w-full">
-        <div className="mb-1 flex items-center justify-between text-[10px] text-zinc-500">
-          <span>🔈 Volume</span>
-          <span>{Math.round(volume * 100)}%</span>
+  const progress = track.duration > 0 ? position / track.duration : 0;
+
+  return (
+    <aside className="flex w-72 flex-col gap-3 rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 text-zinc-300 shadow-xl backdrop-blur">
+      {/* Track header */}
+      <div className="flex items-start gap-3">
+        {track.coverArtHash ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={`/api/art/${track.coverArtHash}`}
+            alt=""
+            className="h-16 w-16 shrink-0 rounded object-cover shadow-lg"
+          />
+        ) : (
+          <div className="h-16 w-16 shrink-0 rounded bg-gradient-to-br from-[#5b7fb8] to-[#2a3a55] shadow-lg" />
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[13px] font-semibold text-zinc-100">{track.title}</div>
+          <div className="truncate text-[11px] text-zinc-400">{track.artist}</div>
+          <div className="truncate text-[10px] text-zinc-500">{track.album}</div>
         </div>
+        <button
+          type="button"
+          onClick={onToggleFav}
+          className={
+            "shrink-0 rounded-full p-1.5 text-[16px] leading-none transition " +
+            (fav
+              ? "text-red-500 hover:text-red-400"
+              : "text-zinc-500 hover:text-zinc-300")
+          }
+          aria-label={fav ? "Unfavorite" : "Favorite"}
+          title={fav ? "Unfavorite" : "Favorite"}
+        >
+          {fav ? "♥" : "♡"}
+        </button>
+      </div>
+
+      {/* Scrub bar */}
+      <div>
+        <input
+          type="range"
+          min={0}
+          max={Math.max(1, Math.floor(track.duration))}
+          value={Math.min(Math.floor(position), Math.floor(track.duration))}
+          onChange={(e) => seekTo(Number(e.target.value))}
+          className="w-full accent-zinc-200"
+          aria-label="seek"
+        />
+        <div className="mt-0.5 flex justify-between text-[10px] text-zinc-500">
+          <span>{formatTime(position)}</span>
+          <span>−{formatTime(Math.max(0, track.duration - position))}</span>
+        </div>
+      </div>
+
+      {/* Transport */}
+      <div className="flex items-center justify-center gap-4">
+        <button
+          type="button"
+          onClick={() => setShuffle(!shuffle)}
+          className={
+            "rounded p-1 text-[14px] transition " +
+            (shuffle ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-300")
+          }
+          aria-pressed={shuffle}
+          title="Shuffle"
+        >
+          ⇄
+        </button>
+        <button
+          type="button"
+          onClick={prev}
+          className="rounded p-1 text-[18px] text-zinc-300 hover:text-zinc-100"
+          aria-label="Previous"
+          title="Previous"
+        >
+          ⏮
+        </button>
+        <button
+          type="button"
+          onClick={togglePlay}
+          className="rounded-full bg-zinc-100 px-3 py-1 text-[18px] text-zinc-950 transition hover:bg-white"
+          aria-label={isPlaying ? "Pause" : "Play"}
+          title={isPlaying ? "Pause" : "Play"}
+        >
+          {isPlaying ? "⏸" : "▶"}
+        </button>
+        <button
+          type="button"
+          onClick={next}
+          className="rounded p-1 text-[18px] text-zinc-300 hover:text-zinc-100"
+          aria-label="Next"
+          title="Next"
+        >
+          ⏭
+        </button>
+        <button
+          type="button"
+          onClick={cycleRepeat}
+          className={
+            "rounded p-1 text-[14px] transition " +
+            (repeat !== "off" ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-300")
+          }
+          aria-label={`repeat ${repeat}`}
+          title={`Repeat: ${repeat}`}
+        >
+          {repeat === "one" ? "🔂" : "🔁"}
+        </button>
+      </div>
+
+      {/* Volume */}
+      <div className="flex items-center gap-2">
+        <span className="text-[14px] text-zinc-500">🔈</span>
         <input
           type="range"
           min={0}
           max={100}
           value={Math.round(volume * 100)}
           onChange={(e) => setVolume(Number(e.target.value) / 100)}
-          className="w-40 accent-zinc-300"
+          className="flex-1 accent-zinc-300"
           aria-label="volume"
         />
+        <span className="w-8 text-right text-[10px] text-zinc-500">
+          {Math.round(volume * 100)}%
+        </span>
       </div>
-
-      <div className="flex gap-2 text-[11px]">
-        <button
-          type="button"
-          onClick={() => setShuffle(!shuffle)}
-          className={
-            "rounded border px-2 py-1 transition " +
-            (shuffle
-              ? "border-zinc-300 bg-zinc-700 text-zinc-100"
-              : "border-zinc-700 bg-zinc-900 text-zinc-500 hover:text-zinc-300")
-          }
-          aria-pressed={shuffle}
-        >
-          ⇄ Shuffle
-        </button>
-        <button
-          type="button"
-          onClick={cycleRepeat}
-          className={
-            "rounded border px-2 py-1 transition " +
-            (repeat !== "off"
-              ? "border-zinc-300 bg-zinc-700 text-zinc-100"
-              : "border-zinc-700 bg-zinc-900 text-zinc-500 hover:text-zinc-300")
-          }
-          aria-label={`repeat ${repeat}`}
-        >
-          {repeat === "one" ? "🔂 One" : repeat === "all" ? "🔁 All" : "🔁 Off"}
-        </button>
-      </div>
-
-      <p className="text-[10px] text-zinc-500">
-        Wheel scroll = volume · Center = Notes
-      </p>
-    </div>
+    </aside>
   );
 }
