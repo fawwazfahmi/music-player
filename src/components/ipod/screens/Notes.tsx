@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { addNote, deleteNote, getNotesForTrack } from "@/server/actions/memory";
+import { isFavorited, toggleFavorite } from "@/server/actions/favorites";
 
 interface Props {
   trackId: string;
@@ -24,13 +25,18 @@ export function Notes({ trackId }: Props) {
   const [notes, setNotes] = useState<NoteRow[]>([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [fav, setFav] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     let cancelled = false;
-    void getNotesForTrack(trackId).then((ns) => {
+    void Promise.all([
+      getNotesForTrack(trackId),
+      isFavorited("TRACK", trackId),
+    ]).then(([ns, f]) => {
       if (cancelled) return;
       setNotes(ns.map((n) => ({ id: n.id, body: n.body, createdAt: new Date(n.createdAt) })));
+      setFav(f);
     });
     return () => {
       cancelled = true;
@@ -66,6 +72,25 @@ export function Notes({ trackId }: Props) {
     <div className="flex h-full flex-col">
       <div className="bg-gradient-to-b from-[#b9c6dc] to-[#5f7aa6] px-2 py-1 text-center text-[10px] font-bold text-white">
         Notes
+      </div>
+      <div className="border-b border-black/10 px-2 py-1">
+        <button
+          type="button"
+          onClick={() => {
+            void toggleFavorite("TRACK", trackId).then((newFav) => {
+              setFav(newFav);
+              window.dispatchEvent(new CustomEvent("ipod-fav-changed"));
+            });
+          }}
+          className={
+            "w-full rounded border px-1.5 py-0.5 text-[10px] " +
+            (fav
+              ? "border-red-600 bg-red-50 text-red-700"
+              : "border-black/30 bg-white/50 text-zinc-700")
+          }
+        >
+          {fav ? "♥ Favorited" : "♡ Favorite this track"}
+        </button>
       </div>
       <form onSubmit={onSubmit} className="border-b border-black/10 px-2 py-1">
         <textarea

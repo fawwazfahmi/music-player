@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePlayerStore } from "@/stores/player-store";
 import { formatDuration } from "@/lib/format-duration";
-import { isFavorited } from "@/server/actions/favorites";
+import { isFavorited, toggleFavorite } from "@/server/actions/favorites";
 
 export function NowPlaying() {
   const queue = usePlayerStore((s) => s.queue);
@@ -73,9 +73,28 @@ export function NowPlaying() {
             <span>−{formatDuration(Math.max(0, track.duration - position))}</span>
           </div>
         </div>
-        <div className="mt-1 text-[9px] text-zinc-600">
-          ▶ Center for Notes
+        <div className="mt-1 flex items-center gap-2 text-[10px]">
+          <button
+            type="button"
+            onClick={() => {
+              if (!track) return;
+              void toggleFavorite("TRACK", track.id).then((newFav) => {
+                setFav(newFav);
+                window.dispatchEvent(new CustomEvent("ipod-fav-changed"));
+              });
+            }}
+            className={
+              "rounded border px-1.5 py-0.5 text-[10px] " +
+              (fav
+                ? "border-red-600 bg-red-50 text-red-700"
+                : "border-black/30 bg-white/50 text-zinc-700")
+            }
+            aria-label={fav ? "Unfavorite" : "Favorite"}
+          >
+            {fav ? "♥ Favorited" : "♡ Favorite"}
+          </button>
         </div>
+        <div className="text-[9px] text-zinc-600">▶ Center for Notes</div>
       </div>
     </div>
   );
