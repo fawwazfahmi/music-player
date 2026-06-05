@@ -70,7 +70,35 @@ export async function searchRecording(artist: string, title: string): Promise<Re
 export async function getArtist(mbid: string): Promise<ArtistInfo> {
   return queue.add(async () => {
     const res = await mbFetch(`/artist/${mbid}`, {});
-    const data = (await res.json()) as { id: string; name: string; annotation?: string };
-    return { name: data.name, bio: data.annotation };
+    const data = (await res.json()) as {
+      id: string;
+      name: string;
+      annotation?: string;
+      disambiguation?: string;
+      type?: string;
+      country?: string;
+      "life-span"?: { begin?: string; end?: string };
+    };
+    // MB annotations are usually empty; build a short bio from structured fields.
+    const bio =
+      data.annotation?.trim() ||
+      buildShortBio(data.disambiguation, data.type, data.country, data["life-span"]?.begin);
+    return { name: data.name, bio };
   }) as Promise<ArtistInfo>;
+}
+
+function buildShortBio(
+  disambiguation: string | undefined,
+  type: string | undefined,
+  country: string | undefined,
+  begin: string | undefined,
+): string | undefined {
+  const parts: string[] = [];
+  if (disambiguation && disambiguation.trim().length > 0) parts.push(disambiguation.trim());
+  const meta: string[] = [];
+  if (country) meta.push(country);
+  if (type) meta.push(type.toLowerCase());
+  if (begin) meta.push(`since ${begin.slice(0, 4)}`);
+  if (meta.length > 0) parts.push(meta.join(" · "));
+  return parts.length > 0 ? parts.join(" — ") : undefined;
 }

@@ -82,9 +82,15 @@ async function processTrackJob(trackId: string): Promise<void> {
   }
 
   const top = candidates[0]!;
-  const strongCount = candidates.filter((c) => c.score >= 70).length;
-  if (top.score < 85 || strongCount > 1) {
-    throw new Error(`multi-match: top=${top.score}, ${strongCount} candidates >=70`);
+  const second = candidates[1]?.score ?? 0;
+  // Accept if:
+  //   - top score is very confident (>=95) — usually a perfect title+artist match, OR
+  //   - top >= 85 AND clearly wins over runner-up (10+ point gap)
+  const acceptable = top.score >= 95 || (top.score >= 85 && top.score - second >= 10);
+  if (!acceptable) {
+    throw new Error(
+      `weak-match: top=${top.score}, second=${second} (need >=95 or >=85 with 10+ gap)`,
+    );
   }
 
   // Update Track with MBID + refined title
