@@ -21,6 +21,7 @@ interface Row {
 
 export function ArtistDetail({ artistId, selected = 0 }: Props) {
   const [name, setName] = useState<string>("");
+  const [bio, setBio] = useState<string | null>(null);
   const [rows, setRows] = useState<Row[]>([]);
   const [fav, setFav] = useState(false);
   const push = useIpodStore((s) => s.push);
@@ -35,6 +36,7 @@ export function ArtistDetail({ artistId, selected = 0 }: Props) {
       if (cancelled) return;
       const artist = artists.find((a) => a.id === artistId);
       setName(artist?.name ?? "Unknown");
+      setBio(artist?.bio ?? null);
       setRows(
         tracks.map((t) => ({
           id: t.id,
@@ -89,6 +91,11 @@ export function ArtistDetail({ artistId, selected = 0 }: Props) {
       <div className="bg-gradient-to-b from-[#b9c6dc] to-[#5f7aa6] px-2 py-1 text-center text-[10px] font-bold text-white">
         {name || "Loading..."}
       </div>
+      {bio && (
+        <div className="border-b border-black/10 bg-white/40 px-2 py-1 text-[9px] leading-tight text-zinc-700">
+          <p className="line-clamp-3">{bio}</p>
+        </div>
+      )}
       <div className="flex-1 overflow-auto">
         <div
           className={
