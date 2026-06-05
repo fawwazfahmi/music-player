@@ -3,7 +3,7 @@ import { useIpodStore } from "@/stores/ipod-store";
 
 describe("ipod-store", () => {
   beforeEach(() => {
-    useIpodStore.setState({ navStack: [{ name: "home" }] });
+    useIpodStore.setState({ navStack: [{ name: "home" }], selectionByScreen: {} });
   });
 
   it("starts with home on the stack", () => {
@@ -30,5 +30,21 @@ describe("ipod-store", () => {
     useIpodStore.getState().push({ name: "artistList" });
     useIpodStore.getState().toRoot();
     expect(useIpodStore.getState().navStack).toEqual([{ name: "home" }]);
+  });
+
+  it("getSelectionFor returns 0 for unseen screens", () => {
+    expect(useIpodStore.getState().getSelectionFor({ name: "musicSub" })).toBe(0);
+  });
+
+  it("setSelectionFor / getSelectionFor round-trip", () => {
+    useIpodStore.getState().setSelectionFor({ name: "musicSub" }, 2);
+    expect(useIpodStore.getState().getSelectionFor({ name: "musicSub" })).toBe(2);
+  });
+
+  it("different parametric screens have separate selections", () => {
+    useIpodStore.getState().setSelectionFor({ name: "artistDetail", artistId: "a" }, 3);
+    useIpodStore.getState().setSelectionFor({ name: "artistDetail", artistId: "b" }, 7);
+    expect(useIpodStore.getState().getSelectionFor({ name: "artistDetail", artistId: "a" })).toBe(3);
+    expect(useIpodStore.getState().getSelectionFor({ name: "artistDetail", artistId: "b" })).toBe(7);
   });
 });

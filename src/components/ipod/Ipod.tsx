@@ -24,24 +24,22 @@ export function Ipod() {
   const toRoot = useIpodStore((s) => s.toRoot);
 
   const player = usePlayerStore();
-  const [selected, setSelected] = useState(0);
+  const selected = useIpodStore((s) => s.getSelectionFor(current));
+  const setSelectionFor = useIpodStore((s) => s.setSelectionFor);
+  const setSelected = (n: number | ((prev: number) => number)) => {
+    const next = typeof n === "function" ? n(selected) : n;
+    setSelectionFor(current, next);
+  };
   const [rowCount, setRowCount] = useState(0);
   const menuDownAt = useRef<number | null>(null);
-  const [lastScreenName, setLastScreenName] = useState(current.name);
-
-  // Reset selection synchronously when screen changes (state-compare pattern)
-  if (lastScreenName !== current.name) {
-    setLastScreenName(current.name);
-    setSelected(0);
-  }
 
   // Recompute row count when screen changes (async work belongs in effect)
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       let count = 0;
-      if (current.name === "home") count = 3;
-      else if (current.name === "musicSub") count = 3;
+      if (current.name === "home") count = 4;
+      else if (current.name === "musicSub") count = 5;
       else if (current.name === "artistList") count = (await getArtists()).length;
       else if (current.name === "albumList") count = (await getAllAlbums()).length;
       else if (current.name === "songList") count = (await getAllSongs()).length;
@@ -145,12 +143,35 @@ export function Ipod() {
       if (sel === 0) push({ name: "musicSub" });
       else if (sel === 1) push({ name: "search" });
       else if (sel === 2) push({ name: "nowPlaying" });
-    } else if (current.name === "search" || current.name === "ytPicker") {
+      else if (sel === 3) push({ name: "settings" });
+    } else if (current.name === "nowPlaying") {
+      const t = usePlayerStore.getState().currentTrack();
+      if (t) push({ name: "notes", trackId: t.id });
+    } else if (
+      current.name === "search" ||
+      current.name === "ytPicker" ||
+      current.name === "settings" ||
+      current.name === "artistDetail" ||
+      current.name === "albumDetail" ||
+      current.name === "playlistList" ||
+      current.name === "playlistDetail" ||
+      current.name === "favoritesList"
+    ) {
       window.dispatchEvent(new CustomEvent("ipod-select", { detail: { selected } }));
     } else if (current.name === "musicSub") {
       if (sel === 0) push({ name: "artistList" });
       else if (sel === 1) push({ name: "albumList" });
       else if (sel === 2) push({ name: "songList" });
+      else if (sel === 3) push({ name: "playlistList" });
+      else if (sel === 4) push({ name: "favoritesList" });
+    } else if (current.name === "artistList") {
+      const artists = await getArtists();
+      const artist = artists[sel];
+      if (artist) push({ name: "artistDetail", artistId: artist.id });
+    } else if (current.name === "albumList") {
+      const albums = await getAllAlbums();
+      const album = albums[sel];
+      if (album) push({ name: "albumDetail", albumId: album.id });
     } else if (current.name === "songList") {
       const songs = await getAllSongs();
       const queue = songs.map((s) => ({

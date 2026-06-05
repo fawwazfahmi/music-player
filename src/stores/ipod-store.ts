@@ -10,18 +10,45 @@ export type ScreenState =
   | { name: "songList" }
   | { name: "nowPlaying" }
   | { name: "search" }
-  | { name: "ytPicker"; query: string };
+  | { name: "ytPicker"; query: string }
+  | { name: "settings" }
+  | { name: "playlistList" }
+  | { name: "playlistDetail"; playlistId: string }
+  | { name: "newPlaylist" }
+  | { name: "favoritesList" }
+  | { name: "notes"; trackId: string };
+
+export function screenKey(s: ScreenState): string {
+  switch (s.name) {
+    case "artistDetail":
+      return `artistDetail:${s.artistId}`;
+    case "albumDetail":
+      return `albumDetail:${s.albumId}`;
+    case "ytPicker":
+      return `ytPicker:${s.query}`;
+    case "playlistDetail":
+      return `playlistDetail:${s.playlistId}`;
+    case "notes":
+      return `notes:${s.trackId}`;
+    default:
+      return s.name;
+  }
+}
 
 interface IpodState {
   navStack: ScreenState[];
+  selectionByScreen: Record<string, number>;
   current: () => ScreenState;
   push: (screen: ScreenState) => void;
   pop: () => void;
   toRoot: () => void;
+  getSelectionFor: (s: ScreenState) => number;
+  setSelectionFor: (s: ScreenState, idx: number) => void;
 }
 
 export const useIpodStore = create<IpodState>((set, get) => ({
   navStack: [{ name: "home" }],
+  selectionByScreen: {},
   current: () => {
     const stack = get().navStack;
     return stack[stack.length - 1] ?? { name: "home" };
@@ -33,4 +60,9 @@ export const useIpodStore = create<IpodState>((set, get) => ({
       return { navStack: s.navStack.slice(0, -1) };
     }),
   toRoot: () => set({ navStack: [{ name: "home" }] }),
+  getSelectionFor: (s) => get().selectionByScreen[screenKey(s)] ?? 0,
+  setSelectionFor: (s, idx) =>
+    set((state) => ({
+      selectionByScreen: { ...state.selectionByScreen, [screenKey(s)]: idx },
+    })),
 }));
