@@ -191,7 +191,14 @@ export function Ipod() {
   function handleEvent(e: WheelEventOut) {
     switch (e.type) {
       case "scroll":
-        if (rowCount > 0) {
+        if (current.name === "nowPlaying") {
+          // On NowPlaying, scroll adjusts volume (like a real iPod click wheel)
+          const cur = usePlayerStore.getState().volume;
+          const step = 0.05;
+          const next = Math.max(0, Math.min(1, cur - e.delta * step));
+          usePlayerStore.getState().setVolume(next);
+          window.dispatchEvent(new CustomEvent("ipod-volume-changed"));
+        } else if (rowCount > 0) {
           setSelected((s) => Math.max(0, Math.min(rowCount - 1, s + e.delta)));
         }
         break;
@@ -247,6 +254,12 @@ export function Ipod() {
 
 function NowPlayingControls({ trackId }: { trackId: string }) {
   const [fav, setFav] = useState(false);
+  const volume = usePlayerStore((s) => s.volume);
+  const shuffle = usePlayerStore((s) => s.shuffle);
+  const repeat = usePlayerStore((s) => s.repeat);
+  const setShuffle = usePlayerStore((s) => s.setShuffle);
+  const cycleRepeat = usePlayerStore((s) => s.cycleRepeat);
+  const setVolume = usePlayerStore((s) => s.setVolume);
 
   useEffect(() => {
     let cancelled = false;
@@ -266,17 +279,17 @@ function NowPlayingControls({ trackId }: { trackId: string }) {
     return () => window.removeEventListener("ipod-fav-changed", handler);
   }, [trackId]);
 
-  async function onToggle() {
+  async function onToggleFav() {
     const newFav = await toggleFavorite("TRACK", trackId);
     setFav(newFav);
     window.dispatchEvent(new CustomEvent("ipod-fav-changed"));
   }
 
   return (
-    <div className="flex flex-col items-start gap-2">
+    <div className="flex flex-col items-start gap-3 text-zinc-300">
       <button
         type="button"
-        onClick={onToggle}
+        onClick={onToggleFav}
         className={
           "rounded-full border px-4 py-1.5 text-[12px] font-medium transition " +
           (fav
@@ -287,7 +300,55 @@ function NowPlayingControls({ trackId }: { trackId: string }) {
       >
         {fav ? "♥ Favorited" : "♡ Favorite"}
       </button>
-      <p className="text-[10px] text-zinc-500">Center button → Notes</p>
+
+      <div className="w-full">
+        <div className="mb-1 flex items-center justify-between text-[10px] text-zinc-500">
+          <span>🔈 Volume</span>
+          <span>{Math.round(volume * 100)}%</span>
+        </div>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={Math.round(volume * 100)}
+          onChange={(e) => setVolume(Number(e.target.value) / 100)}
+          className="w-40 accent-zinc-300"
+          aria-label="volume"
+        />
+      </div>
+
+      <div className="flex gap-2 text-[11px]">
+        <button
+          type="button"
+          onClick={() => setShuffle(!shuffle)}
+          className={
+            "rounded border px-2 py-1 transition " +
+            (shuffle
+              ? "border-zinc-300 bg-zinc-700 text-zinc-100"
+              : "border-zinc-700 bg-zinc-900 text-zinc-500 hover:text-zinc-300")
+          }
+          aria-pressed={shuffle}
+        >
+          ⇄ Shuffle
+        </button>
+        <button
+          type="button"
+          onClick={cycleRepeat}
+          className={
+            "rounded border px-2 py-1 transition " +
+            (repeat !== "off"
+              ? "border-zinc-300 bg-zinc-700 text-zinc-100"
+              : "border-zinc-700 bg-zinc-900 text-zinc-500 hover:text-zinc-300")
+          }
+          aria-label={`repeat ${repeat}`}
+        >
+          {repeat === "one" ? "🔂 One" : repeat === "all" ? "🔁 All" : "🔁 Off"}
+        </button>
+      </div>
+
+      <p className="text-[10px] text-zinc-500">
+        Wheel scroll = volume · Center = Notes
+      </p>
     </div>
   );
 }
