@@ -17,7 +17,8 @@ export type ScreenState =
   | { name: "newPlaylist" }
   | { name: "favoritesList" }
   | { name: "notes"; trackId: string }
-  | { name: "nowPlayingFull" };
+  | { name: "nowPlayingFull" }
+  | { name: "stats" };
 
 export function screenKey(s: ScreenState): string {
   switch (s.name) {

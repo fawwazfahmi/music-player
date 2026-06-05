@@ -15,6 +15,7 @@ import {
   PlaylistIcon,
   SearchIcon,
   SettingsIcon,
+  StatsIcon,
 } from "@/components/icons";
 
 interface NavItemProps {
@@ -115,6 +116,12 @@ export function Sidebar() {
         icon={<HeartIcon size={18} />}
         target={{ name: "favoritesList" }}
         active={activeName === "favoritesList"}
+      />
+      <NavItem
+        label="Stats"
+        icon={<StatsIcon size={18} />}
+        target={{ name: "stats" }}
+        active={activeName === "stats"}
       />
 
       <div className="mt-4 flex items-center justify-between px-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">

@@ -57,7 +57,12 @@ export function LyricsPanel() {
         lyricsSource: "WHISPER",
       });
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e));
+      // Server-action errors can be huge (Prisma validation dumps). Just
+      // surface a short headline; the full stack is in the dev console.
+      const raw = e instanceof Error ? e.message : String(e);
+      const headline = raw.split("\n")[0]?.slice(0, 160) ?? "Transcription failed";
+      setError(headline);
+      console.error("Transcription failed:", e);
     } finally {
       setTranscribing(false);
     }
