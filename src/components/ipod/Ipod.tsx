@@ -144,12 +144,26 @@ export function Ipod() {
       else if (sel === 1) push({ name: "search" });
       else if (sel === 2) push({ name: "nowPlaying" });
       else if (sel === 3) push({ name: "settings" });
-    } else if (current.name === "search" || current.name === "ytPicker") {
+    } else if (
+      current.name === "search" ||
+      current.name === "ytPicker" ||
+      current.name === "settings" ||
+      current.name === "artistDetail" ||
+      current.name === "albumDetail"
+    ) {
       window.dispatchEvent(new CustomEvent("ipod-select", { detail: { selected } }));
     } else if (current.name === "musicSub") {
       if (sel === 0) push({ name: "artistList" });
       else if (sel === 1) push({ name: "albumList" });
       else if (sel === 2) push({ name: "songList" });
+    } else if (current.name === "artistList") {
+      const artists = await getArtists();
+      const artist = artists[sel];
+      if (artist) push({ name: "artistDetail", artistId: artist.id });
+    } else if (current.name === "albumList") {
+      const albums = await getAllAlbums();
+      const album = albums[sel];
+      if (album) push({ name: "albumDetail", albumId: album.id });
     } else if (current.name === "songList") {
       const songs = await getAllSongs();
       const queue = songs.map((s) => ({
