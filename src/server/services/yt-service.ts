@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import ytsr from "@distube/ytsr";
+import YouTube from "youtube-sr";
 import { env } from "@/lib/env";
 
 export interface YtSearchResult {
@@ -29,24 +29,17 @@ function runYtDlp(args: string[]): Promise<string> {
   });
 }
 
-// "4:23" -> 263, "1:02:30" -> 3750, "" -> 0
-function parseDurationString(s: string | undefined | null): number {
-  if (!s) return 0;
-  const parts = s.split(":").map((p) => parseInt(p, 10));
-  if (parts.some((n) => Number.isNaN(n))) return 0;
-  return parts.reduce((acc, n) => acc * 60 + n, 0);
-}
-
 export async function searchYt(query: string, limit = 5): Promise<YtSearchResult[]> {
-  // Uses @distube/ytsr (hits YouTube's innertube API directly) — ~1s.
+  // Uses youtube-sr (hits YouTube's innertube API directly) — ~1-3s.
   // yt-dlp's ytsearch is ~80s due to slow web-client-config fetch + bot detection.
-  const result = await ytsr(query, { type: "video", limit });
-  return result.items.slice(0, limit).map((item) => ({
-    videoId: item.id,
-    title: item.name,
-    uploader: item.author?.name ?? "Unknown",
-    duration: parseDurationString(item.duration),
-    thumbnail: item.thumbnail ?? null,
+  // Was @distube/ytsr but YT changed response shape and it stopped working.
+  const items = await YouTube.search(query, { type: "video", limit });
+  return items.slice(0, limit).map((v) => ({
+    videoId: v.id ?? "",
+    title: v.title ?? "Unknown",
+    uploader: v.channel?.name ?? "Unknown",
+    duration: Math.round((v.duration ?? 0) / 1000), // YouTube returns ms; we want seconds
+    thumbnail: v.thumbnail?.url ?? null,
   }));
 }
 

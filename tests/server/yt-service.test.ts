@@ -1,13 +1,28 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EventEmitter } from "node:events";
 
 vi.mock("node:child_process", () => ({
   spawn: vi.fn(),
 }));
 
-vi.mock("@distube/ytsr", () => ({
-  default: vi.fn(),
+vi.mock("youtube-sr", () => ({
+  default: { search: vi.fn() },
 }));
+
+beforeEach(() => {
+  vi.resetModules();
+  process.env.MUSICBRAINZ_USER_AGENT = "Test/1.0";
+  process.env.DATABASE_URL = "postgresql://u:p@localhost/db";
+  process.env.MUSIC_LIBRARY_PATH = "/srv/music";
+  process.env.YT_DLP_PATH = "/usr/local/bin/yt-dlp";
+  process.env.FFMPEG_PATH = "/usr/local/bin/ffmpeg";
+  process.env.APP_PASSWORD_HASH = "$2b$12$abcdefghijklmnopqrstuv";
+  process.env.COOKIE_SECRET = "x".repeat(48);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 function makeFakeProc() {
   const proc = new EventEmitter() as EventEmitter & {
@@ -20,49 +35,53 @@ function makeFakeProc() {
 }
 
 describe("yt-service", () => {
-  it("searchYt returns parsed innertube results from ytsr", async () => {
-    const ytsrMod = await import("@distube/ytsr");
-    vi.mocked(ytsrMod.default).mockResolvedValueOnce({
-      items: [
-        {
-          id: "vid1",
-          name: "From The Start",
-          author: { name: "Laufey" },
-          duration: "3:16",
-          thumbnail: "http://x/y.jpg",
-        },
-        {
-          id: "vid2",
-          name: "From The Start (Live)",
-          author: { name: "Laufey Live" },
-          duration: "3:20",
-          thumbnail: null,
-        },
-      ],
-    } as never);
+  it("searchYt maps youtube-sr Video[] to our YtSearchResult", async () => {
+    const yt = await import("youtube-sr");
+    vi.mocked(yt.default.search).mockResolvedValueOnce([
+      {
+        id: "vid1",
+        title: "From The Start",
+        channel: { name: "Laufey" },
+        duration: 196000, // milliseconds!
+        thumbnail: { url: "http://x/y.jpg" },
+      },
+      {
+        id: "vid2",
+        title: "From The Start (Live)",
+        channel: { name: "Laufey Live" },
+        duration: 200000,
+        thumbnail: null,
+      },
+    ] as never);
 
     const { searchYt } = await import("@/server/services/yt-service");
     const results = await searchYt("from the start", 2);
     expect(results).toHaveLength(2);
-    expect(results[0]?.videoId).toBe("vid1");
-    expect(results[0]?.title).toBe("From The Start");
-    expect(results[0]?.uploader).toBe("Laufey");
-    expect(results[0]?.duration).toBe(196); // 3:16 = 196s
-    expect(results[1]?.duration).toBe(200); // 3:20 = 200s
+    expect(results[0]).toMatchObject({
+      videoId: "vid1",
+      title: "From The Start",
+      uploader: "Laufey",
+      duration: 196,
+      thumbnail: "http://x/y.jpg",
+    });
+    expect(results[1]?.duration).toBe(200);
   });
 
-  it("searchYt handles hh:mm:ss durations and missing author", async () => {
-    const ytsrMod = await import("@distube/ytsr");
-    vi.mocked(ytsrMod.default).mockResolvedValueOnce({
-      items: [
-        { id: "vidLong", name: "Long Video", author: null, duration: "1:02:30", thumbnail: null },
-      ],
-    } as never);
+  it("searchYt handles missing optional fields gracefully", async () => {
+    const yt = await import("youtube-sr");
+    vi.mocked(yt.default.search).mockResolvedValueOnce([
+      { id: "vidx", title: "Something" } as never,
+    ]);
 
     const { searchYt } = await import("@/server/services/yt-service");
-    const results = await searchYt("long", 1);
-    expect(results[0]?.duration).toBe(3750); // 1*3600 + 2*60 + 30
-    expect(results[0]?.uploader).toBe("Unknown");
+    const results = await searchYt("x", 1);
+    expect(results[0]).toMatchObject({
+      videoId: "vidx",
+      title: "Something",
+      uploader: "Unknown",
+      duration: 0,
+      thumbnail: null,
+    });
   });
 
   it("resolveDirectUrl returns the first stdout line from yt-dlp", async () => {

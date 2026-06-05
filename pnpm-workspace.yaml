@@ -6,5 +6,3 @@ onlyBuiltDependencies:
   - '@prisma/engines'
   - prisma
 
-patchedDependencies:
-  '@distube/ytsr': patches/@distube__ytsr.patch
