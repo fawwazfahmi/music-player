@@ -1,6 +1,11 @@
 import { db } from "@/server/db";
-import { searchRecording, getArtist } from "@/server/services/musicbrainz";
+import { searchRecording, getArtist, type RecordingResult } from "@/server/services/musicbrainz";
 import { fetchCoverArt } from "@/server/services/cover-art";
+import {
+  parseYtTitle,
+  aggressivelyCleanTitle,
+  splitCamelCase,
+} from "@/server/services/yt-title-parser";
 
 let running = false;
 let stop = false;
@@ -72,45 +77,93 @@ async function processTrackJob(trackId: string): Promise<void> {
   });
   if (!track) return;
 
-  const candidates = await searchRecording(track.primaryArtist.name, track.title);
-  if (candidates.length === 0) {
+  // Build a list of (artist, title) candidates to try, in order of preference.
+  // Strategy 1: as-is (current artist + title).
+  // Strategy 2: parsed from title (extracts "Artist - Title" pattern, strips tags).
+  // Strategy 3: aggressively cleaned title with parsed artist (catches "(bridge demo)" etc).
+  const strategies: Array<{ artist: string; title: string; label: string }> = [
+    { artist: track.primaryArtist.name, title: track.title, label: "as-is" },
+  ];
+  const parsed = parseYtTitle(track.title, track.primaryArtist.name);
+  if (parsed.artist !== track.primaryArtist.name || parsed.title !== track.title) {
+    strategies.push({ artist: parsed.artist, title: parsed.title, label: "parsed" });
+  }
+  const aggressive = aggressivelyCleanTitle(track.title);
+  if (aggressive !== parsed.title && aggressive.length > 0) {
+    strategies.push({ artist: parsed.artist, title: aggressive, label: "aggressive" });
+  }
+  // CamelCase split for artists like "BillieEilish" → "Billie Eilish".
+  // Try with both the aggressive title (if available) and the parsed title.
+  const splitArtist = splitCamelCase(parsed.artist);
+  if (splitArtist !== parsed.artist) {
+    const splitTitle = aggressive.length > 0 ? aggressive : parsed.title;
+    strategies.push({ artist: splitArtist, title: splitTitle, label: "camelcase-split" });
+  }
+
+  let top: RecordingResult | null = null;
+  let strategyUsed = "";
+  for (const s of strategies) {
+    const candidates = await searchRecording(s.artist, s.title);
+    if (candidates.length === 0) continue;
+    const t = candidates[0]!;
+    const second = candidates[1]?.score ?? 0;
+    const acceptable = t.score >= 95 || (t.score >= 85 && t.score - second >= 10);
+    if (acceptable) {
+      top = t;
+      strategyUsed = s.label;
+      break;
+    }
+  }
+
+  if (!top) {
+    // None of the strategies returned a confident match — mark as fetched
+    // (with no MBID) so we don't keep retrying. User can manually fix via
+    // the (future) Needs Review screen.
     await db.track.update({
       where: { id: trackId },
       data: { metadataFetched: new Date() },
     });
-    return;
+    throw new Error(`weak-match: no strategy produced a confident match`);
   }
 
-  const top = candidates[0]!;
-  const second = candidates[1]?.score ?? 0;
-  // Accept if:
-  //   - top score is very confident (>=95) — usually a perfect title+artist match, OR
-  //   - top >= 85 AND clearly wins over runner-up (10+ point gap)
-  const acceptable = top.score >= 95 || (top.score >= 85 && top.score - second >= 10);
-  if (!acceptable) {
-    throw new Error(
-      `weak-match: top=${top.score}, second=${second} (need >=95 or >=85 with 10+ gap)`,
-    );
+  console.log(`[mu] enriched "${track.title}" via ${strategyUsed} → "${top.title}" by "${top.artistName}"`);
+
+  // If MB's artist name differs from our current artist row, re-link the
+  // track to the correct Artist (upsert by name; old artist row may be
+  // orphaned but we leave it for now — safer than auto-delete).
+  let primaryArtistId = track.primaryArtistId;
+  if (top.artistMbid && top.artistName && top.artistName !== track.primaryArtist.name) {
+    const correctArtist = await db.artist.upsert({
+      where: { name: top.artistName },
+      create: {
+        name: top.artistName,
+        mbid: top.artistMbid,
+        discoveredAt: track.primaryArtist.discoveredAt ?? new Date(),
+      },
+      update: { mbid: top.artistMbid },
+    });
+    primaryArtistId = correctArtist.id;
   }
 
-  // Update Track with MBID + refined title
+  // Update Track with MBID + refined title + re-linked artist
   await db.track.update({
     where: { id: trackId },
     data: {
       mbid: top.mbid,
       title: top.title,
+      primaryArtistId,
       metadataFetched: new Date(),
     },
   });
 
-  // Update Artist if MBID known and not already fetched
+  // Update Artist (bio) if MBID known and not already fetched
   if (top.artistMbid) {
-    const existing = await db.artist.findUnique({ where: { id: track.primaryArtistId } });
-    if (existing && !existing.mbid) {
+    const targetArtist = await db.artist.findUnique({ where: { id: primaryArtistId } });
+    if (targetArtist && !targetArtist.bio) {
       try {
         const info = await getArtist(top.artistMbid);
         await db.artist.update({
-          where: { id: track.primaryArtistId },
+          where: { id: primaryArtistId },
           data: {
             mbid: top.artistMbid,
             name: info.name,

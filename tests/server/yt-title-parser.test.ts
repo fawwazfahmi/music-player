@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseYtTitle, cleanTitleTags } from "@/server/services/yt-title-parser";
+import { parseYtTitle, cleanTitleTags, aggressivelyCleanTitle } from "@/server/services/yt-title-parser";
 
 describe("parseYtTitle", () => {
   it("splits 'Artist - Title' format", () => {
@@ -64,6 +64,26 @@ describe("parseYtTitle", () => {
       artist: "Unknown",
       title: "Just A Title",
     });
+  });
+
+  it("strips '(Bridge Demo)' and similar variant tags", () => {
+    expect(parseYtTitle("Tate McRae - siren sounds (bridge demo)", "X")).toEqual({
+      artist: "Tate McRae",
+      title: "siren sounds",
+    });
+    expect(parseYtTitle("Artist - Song (Acoustic Version)", "X")).toEqual({
+      artist: "Artist",
+      title: "Song",
+    });
+    expect(parseYtTitle("Artist - Song (Piano Demo)", "X")).toEqual({
+      artist: "Artist",
+      title: "Song",
+    });
+  });
+
+  it("aggressivelyCleanTitle strips any parenthetical + decoration symbols", () => {
+    expect(aggressivelyCleanTitle("siren sounds ☆ (bridge demo)")).toBe("siren sounds");
+    expect(aggressivelyCleanTitle("Song (Some Variant) [Extra]")).toBe("Song");
   });
 
   it("ignores leading or trailing separator (no empty side)", () => {

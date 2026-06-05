@@ -13,12 +13,32 @@
 const SEPARATORS = [" - ", " – ", " — ", " · ", " | "];
 
 // Parenthetical tags that should be stripped from the title (case-insensitive).
-// Single regex covers both () and [] wrappers.
+// Matches any (...) or [...] block that CONTAINS one of these keywords anywhere
+// inside. Catches "(Official Video)", "(Bridge Demo)", "(Acoustic Version)",
+// "(Live at Royal Albert Hall)", "(feat. Drake)", etc.
 const TAG_RE =
-  /\s*[(\[]\s*(?:official\s*(?:music\s*)?video|official\s*audio|official\s*lyric\s*video|official|lyrics?|audio\s*only|audio|hd|hq|4k|8k|live|acoustic|remix|cover|mv|m\/v|visualizer|extended|radio\s*edit|clean|explicit|feat\.?\s*[^)\]]+|ft\.?\s*[^)\]]+)\s*[)\]]\s*/gi;
+  /\s*[(\[][^)\]]*(?:official|lyrics?|audio|hd|hq|4k|8k|live|acoustic|remix|cover|mv|m\/v|visualizer|extended|radio|clean|explicit|feat\.?|ft\.?|demo|version|edit|mix|instrumental|sped\s*up|slowed|reverb|stripped|piano|bonus|deluxe)[^)\]]*[)\]]\s*/gi;
+
+// Symbols like ☆ ♪ ★ ✨ etc that sometimes decorate titles — strip in aggressive mode
+const DECORATION_RE = /[☀-➿✀-➿⌀-⏿⬀-⯿]+/g;
 
 export function cleanTitleTags(title: string): string {
-  return title.replace(TAG_RE, "").replace(/\s{2,}/g, " ").trim();
+  return title.replace(TAG_RE, " ").replace(/\s{2,}/g, " ").trim();
+}
+
+/** Insert spaces between lowercase→uppercase transitions: "BillieEilish" → "Billie Eilish". */
+export function splitCamelCase(s: string): string {
+  return s.replace(/([a-z])([A-Z])/g, "$1 $2");
+}
+
+/** Aggressive variant: also strips any remaining parentheticals + symbol decorations. */
+export function aggressivelyCleanTitle(title: string): string {
+  return cleanTitleTags(title)
+    .replace(/\s*\([^)]*\)\s*/g, " ")
+    .replace(/\s*\[[^\]]*\]\s*/g, " ")
+    .replace(DECORATION_RE, " ")
+    .replace(/\s{2,}/g, " ")
+    .trim();
 }
 
 export interface ParsedTitle {
