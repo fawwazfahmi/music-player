@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import ytsr from "@distube/ytsr";
 import { env } from "@/lib/env";
 
 export interface YtSearchResult {
@@ -7,15 +8,6 @@ export interface YtSearchResult {
   uploader: string;
   duration: number;
   thumbnail: string | null;
-}
-
-interface YtJson {
-  id?: string;
-  title?: string;
-  uploader?: string;
-  channel?: string;
-  duration?: number;
-  thumbnail?: string;
 }
 
 function runYtDlp(args: string[]): Promise<string> {
@@ -37,26 +29,25 @@ function runYtDlp(args: string[]): Promise<string> {
   });
 }
 
+// "4:23" -> 263, "1:02:30" -> 3750, "" -> 0
+function parseDurationString(s: string | undefined | null): number {
+  if (!s) return 0;
+  const parts = s.split(":").map((p) => parseInt(p, 10));
+  if (parts.some((n) => Number.isNaN(n))) return 0;
+  return parts.reduce((acc, n) => acc * 60 + n, 0);
+}
+
 export async function searchYt(query: string, limit = 5): Promise<YtSearchResult[]> {
-  const args = [
-    `ytsearch${limit}:${query}`,
-    "--no-warnings",
-    "-J",
-    "--flat-playlist",
-  ];
-  const raw = await runYtDlp(args);
-  const parsed = JSON.parse(raw) as YtJson & { entries?: YtJson[] };
-  const entries: YtJson[] = parsed.entries ?? [parsed];
-  return entries
-    .filter((e): e is YtJson & { id: string } => typeof e.id === "string")
-    .slice(0, limit)
-    .map((e) => ({
-      videoId: e.id,
-      title: e.title ?? "Unknown",
-      uploader: e.uploader ?? e.channel ?? "Unknown",
-      duration: Math.round(e.duration ?? 0),
-      thumbnail: e.thumbnail ?? null,
-    }));
+  // Uses @distube/ytsr (hits YouTube's innertube API directly) — ~1s.
+  // yt-dlp's ytsearch is ~80s due to slow web-client-config fetch + bot detection.
+  const result = await ytsr(query, { type: "video", limit });
+  return result.items.slice(0, limit).map((item) => ({
+    videoId: item.id,
+    title: item.name,
+    uploader: item.author?.name ?? "Unknown",
+    duration: parseDurationString(item.duration),
+    thumbnail: item.thumbnail ?? null,
+  }));
 }
 
 export async function resolveDirectUrl(videoId: string): Promise<string> {
