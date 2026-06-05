@@ -1,0 +1,43 @@
+# Cloudflare Tunnel configuration for Music Universe.
+#
+# Setup (one-time):
+#
+#   brew install cloudflared
+#   cloudflared tunnel login                       # opens browser, authorizes against your CF account
+#   cloudflared tunnel create music-universe       # creates tunnel + writes a credentials JSON
+#   cloudflared tunnel route dns music-universe kyote.fawwaz.fun
+#
+# Copy this file to ~/.cloudflared/config.yml and fill in:
+#   1. tunnel:           the UUID printed by `cloudflared tunnel create`
+#   2. credentials-file: the path printed by `cloudflared tunnel create`
+#      (usually ~/.cloudflared/<UUID>.json)
+#
+# Then run:
+#   cloudflared tunnel run music-universe
+#
+# Or load the launchd plist (see deploy/launchd/) so it survives reboots.
+
+tunnel: REPLACE_WITH_TUNNEL_UUID
+credentials-file: /Users/fwzfhmy/.cloudflared/REPLACE_WITH_TUNNEL_UUID.json
+
+# Don't auto-update — we let Homebrew manage cloudflared updates.
+no-autoupdate: true
+
+# Origin connection settings — the tunnel pulls /from/ localhost:3000 and pushes
+# it out to Cloudflare's edge, where it terminates TLS and serves your friend.
+ingress:
+  - hostname: kyote.fawwaz.fun
+    service: http://localhost:3000
+    originRequest:
+      # Increase the read timeout so long Whisper transcriptions and YT-DLP
+      # downloads (which run as server actions) don't get killed mid-flight.
+      noTLSVerify: false
+      connectTimeout: 30s
+      tlsTimeout: 30s
+      tcpKeepAlive: 30s
+      keepAliveConnections: 10
+      keepAliveTimeout: 90s
+      httpHostHeader: kyote.fawwaz.fun
+  # Catch-all: anything not matching the hostname above returns 404 instead of
+  # falling through to a different service.
+  - service: http_status:404

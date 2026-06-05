@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd job: Cloudflare Tunnel for Music Universe.
+
+  Prerequisites:
+    1. cloudflared installed (brew install cloudflared)
+    2. `cloudflared tunnel login` run once (browser auth)
+    3. Tunnel created: `cloudflared tunnel create music-universe`
+    4. DNS routed: `cloudflared tunnel route dns music-universe kyote.fawwaz.fun`
+    5. ~/.cloudflared/config.yml populated from deploy/cloudflared/config.example.yml
+
+  Install:
+    cp deploy/launchd/com.musicuniverse.tunnel.plist ~/Library/LaunchAgents/
+    launchctl load -w ~/Library/LaunchAgents/com.musicuniverse.tunnel.plist
+
+  Logs:
+    tail -f ~/Library/Logs/MusicUniverse/tunnel.out.log
+    tail -f ~/Library/Logs/MusicUniverse/tunnel.err.log
+
+  Note: cloudflared reads its config from ~/.cloudflared/config.yml by default,
+  which already names the tunnel — so `cloudflared tunnel run` with no extra
+  args is the correct invocation here.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.musicuniverse.tunnel</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/cloudflared</string>
+        <string>tunnel</string>
+        <string>run</string>
+        <string>music-universe</string>
+    </array>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <!-- TUNNEL_METRICS exposes Prometheus metrics locally for debugging. -->
+        <key>TUNNEL_METRICS</key>
+        <string>localhost:55556</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <key>StandardOutPath</key>
+    <string>/Users/fwzfhmy/Library/Logs/MusicUniverse/tunnel.out.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/fwzfhmy/Library/Logs/MusicUniverse/tunnel.err.log</string>
+</dict>
+</plist>

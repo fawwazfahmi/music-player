@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd job: Music Universe Next.js app (production).
+
+  Install:
+    cp deploy/launchd/com.musicuniverse.app.plist ~/Library/LaunchAgents/
+    launchctl load -w ~/Library/LaunchAgents/com.musicuniverse.app.plist
+
+  Start / stop / inspect:
+    launchctl start  com.musicuniverse.app
+    launchctl stop   com.musicuniverse.app
+    launchctl list | grep musicuniverse
+
+  Logs:
+    tail -f ~/Library/Logs/MusicUniverse/app.out.log
+    tail -f ~/Library/Logs/MusicUniverse/app.err.log
+
+  Run `pnpm build` once before loading (and after every code change). The
+  job runs `next start` which expects a prebuilt .next directory.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.musicuniverse.app</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/opt/homebrew/bin/pnpm</string>
+        <string>start</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/fwzfhmy/Projects/music-player</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>NODE_ENV</key>
+        <string>production</string>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+        <key>Crashed</key>
+        <true/>
+    </dict>
+
+    <!-- Crash-loop protection: if the app dies, wait 10s before restarting. -->
+    <key>ThrottleInterval</key>
+    <integer>10</integer>
+
+    <key>StandardOutPath</key>
+    <string>/Users/fwzfhmy/Library/Logs/MusicUniverse/app.out.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/fwzfhmy/Library/Logs/MusicUniverse/app.err.log</string>
+</dict>
+</plist>
