@@ -12,6 +12,7 @@ import {
   downloadAudio,
   type YtSearchResult,
 } from "@/server/services/yt-service";
+import { parseYtTitle } from "@/server/services/yt-title-parser";
 
 const CACHE_DIR = path.join(env.MUSIC_LIBRARY_PATH, ".cache", "yt");
 
@@ -54,9 +55,15 @@ export async function selectYtResult(
     return { trackId: existing.id };
   }
 
+  // Parse the YT video title into a clean artist + song title.
+  // "Sabrina Carpenter - Manchild (Official Video)" by uploader "Dan Music"
+  //   → artist "Sabrina Carpenter", title "Manchild"
+  // If no "Artist - Title" pattern is found, falls back to uploader.
+  const parsed = parseYtTitle(result.title, result.uploader);
+
   const artist = await db.artist.upsert({
-    where: { name: result.uploader },
-    create: { name: result.uploader, discoveredAt: new Date() },
+    where: { name: parsed.artist },
+    create: { name: parsed.artist, discoveredAt: new Date() },
     update: {},
   });
   const album = await db.album.upsert({
@@ -70,7 +77,7 @@ export async function selectYtResult(
     (
       await db.track.create({
         data: {
-          title: result.title,
+          title: parsed.title,
           duration: result.duration,
           primaryArtistId: artist.id,
           albumId: album.id,

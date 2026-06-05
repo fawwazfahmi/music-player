@@ -71,6 +71,10 @@ async function walk(dir: string): Promise<string[]> {
   const entries = await fs.readdir(dir, { withFileTypes: true });
   const out: string[] = [];
   for (const entry of entries) {
+    // Skip dot-prefixed entries (.cache, .DS_Store, etc) to match the chokidar
+    // watcher's ignore pattern. Keeps the scanner from re-ingesting YT cached
+    // m4a files as if they were a separate local library.
+    if (entry.name.startsWith(".")) continue;
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) out.push(...(await walk(full)));
     else if (entry.isFile() && AUDIO_EXTS.has(path.extname(entry.name).toLowerCase())) {
