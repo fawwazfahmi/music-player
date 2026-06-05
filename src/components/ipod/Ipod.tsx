@@ -15,6 +15,19 @@ import {
 } from "@/server/actions/views";
 import { startPlay, updatePlayProgress } from "@/server/actions/playback";
 import { isFavorited, toggleFavorite } from "@/server/actions/favorites";
+import {
+  HeartIcon,
+  HeartOutlineIcon,
+  PauseIcon,
+  PlayIcon,
+  RepeatIcon,
+  RepeatOneIcon,
+  ShuffleIcon,
+  SkipNextIcon,
+  SkipPreviousIcon,
+  VolumeMuteIcon,
+  VolumeUpIcon,
+} from "@/components/icons";
 
 const HOLD_MENU_MS = 600;
 
@@ -343,7 +356,7 @@ function PersistentPlayerPanel() {
             type="button"
             onClick={onToggleFav}
             className={
-              "shrink-0 rounded-full p-1.5 text-[16px] leading-none transition " +
+              "shrink-0 rounded-full p-1.5 leading-none transition " +
               (fav
                 ? "text-red-500 hover:text-red-400"
                 : "text-zinc-500 hover:text-zinc-300")
@@ -351,7 +364,7 @@ function PersistentPlayerPanel() {
             aria-label={fav ? "Unfavorite" : "Favorite"}
             title={fav ? "Unfavorite" : "Favorite"}
           >
-            {fav ? "♥" : "♡"}
+            {fav ? <HeartIcon size={18} /> : <HeartOutlineIcon size={18} />}
           </button>
         )}
       </div>
@@ -375,66 +388,66 @@ function PersistentPlayerPanel() {
       </div>
 
       {/* Transport */}
-      <div className="flex items-center justify-center gap-4">
+      <div className="flex items-center justify-center gap-3">
         <button
           type="button"
           onClick={() => setShuffle(!shuffle)}
           className={
-            "rounded p-1 text-[14px] transition " +
+            "rounded p-1.5 transition " +
             (shuffle ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-300")
           }
           aria-pressed={shuffle}
           title="Shuffle"
         >
-          ⇄
+          <ShuffleIcon size={18} />
         </button>
         <button
           type="button"
           onClick={prev}
           disabled={!hasTrack}
-          className="rounded p-1 text-[18px] text-zinc-300 transition hover:text-zinc-100 disabled:opacity-30 disabled:hover:text-zinc-300"
+          className="rounded p-1.5 text-zinc-300 transition hover:text-zinc-100 disabled:opacity-30 disabled:hover:text-zinc-300"
           aria-label="Previous"
           title="Previous"
         >
-          ⏮
+          <SkipPreviousIcon size={22} />
         </button>
         <button
           type="button"
           onClick={togglePlay}
           disabled={!hasTrack}
-          className="rounded-full bg-zinc-100 px-3 py-1 text-[18px] text-zinc-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-zinc-100"
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100 text-zinc-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-zinc-100"
           aria-label={isPlaying ? "Pause" : "Play"}
           title={isPlaying ? "Pause" : "Play"}
         >
-          {isPlaying ? "⏸" : "▶"}
+          {isPlaying ? <PauseIcon size={20} /> : <PlayIcon size={20} />}
         </button>
         <button
           type="button"
           onClick={next}
           disabled={!hasTrack}
-          className="rounded p-1 text-[18px] text-zinc-300 transition hover:text-zinc-100 disabled:opacity-30 disabled:hover:text-zinc-300"
+          className="rounded p-1.5 text-zinc-300 transition hover:text-zinc-100 disabled:opacity-30 disabled:hover:text-zinc-300"
           aria-label="Next"
           title="Next"
         >
-          ⏭
+          <SkipNextIcon size={22} />
         </button>
         <button
           type="button"
           onClick={cycleRepeat}
           className={
-            "rounded p-1 text-[14px] transition " +
+            "rounded p-1.5 transition " +
             (repeat !== "off" ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-300")
           }
           aria-label={`repeat ${repeat}`}
           title={`Repeat: ${repeat}`}
         >
-          {repeat === "one" ? "🔂" : "🔁"}
+          {repeat === "one" ? <RepeatOneIcon size={18} /> : <RepeatIcon size={18} />}
         </button>
       </div>
 
       {/* Volume */}
-      <div className="flex items-center gap-2">
-        <span className="text-[14px] text-zinc-500">🔈</span>
+      <div className="flex items-center gap-2 text-zinc-500">
+        {volume === 0 ? <VolumeMuteIcon size={16} /> : <VolumeUpIcon size={16} />}
         <input
           type="range"
           min={0}
@@ -444,9 +457,7 @@ function PersistentPlayerPanel() {
           className="flex-1 accent-zinc-300"
           aria-label="volume"
         />
-        <span className="w-8 text-right text-[10px] text-zinc-500">
-          {Math.round(volume * 100)}%
-        </span>
+        <span className="w-8 text-right text-[10px]">{Math.round(volume * 100)}</span>
       </div>
     </aside>
   );
