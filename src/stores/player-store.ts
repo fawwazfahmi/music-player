@@ -38,6 +38,8 @@ interface PlayerState {
   /** Remove the track at `index` from the queue. Adjusts currentIndex and
       stops playback if the queue becomes empty. */
   removeFromQueue: (index: number) => void;
+  /** Jump playback to a specific queue index (used by the Queue tab). */
+  jumpToIndex: (index: number) => void;
   /** Remove every occurrence of `trackId` from the queue. Used after the row
       is deleted from the database so it can't be played. */
   purgeTrack: (trackId: string) => void;
@@ -111,6 +113,18 @@ export const usePlayerStore = create<PlayerState>()(
           const insertAt = s.currentIndex + 1;
           const queue = [...s.queue.slice(0, insertAt), track, ...s.queue.slice(insertAt)];
           return { queue };
+        }),
+      jumpToIndex: (index) =>
+        set((s) => {
+          if (index < 0 || index >= s.queue.length) return s;
+          const next = s.queue[index];
+          return {
+            currentIndex: index,
+            position: 0,
+            isPlaying: true,
+            videoLoading: !!next?.ytVideoId,
+            playbackKey: s.playbackKey + 1,
+          };
         }),
       removeFromQueue: (index) =>
         set((s) => {

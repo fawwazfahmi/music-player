@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { useIpodStore } from "@/stores/ipod-store";
 import { LyricsPanel } from "@/components/player/LyricsPanel";
+import { QueuePanel } from "@/components/player/QueuePanel";
 import { ChevronRightIcon } from "@/components/icons";
+import { usePlayerStore } from "@/stores/player-store";
 
-type Tab = "lyrics" | "video";
+type Tab = "lyrics" | "queue";
 
 export function RightPanel() {
   const [tab, setTab] = useState<Tab>("lyrics");
@@ -50,30 +52,54 @@ export function RightPanel() {
       </div>
 
       <div className="flex border-b border-zinc-800/70 text-xs">
-        <button
-          type="button"
-          onClick={() => setTab("lyrics")}
-          className={
-            "flex-1 border-b-2 px-3 py-2 font-semibold transition " +
-            (tab === "lyrics"
-              ? "border-emerald-500 text-zinc-100"
-              : "border-transparent text-zinc-500 hover:text-zinc-300")
-          }
-        >
-          Lyrics
-        </button>
-        <button
-          type="button"
-          disabled
-          className="flex-1 border-b-2 border-transparent px-3 py-2 font-semibold text-zinc-700"
-          title="Queue view coming soon"
-        >
-          Queue
-        </button>
+        <TabButton label="Lyrics" active={tab === "lyrics"} onClick={() => setTab("lyrics")} />
+        <TabButton label="Queue" active={tab === "queue"} onClick={() => setTab("queue")} badge={<QueueBadge />} />
       </div>
       <div className="min-h-0 flex-1 overflow-hidden">
         {tab === "lyrics" && <LyricsPanel />}
+        {tab === "queue" && <QueuePanel />}
       </div>
     </aside>
+  );
+}
+
+function TabButton({
+  label,
+  active,
+  onClick,
+  badge,
+}: {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  badge?: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        "flex flex-1 items-center justify-center gap-1.5 border-b-2 px-3 py-2 font-semibold transition " +
+        (active
+          ? "border-emerald-500 text-zinc-100"
+          : "border-transparent text-zinc-500 hover:text-zinc-300")
+      }
+    >
+      <span>{label}</span>
+      {badge}
+    </button>
+  );
+}
+
+function QueueBadge() {
+  // Count tracks AFTER the current one — "up next" is the actionable number.
+  const upNext = usePlayerStore(
+    (s) => Math.max(0, s.queue.length - 1 - s.currentIndex),
+  );
+  if (upNext === 0) return null;
+  return (
+    <span className="rounded-full bg-zinc-800 px-1.5 py-0.5 text-[9px] font-semibold text-zinc-300">
+      {upNext}
+    </span>
   );
 }
