@@ -228,12 +228,16 @@ export function Ipod() {
 
   return (
     <main className="grid min-h-dvh place-items-center bg-zinc-950 p-4">
-      <div data-selected={selected} data-row-count={rowCount}>
-        <Chassis screen={<Screen selected={selected} />} wheel={<ClickWheel onEvent={handleEvent} />} />
+      <div className="flex flex-col items-center gap-6 md:flex-row md:items-start">
+        <div data-selected={selected} data-row-count={rowCount}>
+          <Chassis screen={<Screen selected={selected} />} wheel={<ClickWheel onEvent={handleEvent} />} />
+        </div>
+        {showNowPlayingControls && (
+          <div className="md:pt-12">
+            <NowPlayingControls trackId={currentTrack.id} />
+          </div>
+        )}
       </div>
-      {showNowPlayingControls && (
-        <NowPlayingControls trackId={currentTrack.id} />
-      )}
       <p className="mt-3 text-[11px] text-zinc-500">
         Selected: {selected} / {Math.max(0, rowCount - 1)}
       </p>
@@ -269,7 +273,7 @@ function NowPlayingControls({ trackId }: { trackId: string }) {
   }
 
   return (
-    <div className="mt-4 flex flex-col items-center gap-2">
+    <div className="flex flex-col items-start gap-2">
       <button
         type="button"
         onClick={onToggle}
