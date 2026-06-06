@@ -40,6 +40,9 @@ interface PlayerState {
   removeFromQueue: (index: number) => void;
   /** Jump playback to a specific queue index (used by the Queue tab). */
   jumpToIndex: (index: number) => void;
+  /** Move a track from one queue position to another. currentIndex is
+      adjusted so the currently-playing track stays correctly pointed at. */
+  reorderQueue: (from: number, to: number) => void;
   /** Remove every occurrence of `trackId` from the queue. Used after the row
       is deleted from the database so it can't be played. */
   purgeTrack: (trackId: string) => void;
@@ -113,6 +116,32 @@ export const usePlayerStore = create<PlayerState>()(
           const insertAt = s.currentIndex + 1;
           const queue = [...s.queue.slice(0, insertAt), track, ...s.queue.slice(insertAt)];
           return { queue };
+        }),
+      reorderQueue: (from, to) =>
+        set((s) => {
+          if (
+            from === to ||
+            from < 0 ||
+            to < 0 ||
+            from >= s.queue.length ||
+            to >= s.queue.length
+          ) {
+            return s;
+          }
+          const next = [...s.queue];
+          const [moved] = next.splice(from, 1);
+          next.splice(to, 0, moved!);
+          // Recompute currentIndex so the actively-playing track stays the
+          // active one, regardless of how the reorder shuffled its position.
+          let currentIndex = s.currentIndex;
+          if (from === s.currentIndex) {
+            currentIndex = to;
+          } else if (from < s.currentIndex && to >= s.currentIndex) {
+            currentIndex = s.currentIndex - 1;
+          } else if (from > s.currentIndex && to <= s.currentIndex) {
+            currentIndex = s.currentIndex + 1;
+          }
+          return { queue: next, currentIndex };
         }),
       jumpToIndex: (index) =>
         set((s) => {

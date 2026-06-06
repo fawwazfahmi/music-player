@@ -1,5 +1,19 @@
 "use client";
 
+import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { usePlayerStore } from "@/stores/player-store";
 import { CloseIcon, PlayIcon } from "@/components/icons";
 import { formatDuration } from "@/lib/format-duration";
@@ -9,6 +23,11 @@ export function QueuePanel() {
   const queue = usePlayerStore((s) => s.queue);
   const currentIndex = usePlayerStore((s) => s.currentIndex);
   const isPlaying = usePlayerStore((s) => s.isPlaying);
+  const reorderQueue = usePlayerStore((s) => s.reorderQueue);
+
+  // dnd-kit needs a small activation distance so a regular row-click still
+  // jumps playback instead of being interpreted as the start of a drag.
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   if (queue.length === 0) {
     return (
@@ -18,10 +37,21 @@ export function QueuePanel() {
     );
   }
 
-  // Split into "now playing" / "up next" so the user always sees what's
-  // playing at the top and what's coming next below.
   const playing = queue[currentIndex];
   const upNext = queue.slice(currentIndex + 1);
+  // Drag identifiers are absolute queue indices encoded as strings — dnd-kit
+  // requires unique sortable item ids and the queue can have duplicate
+  // trackIds.
+  const upNextIds = upNext.map((_, i) => `q-${currentIndex + 1 + i}`);
+
+  function handleDragEnd(e: DragEndEvent) {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const from = parseInt(String(active.id).slice(2), 10);
+    const to = parseInt(String(over.id).slice(2), 10);
+    if (Number.isNaN(from) || Number.isNaN(to)) return;
+    reorderQueue(from, to);
+  }
 
   return (
     <div className="flex h-full flex-col overflow-y-auto px-3 py-3 scrollbar-thin scrollbar-thumb-zinc-700">
@@ -49,32 +79,32 @@ export function QueuePanel() {
       {upNext.length === 0 ? (
         <p className="px-1 py-3 text-xs text-zinc-600">Nothing queued.</p>
       ) : (
-        upNext.map((t, i) => (
-          <QueueRow
-            key={`${currentIndex + 1 + i}-${t.id}`}
-            index={currentIndex + 1 + i}
-            title={t.title}
-            artist={t.artist}
-            duration={t.duration}
-            coverArtHash={t.coverArtHash ?? null}
-            ytVideoId={t.ytVideoId ?? null}
-          />
-        ))
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext items={upNextIds} strategy={verticalListSortingStrategy}>
+            {upNext.map((t, i) => (
+              <SortableQueueRow
+                key={upNextIds[i]}
+                sortId={upNextIds[i]!}
+                index={currentIndex + 1 + i}
+                title={t.title}
+                artist={t.artist}
+                duration={t.duration}
+                coverArtHash={t.coverArtHash ?? null}
+                ytVideoId={t.ytVideoId ?? null}
+              />
+            ))}
+          </SortableContext>
+        </DndContext>
       )}
     </div>
   );
 }
 
-function QueueRow({
-  index,
-  title,
-  artist,
-  duration,
-  coverArtHash,
-  ytVideoId,
-  active,
-  playing,
-}: {
+interface RowProps {
   index: number;
   title: string;
   artist: string;
@@ -83,12 +113,36 @@ function QueueRow({
   ytVideoId: string | null;
   active?: boolean;
   playing?: boolean;
-}) {
+  /** Drag handle props from dnd-kit. When provided, the row is draggable. */
+  dragRef?: (node: HTMLElement | null) => void;
+  dragStyle?: React.CSSProperties;
+  dragHandleProps?: Record<string, unknown>;
+  isDragging?: boolean;
+}
+
+function QueueRow(props: RowProps) {
+  const {
+    index,
+    title,
+    artist,
+    duration,
+    coverArtHash,
+    ytVideoId,
+    active,
+    playing,
+    dragRef,
+    dragStyle,
+    dragHandleProps,
+    isDragging,
+  } = props;
   const jumpToIndex = usePlayerStore((s) => s.jumpToIndex);
   const removeFromQueue = usePlayerStore((s) => s.removeFromQueue);
 
   return (
     <div
+      ref={dragRef}
+      style={dragStyle}
+      {...(dragHandleProps ?? {})}
       role="button"
       tabIndex={0}
       onClick={() => jumpToIndex(index)}
@@ -100,7 +154,8 @@ function QueueRow({
       }}
       className={
         "group flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1.5 transition hover:bg-zinc-800/60 " +
-        (active ? "bg-zinc-800/40 text-emerald-400" : "")
+        (active ? "bg-zinc-800/40 text-emerald-400 " : "") +
+        (isDragging ? "z-10 bg-zinc-800/90 shadow-lg ring-1 ring-zinc-700" : "")
       }
     >
       {(() => {
@@ -133,6 +188,7 @@ function QueueRow({
           e.stopPropagation();
           removeFromQueue(index);
         }}
+        onPointerDown={(e) => e.stopPropagation()}
         aria-label="Remove from queue"
         title="Remove from queue"
         className="rounded-full p-1 text-zinc-500 opacity-0 transition group-hover:opacity-100 hover:bg-zinc-700/60 hover:text-zinc-100"
@@ -140,5 +196,24 @@ function QueueRow({
         <CloseIcon size={14} />
       </button>
     </div>
+  );
+}
+
+function SortableQueueRow({ sortId, ...rest }: { sortId: string } & Omit<RowProps, "dragRef" | "dragStyle" | "dragHandleProps" | "isDragging">) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: sortId });
+  const dragStyle: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.85 : 1,
+  };
+  return (
+    <QueueRow
+      {...rest}
+      dragRef={setNodeRef}
+      dragStyle={dragStyle}
+      dragHandleProps={{ ...attributes, ...listeners }}
+      isDragging={isDragging}
+    />
   );
 }
