@@ -16,7 +16,16 @@ export interface GetLyricsResult {
   source: "cache" | "lrclib" | "none";
   /** Stored provenance — present when we have any lyrics for this track. */
   lyricsSource: LyricsSource | null;
+  /** True when LRCLIB missed and we kicked off a background Whisper
+      transcription. The lyrics panel polls getLyrics again every few seconds
+      while this is set. */
+  autoTranscribing: boolean;
 }
+
+// Module-level lock so concurrent getLyrics calls for the same track don't
+// fire whisper twice. Cleared when the background job finishes (success or
+// fail).
+const inFlightTranscriptions = new Set<string>();
 
 export async function getLyrics(trackId: string): Promise<GetLyricsResult> {
   const track = await db.track.findUnique({
@@ -27,14 +36,7 @@ export async function getLyrics(trackId: string): Promise<GetLyricsResult> {
     },
   });
   if (!track) {
-    return {
-      trackId,
-      synced: [],
-      plain: null,
-      instrumental: false,
-      source: "none",
-      lyricsSource: null,
-    };
+    return empty(trackId);
   }
 
   // Cache hit
@@ -46,32 +48,29 @@ export async function getLyrics(trackId: string): Promise<GetLyricsResult> {
       instrumental: false,
       source: "cache",
       lyricsSource: track.lyricsSource as LyricsSource | null,
+      autoTranscribing: false,
     };
   }
 
+  // A whisper job is already in flight for this track from a previous call.
+  if (inFlightTranscriptions.has(trackId)) {
+    return { ...empty(trackId), autoTranscribing: true };
+  }
+
+  // Try LRCLIB
+  let result: Awaited<ReturnType<typeof fetchLyrics>> | null = null;
   try {
-    const result = await fetchLyrics(
+    result = await fetchLyrics(
       track.primaryArtist.name,
       track.title,
       track.album?.title,
       track.duration,
     );
-    if (!result) {
-      // Mark as fetched (no lyrics) so we don't retry every time
-      await db.track.update({
-        where: { id: trackId },
-        data: { lyricsFetched: new Date() },
-      });
-      return {
-        trackId,
-        synced: [],
-        plain: null,
-        instrumental: false,
-        source: "none",
-        lyricsSource: null,
-      };
-    }
+  } catch {
+    // network blip — fall through, may try whisper anyway
+  }
 
+  if (result) {
     const lyricsSource: LyricsSource | null = result.syncedLyrics
       ? "LRCLIB_SYNCED"
       : result.plainLyrics
@@ -95,17 +94,66 @@ export async function getLyrics(trackId: string): Promise<GetLyricsResult> {
       instrumental: result.instrumental,
       source: "lrclib",
       lyricsSource,
-    };
-  } catch {
-    return {
-      trackId,
-      synced: [],
-      plain: null,
-      instrumental: false,
-      source: "none",
-      lyricsSource: null,
+      autoTranscribing: false,
     };
   }
+
+  // LRCLIB returned nothing. Off-canonical YT tracks (covers, demos, niche
+  // uploads) almost never have an LRCLIB match — auto-fire Whisper instead
+  // of making the user click "Transcribe with AI" every time. Only do this
+  // for tracks we have a real m4a for.
+  const isYtSourced = track.source === "YT_CACHED" || track.source === "YT_STREAMING";
+  if (isYtSourced && track.filePath) {
+    inFlightTranscriptions.add(trackId);
+    const filePath = track.filePath;
+    void (async () => {
+      try {
+        const { syncedLrc, plainText } = await transcribeFile(filePath);
+        await db.track.update({
+          where: { id: trackId },
+          data: {
+            lyricsSynced: syncedLrc,
+            lyricsPlain: plainText,
+            lyricsSource: "WHISPER",
+            lyricsFetched: new Date(),
+          },
+        });
+        console.log(`[mu] auto-transcribed ${trackId} via Whisper`);
+      } catch (e) {
+        console.error(`[mu] auto-transcribe failed for ${trackId}:`, e);
+        // Mark as fetched so we don't try LRCLIB or whisper on every page view.
+        await db.track
+          .update({
+            where: { id: trackId },
+            data: { lyricsFetched: new Date() },
+          })
+          .catch(() => {});
+      } finally {
+        inFlightTranscriptions.delete(trackId);
+      }
+    })();
+    return { ...empty(trackId), autoTranscribing: true };
+  }
+
+  // Not YT-sourced (LOCAL_SCAN) or no audio file — give up, mark fetched so
+  // we don't keep hitting LRCLIB.
+  await db.track.update({
+    where: { id: trackId },
+    data: { lyricsFetched: new Date() },
+  });
+  return empty(trackId);
+}
+
+function empty(trackId: string): GetLyricsResult {
+  return {
+    trackId,
+    synced: [],
+    plain: null,
+    instrumental: false,
+    source: "none",
+    lyricsSource: null,
+    autoTranscribing: false,
+  };
 }
 
 export interface TranscribeResult {
@@ -116,9 +164,8 @@ export interface TranscribeResult {
 }
 
 /**
- * Transcribe a track using whisper.cpp. Stores result with WHISPER provenance,
- * overwriting whatever was there before. Returns the new synced lyrics so the
- * caller can re-render immediately.
+ * Manual re-transcription — overwrites whatever's stored. Bypasses the
+ * auto-transcribe lock since the user explicitly asked for it.
  */
 export async function transcribeTrack(trackId: string): Promise<TranscribeResult> {
   const track = await db.track.findUnique({

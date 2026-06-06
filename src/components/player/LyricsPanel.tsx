@@ -21,7 +21,9 @@ export function LyricsPanel() {
   const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Fetch lyrics on track change
+  // Fetch lyrics on track change. If the server reports it kicked off an
+  // auto-transcription, re-poll every 4s until it lands so the user doesn't
+  // need to navigate away and back.
   useEffect(() => {
     if (!track) {
       setData(null);
@@ -30,15 +32,34 @@ export function LyricsPanel() {
     setLoading(true);
     setError(null);
     let cancelled = false;
-    void getLyrics(track.id)
-      .then((r) => {
-        if (!cancelled) setData(r);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    let pollHandle: ReturnType<typeof setTimeout> | null = null;
+    const trackId = track.id;
+
+    function schedulePoll() {
+      pollHandle = setTimeout(fetchOnce, 4000);
+    }
+
+    function fetchOnce() {
+      void getLyrics(trackId)
+        .then((r) => {
+          if (cancelled) return;
+          setData(r);
+          if (r.autoTranscribing) {
+            schedulePoll(); // still cooking — try again in 4s
+          }
+        })
+        .catch((e) => {
+          if (!cancelled) console.error("[mu] getLyrics failed", e);
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false);
+        });
+    }
+    fetchOnce();
+
     return () => {
       cancelled = true;
+      if (pollHandle !== null) clearTimeout(pollHandle);
     };
   }, [track?.id]);
 
@@ -55,6 +76,7 @@ export function LyricsPanel() {
         instrumental: false,
         source: "cache",
         lyricsSource: "WHISPER",
+        autoTranscribing: false,
       });
     } catch (e: unknown) {
       // Server-action errors can be huge (Prisma validation dumps). Just
@@ -121,14 +143,20 @@ export function LyricsPanel() {
     );
   }
 
-  if (transcribing) {
+  if (transcribing || data?.autoTranscribing) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-zinc-400">
         <div className="h-1.5 w-32 overflow-hidden rounded-full bg-zinc-800">
           <div className="h-full w-1/2 animate-pulse rounded-full bg-emerald-500" />
         </div>
-        <span>Transcribing with Whisper…</span>
-        <span className="text-xs text-zinc-600">This usually takes 20–60s</span>
+        <span>
+          {data?.autoTranscribing ? "Auto-transcribing with Whisper…" : "Transcribing with Whisper…"}
+        </span>
+        <span className="text-xs text-zinc-600">
+          {data?.autoTranscribing
+            ? "No LRCLIB match — Whisper is taking it from here. Usually 20-60s."
+            : "This usually takes 20–60s"}
+        </span>
       </div>
     );
   }
