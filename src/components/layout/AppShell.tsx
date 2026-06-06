@@ -13,6 +13,8 @@ import { PlayerBar } from "@/components/player/PlayerBar";
 import { MainContent } from "@/components/pages/MainContent";
 import { VideoStage } from "@/components/player/VideoStage";
 import { DownloadIndicator } from "@/components/player/DownloadIndicator";
+import { KeyboardHelpDialog } from "@/components/player/KeyboardHelpDialog";
+import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { ChevronLeftIcon, MenuIcon, CloseIcon } from "@/components/icons";
 
 export function AppShell() {
@@ -22,6 +24,10 @@ export function AppShell() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [rightOpen, setRightOpen] = useState(false);
+
+  // Global keyboard shortcuts — space=play/pause, arrows for seek/track,
+  // ?=help, /=search. Disabled while typing in inputs.
+  const { helpOpen, closeHelp } = useKeyboardShortcuts();
 
   const historyIdRef = useRef<string | null>(null);
   const lastReportedSecondRef = useRef(0);
@@ -241,6 +247,7 @@ export function AppShell() {
       <VideoStage />
       {/* Floating "downloading…" toast that persists across nav */}
       <DownloadIndicator />
+      <KeyboardHelpDialog open={helpOpen} onClose={closeHelp} />
     </div>
   );
 }

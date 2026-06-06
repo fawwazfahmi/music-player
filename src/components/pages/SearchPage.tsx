@@ -58,9 +58,10 @@ export function SearchPage() {
           <input
             ref={inputRef}
             type="text"
+            data-shortcut="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search songs, artists, albums..."
+            placeholder="Search songs, artists, albums…  (press /)"
             className="flex-1 bg-transparent text-sm text-zinc-100 outline-none placeholder:text-zinc-500"
           />
         </div>
