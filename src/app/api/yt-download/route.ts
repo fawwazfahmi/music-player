@@ -1,12 +1,14 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { runYtDownload } from "@/server/services/yt-download";
+import { createPendingDownload, runDownloadJob } from "@/server/services/yt-download";
 import type { YtSearchResult } from "@/server/services/yt-service";
 
-// We deliberately use a plain API route (not a Server Action) for this slow
-// operation. React's Server Action runtime serializes per-client transitions,
-// so a 100s yt-dlp download was blocking every other server action (Songs,
-// Albums, Artists, etc.) until it finished. Plain fetch lands here without
-// touching that queue, leaving the rest of the app responsive.
+// Two-phase download (avoid Cloudflare's 100s edge timeout):
+//
+//   1. createPendingDownload — synchronously creates Track + YtCacheEntry,
+//      returns trackId. ~50ms.
+//   2. runDownloadJob — fired-and-forgotten. Runs in the Node process for
+//      as long as yt-dlp needs (often 60-150s for big files / slow YT).
+//      Client polls /api/yt-status/[ytVideoId] for completion.
 
 function isValidResult(body: unknown): body is YtSearchResult {
   if (!body || typeof body !== "object") return false;
@@ -32,11 +34,21 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const result = await runYtDownload(body);
-    return NextResponse.json(result);
+    const { trackId, cached } = await createPendingDownload(body);
+
+    // Already on disk → tell the client to skip polling and play directly.
+    if (cached) {
+      return NextResponse.json({ trackId, status: "READY" });
+    }
+
+    // Phase 2 — DO NOT await. The Node process keeps it alive even after
+    // this response is sent and the HTTP connection closes.
+    void runDownloadJob(body, trackId);
+
+    return NextResponse.json({ trackId, status: "DOWNLOADING" });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error("[mu] yt-download route failed:", message);
-    return NextResponse.json({ error: "download_failed", message }, { status: 500 });
+    console.error("[mu] yt-download POST failed:", message);
+    return NextResponse.json({ error: "create_failed", message }, { status: 500 });
   }
 }

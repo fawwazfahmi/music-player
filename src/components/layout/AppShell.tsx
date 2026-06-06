@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useIpodStore } from "@/stores/ipod-store";
 import { usePlayerStore } from "@/stores/player-store";
+import { useDownloadStore } from "@/stores/download-store";
 import { getEngine } from "@/audio/engine";
 import { bindMediaSession, updateMediaMetadata } from "@/audio/media-session";
 import { startPlay, updatePlayProgress } from "@/server/actions/playback";
@@ -86,6 +87,52 @@ export function AppShell() {
       usePlayerStore.getState().next();
     });
   }, []);
+
+  // YT download polling — when a job is active in the download store, poll
+  // /api/yt-status until the server marks it READY (or FAILED). On READY,
+  // hand the pre-built queueTrack to the player so playback starts as soon
+  // as the file is actually on disk. Survives navigation because this
+  // effect lives on AppShell (always mounted), not on YtPickerPage.
+  const activeDownload = useDownloadStore((s) => s.active);
+  useEffect(() => {
+    if (!activeDownload || activeDownload.error) return;
+    const ytVideoId = activeDownload.id;
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    async function poll() {
+      if (stopped) return;
+      try {
+        const res = await fetch(`/api/yt-status/${ytVideoId}`, { cache: "no-store" });
+        if (!stopped && res.ok) {
+          const status = (await res.json()) as {
+            status: "DOWNLOADING" | "READY" | "FAILED" | "UNKNOWN";
+            errorMessage: string | null;
+          };
+          if (stopped) return;
+          if (status.status === "READY") {
+            usePlayerStore.getState().setQueue([activeDownload!.queueTrack], 0);
+            useDownloadStore.getState().finish();
+            return;
+          }
+          if (status.status === "FAILED") {
+            useDownloadStore
+              .getState()
+              .fail(status.errorMessage ?? "Download failed");
+            return;
+          }
+        }
+      } catch {
+        /* network blip — try again */
+      }
+      timer = setTimeout(poll, 2500);
+    }
+    void poll();
+    return () => {
+      stopped = true;
+      if (timer !== null) clearTimeout(timer);
+    };
+  }, [activeDownload]);
 
   // OS media session
   useEffect(() => {

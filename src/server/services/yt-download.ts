@@ -1,7 +1,19 @@
-// YT download orchestration — extracted from src/server/actions/search.ts so
-// the API route can invoke it directly without going through the React Server
-// Action queue (which serializes per-client and was blocking unrelated server
-// actions like getAllSongs for the entire duration of a download).
+// YT download orchestration.
+//
+// Split into two phases so the HTTP request doesn't sit open for the full
+// download (Cloudflare's free-plan edge times out at 100s, which kills any
+// >100s download even though the upstream Node process keeps running).
+//
+//   Phase 1 — createPendingDownload (fast, awaited by API route)
+//     Creates / refreshes the Track row + YtCacheEntry as DOWNLOADING.
+//     Returns the trackId so the client knows what to poll for.
+//
+//   Phase 2 — runDownloadJob (slow, fire-and-forget)
+//     Spawns yt-dlp, finalizes the DB row, marks YtCacheEntry READY.
+//     Runs in the Node process independently of the original HTTP request.
+//
+// Clients poll GET /api/yt-status/[ytVideoId] to learn when Phase 2 finishes
+// and the audio is actually playable.
 
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -25,21 +37,29 @@ async function sha256(filePath: string): Promise<string> {
   return hash.digest("hex");
 }
 
-export async function runYtDownload(
-  result: YtSearchResult,
-): Promise<{ trackId: string }> {
-  const log = (phase: string, extra?: object) =>
-    console.log(`[mu] runYtDownload/${result.videoId} ${phase}`, extra ?? "");
-  const t0 = Date.now();
-  log("start", { title: result.title });
+export interface CreateDownloadResult {
+  trackId: string;
+  cached: boolean; // already-downloaded → no Phase 2 needed
+}
 
+/**
+ * Phase 1: create the Track row + YtCacheEntry, return trackId. Fast (~50ms).
+ */
+export async function createPendingDownload(
+  result: YtSearchResult,
+): Promise<CreateDownloadResult> {
   const existing = await db.track.findUnique({
     where: { ytVideoId: result.videoId },
-    select: { id: true, source: true },
+    select: { id: true, source: true, filePath: true },
   });
-  if (existing && existing.source === "YT_CACHED") {
-    log("end:cache-hit", { ms: Date.now() - t0 });
-    return { trackId: existing.id };
+  if (existing && existing.source === "YT_CACHED" && existing.filePath) {
+    // Verify file still on disk; if it's gone we'll re-download.
+    try {
+      await fs.stat(existing.filePath);
+      return { trackId: existing.id, cached: true };
+    } catch {
+      /* fall through to re-download */
+    }
   }
 
   const parsed = parseYtTitle(result.title, result.uploader);
@@ -89,6 +109,25 @@ export async function runYtDownload(
     update: { status: "DOWNLOADING", attempts: { increment: 1 } },
   });
 
+  return { trackId, cached: false };
+}
+
+/**
+ * Phase 2: actually download the audio, finalize the Track row, mark cache
+ * entry READY. Runs in the background — DOES NOT block the HTTP response.
+ *
+ * Errors are caught internally and recorded on the YtCacheEntry so the
+ * client polling /api/yt-status sees them.
+ */
+export async function runDownloadJob(
+  result: YtSearchResult,
+  trackId: string,
+): Promise<void> {
+  const log = (phase: string, extra?: object) =>
+    console.log(`[mu] runDownloadJob/${result.videoId} ${phase}`, extra ?? "");
+  const t0 = Date.now();
+  log("start", { title: result.title });
+
   try {
     await fs.mkdir(CACHE_DIR, { recursive: true });
     const tDl = Date.now();
@@ -114,12 +153,37 @@ export async function runYtDownload(
     log("end:ok", { totalMs: Date.now() - t0 });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    await db.ytCacheEntry.update({
-      where: { ytVideoId: result.videoId },
-      data: { status: "FAILED", errorMessage: message.slice(0, 500) },
-    });
-    throw err;
+    log("end:fail", { totalMs: Date.now() - t0, message: message.slice(0, 200) });
+    await db.ytCacheEntry
+      .update({
+        where: { ytVideoId: result.videoId },
+        data: { status: "FAILED", errorMessage: message.slice(0, 500) },
+      })
+      .catch(() => {
+        /* DB might be down; best-effort */
+      });
   }
+}
 
-  return { trackId };
+export interface YtStatus {
+  ytVideoId: string;
+  trackId: string | null;
+  status: "DOWNLOADING" | "READY" | "FAILED" | "UNKNOWN";
+  errorMessage: string | null;
+}
+
+export async function getYtStatus(ytVideoId: string): Promise<YtStatus> {
+  const entry = await db.ytCacheEntry.findUnique({
+    where: { ytVideoId },
+    select: { ytVideoId: true, trackId: true, status: true, errorMessage: true },
+  });
+  if (!entry) {
+    return { ytVideoId, trackId: null, status: "UNKNOWN", errorMessage: null };
+  }
+  return {
+    ytVideoId: entry.ytVideoId,
+    trackId: entry.trackId,
+    status: entry.status as YtStatus["status"],
+    errorMessage: entry.errorMessage,
+  };
 }
