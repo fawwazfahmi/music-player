@@ -164,6 +164,37 @@ export interface TranscribeResult {
 }
 
 /**
+ * Persist user-edited synced lyrics. The client reconstructs the full LRC
+ * string from its in-memory line list and sends it whole — round-trip is
+ * cheap and the server doesn't need to know which specific line changed.
+ *
+ * Also recomputes lyricsPlain so the plain-text fallback view stays in
+ * sync (strip the timestamps, join non-empty lines).
+ */
+export async function updateSyncedLyrics(
+  trackId: string,
+  syncedLrc: string,
+): Promise<void> {
+  const plain = syncedLrc
+    .split(/\r?\n/)
+    .map((l) => l.replace(/\[\d{1,2}:\d{2}(?:[.:]\d{1,3})?\]/g, "").trim())
+    .filter((l) => l.length > 0)
+    .join("\n");
+
+  await db.track.update({
+    where: { id: trackId },
+    data: {
+      lyricsSynced: syncedLrc,
+      lyricsPlain: plain,
+      lyricsFetched: new Date(),
+      // Don't downgrade WHISPER → MANUAL on every edit; users edit one or two
+      // lines and the provenance is still mostly Whisper. The fact that
+      // they tweaked it is captured by lyricsFetched moving forward.
+    },
+  });
+}
+
+/**
  * Manual re-transcription — overwrites whatever's stored. Bypasses the
  * auto-transcribe lock since the user explicitly asked for it.
  */
