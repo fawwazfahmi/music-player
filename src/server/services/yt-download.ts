@@ -21,7 +21,7 @@ import crypto from "node:crypto";
 import { createReadStream } from "node:fs";
 import { db } from "@/server/db";
 import { env } from "@/lib/env";
-import { downloadAudio, type YtSearchResult } from "@/server/services/yt-service";
+import { downloadAudio, fetchPlaylist, type YtSearchResult } from "@/server/services/yt-service";
 import { parseYtTitle } from "@/server/services/yt-title-parser";
 
 const CACHE_DIR = path.join(env.MUSIC_LIBRARY_PATH, ".cache", "yt");
@@ -246,6 +246,83 @@ export async function resetStuckDownloads(): Promise<{ marked: number }> {
   });
   console.log(`[mu] yt-download: reset ${stuck.length} stuck DOWNLOADING entries`);
   return { marked: stuck.length };
+}
+
+// ─── Playlist / mix batch ─────────────────────────────────────────────────
+
+export interface PlaylistTrack {
+  trackId: string;
+  cached: boolean;
+  videoId: string;
+  title: string;
+  uploader: string;
+  duration: number;
+  thumbnail: string | null;
+}
+
+export interface PlaylistEnqueueResult {
+  total: number;
+  tracks: PlaylistTrack[];
+}
+
+/**
+ * Fetch a YT playlist / mix, create Track + YtCacheEntry rows for every
+ * video (so the client can append them to the queue immediately), then kick
+ * off a sequential background download chain for the non-cached ones.
+ *
+ * Returns as soon as the rows exist — the actual downloads keep running
+ * in the Node process well after this resolves.
+ */
+export async function enqueuePlaylist(url: string): Promise<PlaylistEnqueueResult> {
+  const videos = await fetchPlaylist(url);
+  if (videos.length === 0) return { total: 0, tracks: [] };
+
+  const tracks: PlaylistTrack[] = [];
+  for (const v of videos) {
+    try {
+      const { trackId, cached } = await createPendingDownload(v);
+      tracks.push({
+        trackId,
+        cached,
+        videoId: v.videoId,
+        title: v.title,
+        uploader: v.uploader,
+        duration: v.duration,
+        thumbnail: v.thumbnail,
+      });
+    } catch (err) {
+      console.error(`[mu] playlist enqueue failed for ${v.videoId}`, err);
+    }
+  }
+
+  // Background download chain — sequential so we don't fork 50 yt-dlp procs
+  // at once on a 50-song mix. Each job stays alive in the Node process
+  // independently of the HTTP request that triggered enqueuePlaylist.
+  void runPlaylistDownloadChain(
+    videos
+      .map((v) => {
+        const matched = tracks.find((t) => t.videoId === v.videoId);
+        return matched && !matched.cached
+          ? ({ video: v, trackId: matched.trackId } as const)
+          : null;
+      })
+      .filter((x): x is { video: YtSearchResult; trackId: string } => x !== null),
+  );
+
+  return { total: tracks.length, tracks };
+}
+
+async function runPlaylistDownloadChain(
+  items: { video: YtSearchResult; trackId: string }[],
+): Promise<void> {
+  for (const item of items) {
+    try {
+      await runDownloadJob(item.video, item.trackId);
+    } catch (err) {
+      console.error(`[mu] playlist download failed for ${item.video.videoId}`, err);
+    }
+  }
+  console.log(`[mu] playlist download chain finished (${items.length} videos)`);
 }
 
 export async function getYtStatus(ytVideoId: string): Promise<YtStatus> {

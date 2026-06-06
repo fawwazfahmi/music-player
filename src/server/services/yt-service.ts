@@ -155,6 +155,48 @@ async function searchWithYtDlp(query: string, limit: number): Promise<YtSearchRe
     .slice(0, limit);
 }
 
+// yt-dlp can return a single video URL via --dump-single-json too, which
+// breaks the playlist parsing. Detect a playlist by looking for the
+// "?list=" or "&list=" query param in the URL.
+export function isPlaylistUrl(raw: string): boolean {
+  try {
+    const u = new URL(raw);
+    return /list=/.test(u.search);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Fetch a YouTube playlist (or "mix" / radio) by URL. Uses yt-dlp's
+ * --flat-playlist mode, which returns just the video IDs / titles / durations
+ * without resolving each video's stream URL — fast and cheap (<2s for most
+ * mixes), suitable for showing the list before deciding to download anything.
+ *
+ * Returns an empty array if yt-dlp can't recognize the URL as a playlist.
+ */
+export async function fetchPlaylist(url: string): Promise<YtSearchResult[]> {
+  const raw = await runYtDlp([
+    url,
+    "--flat-playlist",
+    "--dump-single-json",
+    "--no-warnings",
+  ]);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  const entries =
+    (parsed as { entries?: YtDlpEntry[] } | YtDlpEntry[])?.constructor === Array
+      ? (parsed as YtDlpEntry[])
+      : (parsed as { entries?: YtDlpEntry[] }).entries ?? [];
+  return entries
+    .map(mapYtDlpEntry)
+    .filter((x): x is YtSearchResult => x !== null);
+}
+
 export async function searchYt(query: string, limit = 5): Promise<YtSearchResult[]> {
   const trimmed = query.trim();
   if (!trimmed) return [];

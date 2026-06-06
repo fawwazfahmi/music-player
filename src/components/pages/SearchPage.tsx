@@ -1,19 +1,92 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { searchLibrary } from "@/server/actions/search";
 import type { SearchResults } from "@/server/services/search";
 import { useIpodStore } from "@/stores/ipod-store";
 import { usePlayerStore } from "@/stores/player-store";
-import { AlbumIcon, ArtistIcon, MusicNoteIcon, SearchIcon } from "@/components/icons";
+import { AlbumIcon, ArtistIcon, MusicNoteIcon, PlaylistIcon, SearchIcon } from "@/components/icons";
 import { buildQueueTrack } from "./_shared";
+
+// True for a YouTube URL that points at a playlist / mix (has ?list=…).
+function detectYtPlaylistUrl(text: string): string | null {
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  try {
+    const u = new URL(trimmed);
+    if (!/(?:^|\.)youtube\.com$|(?:^|\.)youtu\.be$/i.test(u.hostname)) return null;
+    if (!u.searchParams.get("list")) return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
+interface PlaylistTrackResp {
+  trackId: string;
+  cached: boolean;
+  videoId: string;
+  title: string;
+  uploader: string;
+  duration: number;
+  thumbnail: string | null;
+}
 
 export function SearchPage() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResults>({ tracks: [], artists: [], albums: [] });
   const [searching, setSearching] = useState(false);
+  const [playlistBusy, setPlaylistBusy] = useState(false);
+  const [toast, setToast] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const push = useIpodStore((s) => s.push);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const playlistUrl = useMemo(() => detectYtPlaylistUrl(query), [query]);
+
+  async function addPlaylist(mode: "play" | "append") {
+    if (!playlistUrl) return;
+    setPlaylistBusy(true);
+    setToast(null);
+    try {
+      const res = await fetch("/api/yt-playlist", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url: playlistUrl }),
+      });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => null)) as { message?: string; error?: string } | null;
+        throw new Error(j?.message ?? j?.error ?? `HTTP ${res.status}`);
+      }
+      const data = (await res.json()) as { total: number; tracks: PlaylistTrackResp[] };
+      const queueTracks = data.tracks.map((t) =>
+        buildQueueTrack({
+          id: t.trackId,
+          title: t.title,
+          duration: t.duration,
+          artistName: t.uploader,
+          albumTitle: "YouTube Mix",
+          ytVideoId: t.videoId,
+        }),
+      );
+      if (mode === "play") {
+        usePlayerStore.getState().setQueue(queueTracks, 0);
+      } else {
+        usePlayerStore.getState().addManyToQueue(queueTracks);
+      }
+      setToast({
+        kind: "ok",
+        text: `${data.total} song${data.total === 1 ? "" : "s"} added — downloading in the background`,
+      });
+      setQuery("");
+    } catch (err) {
+      setToast({
+        kind: "err",
+        text: err instanceof Error ? err.message : "Playlist failed",
+      });
+    } finally {
+      setPlaylistBusy(false);
+    }
+  }
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -68,9 +141,51 @@ export function SearchPage() {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+        {playlistUrl && (
+          <div className="mb-4 flex flex-col gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-4">
+            <div className="flex items-center gap-2 text-sm text-emerald-200">
+              <PlaylistIcon size={16} />
+              <span>YouTube playlist / mix detected</span>
+            </div>
+            <p className="break-all text-xs text-zinc-400">{playlistUrl}</p>
+            <div className="mt-1 flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={playlistBusy}
+                onClick={() => void addPlaylist("play")}
+                className="rounded-full bg-emerald-500 px-4 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-emerald-400 disabled:opacity-50"
+              >
+                {playlistBusy ? "Adding…" : "Play playlist"}
+              </button>
+              <button
+                type="button"
+                disabled={playlistBusy}
+                onClick={() => void addPlaylist("append")}
+                className="rounded-full border border-emerald-500/60 px-4 py-1.5 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-500/20 disabled:opacity-50"
+              >
+                {playlistBusy ? "Adding…" : "Add to queue"}
+              </button>
+            </div>
+            <p className="text-[10px] text-zinc-500">
+              Downloads run sequentially in the background. First track might take 30-60s to be playable.
+            </p>
+          </div>
+        )}
+        {toast && (
+          <div
+            className={
+              "mb-4 rounded-lg px-3 py-2 text-xs " +
+              (toast.kind === "ok"
+                ? "bg-emerald-500/15 text-emerald-200"
+                : "bg-red-500/15 text-red-200")
+            }
+          >
+            {toast.text}
+          </div>
+        )}
         {query.trim().length === 0 ? (
           <p className="py-12 text-center text-sm text-zinc-500">
-            Type to search your library.
+            Type to search your library, or paste a YouTube playlist URL.
           </p>
         ) : searching ? (
           <p className="py-12 text-center text-sm text-zinc-500">Searching…</p>

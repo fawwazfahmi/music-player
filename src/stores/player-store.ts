@@ -47,6 +47,9 @@ interface PlayerState {
   /** Append a track to the end of the queue. If the queue is empty, starts
       playing it immediately. */
   addToQueue: (track: QueueTrack) => void;
+  /** Append many tracks in one shot — used when adding a YT playlist /
+      mix so we do a single state update instead of N back-to-back. */
+  addManyToQueue: (tracks: QueueTrack[]) => void;
   /** Insert a track right after the currently playing one. If the queue is
       empty, starts playing immediately. */
   playNext: (track: QueueTrack) => void;
@@ -115,6 +118,22 @@ export const usePlayerStore = create<PlayerState>()(
             };
           }
           return { queue: [...s.queue, track] };
+        }),
+      addManyToQueue: (tracks) =>
+        set((s) => {
+          if (tracks.length === 0) return s;
+          if (s.queue.length === 0) {
+            const first = tracks[0]!;
+            return {
+              queue: tracks,
+              currentIndex: 0,
+              isPlaying: true,
+              videoLoading: !!first.ytVideoId,
+              playbackKey: s.playbackKey + 1,
+              position: 0,
+            };
+          }
+          return { queue: [...s.queue, ...tracks] };
         }),
       playNext: (track) =>
         set((s) => {
