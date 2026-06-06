@@ -35,25 +35,25 @@ export function PartyControls() {
 
   const latestSyncRef = useRef<ReceiverSync | null>(null);
 
-  // ─── SSE stream (both sides) ───────────────────────────────────────────
-  // EventSource auto-reconnects on disconnect. We use a single connection
-  // for the entire session and let the server's keepalive comments keep
-  // it warm through Cloudflare's tunnel.
+  // ─── Receiver transport (both sides) ───────────────────────────────────
+  // Tries SSE first (push, sub-100ms). If SSE doesn't open within 3s — old
+  // browser without EventSource, corporate proxy that strips streams,
+  // origin behind a buffering reverse proxy — silently degrades to polling
+  // at the same 750ms cadence we had pre-SSE so the party still works,
+  // just with the old desync floor.
   useEffect(() => {
-    if (typeof EventSource === "undefined") return; // SSR / very old browsers
-    const es = new EventSource("/api/party/stream");
-    es.onmessage = (e) => {
-      let data: PartyView | null = null;
-      try {
-        data = JSON.parse(e.data) as PartyView | null;
-      } catch {
-        return;
-      }
+    let es: EventSource | null = null;
+    let pollTimer: ReturnType<typeof setTimeout> | null = null;
+    let openWatchdog: ReturnType<typeof setTimeout> | null = null;
+    let mode: "sse" | "poll" | "closed" = "sse";
+    let receivedFirstMessage = false;
+
+    function applyState(data: PartyView | null, roundTripMs = 0) {
       setRemote(data);
       if (data?.active) {
         latestSyncRef.current = {
           receivedAt: Date.now(),
-          serverAgeMs: data.ageMs,
+          serverAgeMs: data.ageMs + roundTripMs / 2, // small RTT correction for poll path
           position: data.position,
           isPlaying: data.isPlaying,
           trackId: data.trackId,
@@ -61,13 +61,82 @@ export function PartyControls() {
       } else if (following) {
         setFollowing(false);
       }
+    }
+
+    async function pollOnce() {
+      const t0 = Date.now();
+      try {
+        const res = await fetch("/api/party", { cache: "no-store" });
+        if (mode !== "poll") return;
+        if (res.ok) {
+          const data = (await res.json()) as PartyView | null;
+          applyState(data, Date.now() - t0);
+        }
+      } catch {
+        /* network blip */
+      }
+      if (mode === "poll") pollTimer = setTimeout(pollOnce, 750);
+    }
+
+    function switchToPolling() {
+      if (mode !== "sse") return;
+      console.warn("[mu] party: SSE didn't open within 3s — falling back to polling");
+      mode = "poll";
+      es?.close();
+      es = null;
+      void pollOnce();
+    }
+
+    function trySSE() {
+      if (typeof EventSource === "undefined") {
+        switchToPolling();
+        return;
+      }
+      es = new EventSource("/api/party/stream");
+      es.onopen = () => {
+        // Connection alive — clear the watchdog so we don't bounce to
+        // polling if a later transient error fires.
+        if (openWatchdog !== null) {
+          clearTimeout(openWatchdog);
+          openWatchdog = null;
+        }
+      };
+      es.onmessage = (e) => {
+        receivedFirstMessage = true;
+        if (openWatchdog !== null) {
+          clearTimeout(openWatchdog);
+          openWatchdog = null;
+        }
+        let data: PartyView | null = null;
+        try {
+          data = JSON.parse(e.data) as PartyView | null;
+        } catch {
+          return;
+        }
+        applyState(data);
+      };
+      es.onerror = () => {
+        // EventSource auto-reconnects with a backoff after a healthy open,
+        // so if we've already received a message we let it ride. Only the
+        // never-opened path triggers polling fallback (handled by the
+        // watchdog below).
+      };
+
+      openWatchdog = setTimeout(() => {
+        if (!receivedFirstMessage && es?.readyState !== EventSource.OPEN) {
+          switchToPolling();
+        }
+      }, 3000);
+    }
+
+    trySSE();
+
+    return () => {
+      mode = "closed";
+      es?.close();
+      if (pollTimer !== null) clearTimeout(pollTimer);
+      if (openWatchdog !== null) clearTimeout(openWatchdog);
     };
-    es.onerror = () => {
-      // EventSource auto-reconnects with a backoff; we don't need to do
-      // anything special. Browsers throw a benign error event on every
-      // reconnect attempt, so we deliberately don't log.
-    };
-    return () => es.close();
   }, [following, setRemote, setFollowing]);
 
   // ─── AUTO-JOIN (?party=…) ──────────────────────────────────────────────
