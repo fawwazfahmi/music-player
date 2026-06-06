@@ -18,7 +18,9 @@ export type ScreenState =
   | { name: "favoritesList" }
   | { name: "notes"; trackId: string }
   | { name: "nowPlayingFull" }
-  | { name: "stats" };
+  | { name: "stats" }
+  | { name: "tagList" }
+  | { name: "tagDetail"; tagId: string };
 
 export function screenKey(s: ScreenState): string {
   switch (s.name) {
@@ -32,6 +34,8 @@ export function screenKey(s: ScreenState): string {
       return `playlistDetail:${s.playlistId}`;
     case "notes":
       return `notes:${s.trackId}`;
+    case "tagDetail":
+      return `tagDetail:${s.tagId}`;
     default:
       return s.name;
   }

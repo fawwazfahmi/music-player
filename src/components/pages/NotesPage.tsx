@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { addNote, deleteNote, getNotesForTrack } from "@/server/actions/memory";
 import { DeleteIcon, NoteIcon } from "@/components/icons";
+import { TagEditor } from "@/components/tags/TagEditor";
 import { PageHeader } from "./_shared";
 
 interface Props {
@@ -63,6 +64,9 @@ export function NotesPage({ trackId }: Props) {
     <div className="flex h-full flex-col">
       <PageHeader title="Notes" subtitle="Memory journal" />
       <div className="min-h-0 flex-1 overflow-y-auto p-6">
+        <div className="mx-auto mb-6 max-w-2xl">
+          <TagEditor trackId={trackId} />
+        </div>
         <form onSubmit={onSubmit} className="mx-auto max-w-2xl">
           <textarea
             ref={inputRef}

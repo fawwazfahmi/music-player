@@ -16,6 +16,7 @@ import {
   SearchIcon,
   SettingsIcon,
   StatsIcon,
+  TagIcon,
 } from "@/components/icons";
 
 interface NavItemProps {
@@ -122,6 +123,12 @@ export function Sidebar() {
         icon={<StatsIcon size={18} />}
         target={{ name: "stats" }}
         active={activeName === "stats"}
+      />
+      <NavItem
+        label="Tags"
+        icon={<TagIcon size={18} />}
+        target={{ name: "tagList" }}
+        active={activeName === "tagList" || activeName === "tagDetail"}
       />
 
       <div className="mt-4 flex items-center justify-between px-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
