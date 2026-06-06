@@ -16,6 +16,7 @@ import {
 } from "@/server/actions/stats";
 import { usePlayerStore } from "@/stores/player-store";
 import { useIpodStore } from "@/stores/ipod-store";
+import { coverUrl } from "@/lib/cover-url";
 import { PageHeader, buildQueueTrack } from "./_shared";
 import { PlayIcon } from "@/components/icons";
 import { formatDuration } from "@/lib/format-duration";
@@ -166,8 +167,8 @@ function Stat({
   );
 }
 
-function useCoverUrl(hash: string | null): string | null {
-  return useMemo(() => (hash ? `/api/art/${hash}` : null), [hash]);
+function useResolvedCoverUrl(hash: string | null, ytVideoId?: string | null): string | null {
+  return useMemo(() => coverUrl(hash, ytVideoId), [hash, ytVideoId]);
 }
 
 function TopTracksList({ items }: { items: TopTrack[] | null }) {
@@ -200,7 +201,7 @@ function TopTracksList({ items }: { items: TopTrack[] | null }) {
             className="group flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition hover:bg-zinc-800/50"
           >
             <span className="w-6 text-right text-xs text-zinc-500 tabular-nums">{i + 1}</span>
-            <Cover hash={t.coverArtHash} alt={t.title} />
+            <Cover hash={t.coverArtHash} ytVideoId={t.ytVideoId} alt={t.title} />
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-medium text-zinc-100">{t.title}</div>
               <div className="truncate text-xs text-zinc-500">{t.artist}</div>
@@ -305,7 +306,7 @@ function RecentList({ items }: { items: RecentPlay[] | null }) {
             onClick={() => playAt(i)}
             className="group flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition hover:bg-zinc-800/50"
           >
-            <Cover hash={t.coverArtHash} alt={t.title} />
+            <Cover hash={t.coverArtHash} ytVideoId={t.ytVideoId} alt={t.title} />
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-medium text-zinc-100">{t.title}</div>
               <div className="truncate text-xs text-zinc-500">{t.artist}</div>
@@ -325,14 +326,16 @@ function RecentList({ items }: { items: RecentPlay[] | null }) {
 
 function Cover({
   hash,
+  ytVideoId,
   alt,
   square,
 }: {
   hash: string | null;
+  ytVideoId?: string | null;
   alt: string;
   square?: boolean;
 }) {
-  const url = useCoverUrl(hash);
+  const url = useResolvedCoverUrl(hash, ytVideoId);
   const cls = "h-9 w-9 shrink-0 " + (square ? "rounded" : "rounded");
   if (url) {
     return (

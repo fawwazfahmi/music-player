@@ -5,6 +5,7 @@ import { getAllAlbums, getArtists, getAllSongs } from "@/server/actions/views";
 import { useIpodStore } from "@/stores/ipod-store";
 import { usePlayerStore } from "@/stores/player-store";
 import { AlbumIcon, ArtistIcon, MusicNoteIcon, PlayIcon } from "@/components/icons";
+import { coverUrl } from "@/lib/cover-url";
 import { buildQueueTrack } from "./_shared";
 
 export function HomePage() {
@@ -79,18 +80,17 @@ export function HomePage() {
                     onClick={() => playSongAt(i)}
                     className="group flex items-center gap-3 overflow-hidden rounded-lg bg-zinc-900/50 transition hover:bg-zinc-800"
                   >
-                    {s.album?.coverArtHash ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={`/api/art/${s.album.coverArtHash}`}
-                        alt=""
-                        className="h-16 w-16 shrink-0 object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-16 w-16 shrink-0 items-center justify-center bg-gradient-to-br from-zinc-700 to-zinc-900 text-zinc-500">
-                        <MusicNoteIcon size={24} />
-                      </div>
-                    )}
+                    {(() => {
+                      const url = coverUrl(s.album?.coverArtHash, s.ytVideoId);
+                      return url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={url} alt="" className="h-16 w-16 shrink-0 object-cover" />
+                      ) : (
+                        <div className="flex h-16 w-16 shrink-0 items-center justify-center bg-gradient-to-br from-zinc-700 to-zinc-900 text-zinc-500">
+                          <MusicNoteIcon size={24} />
+                        </div>
+                      );
+                    })()}
                     <div className="min-w-0 flex-1 pr-3 text-left">
                       <div className="truncate text-sm font-semibold text-zinc-100">
                         {s.title}

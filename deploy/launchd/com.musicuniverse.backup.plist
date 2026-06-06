@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd job: nightly Music Universe backup.
+
+  Runs scripts/backup.sh once per day at 03:00 local time. The script
+  dumps the database (custom-format) and tars the music library into
+  ~/Backups/MusicUniverse/<timestamp>/, pruning anything older than 30
+  days.
+
+  Install:
+    cp deploy/launchd/com.musicuniverse.backup.plist ~/Library/LaunchAgents/
+    launchctl load -w ~/Library/LaunchAgents/com.musicuniverse.backup.plist
+
+  Run on demand (without waiting for 03:00):
+    launchctl start com.musicuniverse.backup
+    tail -f ~/Library/Logs/MusicUniverse/backup.out.log
+
+  RunAtLoad is false on purpose — we only want the scheduled run, not a
+  backup every time the Mac boots.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.musicuniverse.backup</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/fwzfhmy/Projects/music-player/scripts/backup.sh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/fwzfhmy/Projects/music-player</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>3</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/fwzfhmy/Library/Logs/MusicUniverse/backup.out.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/fwzfhmy/Library/Logs/MusicUniverse/backup.err.log</string>
+</dict>
+</plist>

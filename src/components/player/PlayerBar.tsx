@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { usePlayerStore } from "@/stores/player-store";
 import { getEngine } from "@/audio/engine";
+import { coverUrl } from "@/lib/cover-url";
 import { isFavorited, toggleFavorite } from "@/server/actions/favorites";
 import {
   HeartIcon,
@@ -85,16 +86,15 @@ export function PlayerBar() {
     <div className="grid h-20 grid-cols-[1fr_2fr_1fr] items-center gap-4 border-t border-zinc-800/70 bg-zinc-950/95 px-4 backdrop-blur">
       {/* Left: now-playing info */}
       <div className="flex min-w-0 items-center gap-3">
-        {track?.coverArtHash ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={`/api/art/${track.coverArtHash}`}
-            alt=""
-            className="h-12 w-12 shrink-0 rounded object-cover shadow"
-          />
-        ) : (
-          <div className="h-12 w-12 shrink-0 rounded bg-gradient-to-br from-zinc-700 to-zinc-900" />
-        )}
+        {(() => {
+          const url = track ? coverUrl(track.coverArtHash, track.ytVideoId) : null;
+          return url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={url} alt="" className="h-12 w-12 shrink-0 rounded object-cover shadow" />
+          ) : (
+            <div className="h-12 w-12 shrink-0 rounded bg-gradient-to-br from-zinc-700 to-zinc-900" />
+          );
+        })()}
         <div className="min-w-0 flex-1">
           {track ? (
             <>

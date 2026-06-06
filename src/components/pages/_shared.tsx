@@ -2,6 +2,7 @@
 
 import { usePlayerStore, type QueueTrack } from "@/stores/player-store";
 import { formatDuration } from "@/lib/format-duration";
+import { coverUrl } from "@/lib/cover-url";
 import { PlayIcon } from "@/components/icons";
 import { TrackMenu } from "@/components/player/TrackMenu";
 
@@ -42,16 +43,15 @@ export function SongRow({ track, index, onPlay, onDeleted, showAlbum = true }: S
           <PlayIcon size={14} />
         </span>
       </div>
-      {track.coverArtHash ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={`/api/art/${track.coverArtHash}`}
-          alt=""
-          className="h-9 w-9 rounded object-cover"
-        />
-      ) : (
-        <div className="h-9 w-9 rounded bg-gradient-to-br from-zinc-700 to-zinc-900" />
-      )}
+      {(() => {
+        const url = coverUrl(track.coverArtHash, track.ytVideoId);
+        return url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={url} alt="" className="h-9 w-9 rounded object-cover" />
+        ) : (
+          <div className="h-9 w-9 rounded bg-gradient-to-br from-zinc-700 to-zinc-900" />
+        );
+      })()}
       <div className="min-w-0">
         <div className={"truncate text-sm font-medium " + (active ? "" : "text-zinc-100")}>
           {track.title}

@@ -3,6 +3,7 @@
 import { usePlayerStore } from "@/stores/player-store";
 import { CloseIcon, PlayIcon } from "@/components/icons";
 import { formatDuration } from "@/lib/format-duration";
+import { coverUrl } from "@/lib/cover-url";
 
 export function QueuePanel() {
   const queue = usePlayerStore((s) => s.queue);
@@ -35,6 +36,7 @@ export function QueuePanel() {
             artist={playing.artist}
             duration={playing.duration}
             coverArtHash={playing.coverArtHash ?? null}
+            ytVideoId={playing.ytVideoId ?? null}
             active
             playing={isPlaying}
           />
@@ -55,6 +57,7 @@ export function QueuePanel() {
             artist={t.artist}
             duration={t.duration}
             coverArtHash={t.coverArtHash ?? null}
+            ytVideoId={t.ytVideoId ?? null}
           />
         ))
       )}
@@ -68,6 +71,7 @@ function QueueRow({
   artist,
   duration,
   coverArtHash,
+  ytVideoId,
   active,
   playing,
 }: {
@@ -76,6 +80,7 @@ function QueueRow({
   artist: string;
   duration: number;
   coverArtHash: string | null;
+  ytVideoId: string | null;
   active?: boolean;
   playing?: boolean;
 }) {
@@ -98,16 +103,15 @@ function QueueRow({
         (active ? "bg-zinc-800/40 text-emerald-400" : "")
       }
     >
-      {coverArtHash ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={`/api/art/${coverArtHash}`}
-          alt=""
-          className="h-9 w-9 shrink-0 rounded object-cover"
-        />
-      ) : (
-        <div className="h-9 w-9 shrink-0 rounded bg-gradient-to-br from-zinc-700 to-zinc-900" />
-      )}
+      {(() => {
+        const url = coverUrl(coverArtHash, ytVideoId);
+        return url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={url} alt="" className="h-9 w-9 shrink-0 rounded object-cover" />
+        ) : (
+          <div className="h-9 w-9 shrink-0 rounded bg-gradient-to-br from-zinc-700 to-zinc-900" />
+        );
+      })()}
       <div className="min-w-0 flex-1">
         <div
           className={
