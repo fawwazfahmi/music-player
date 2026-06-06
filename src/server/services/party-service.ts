@@ -19,19 +19,71 @@ export interface PartyView {
       client compute the broadcaster's *current* position rather than the
       stale one it received. */
   ageMs: number;
+  // ── Track metadata snapshot ───────────────────────────────────────────
+  // The broadcaster's PATCH only carries trackId; the receiver still needs
+  // the title / artist / cover / ytVideoId to actually render a Now Playing
+  // tile. Server enriches on emit by looking up the Track row (cached by
+  // trackId so we don't hammer the DB while the same song is playing).
+  trackTitle: string | null;
+  trackArtist: string | null;
+  trackCoverArtHash: string | null;
+  trackYtVideoId: string | null;
 }
 
-function toView(row: {
-  id: string;
-  active: boolean;
-  startedBy: string;
-  trackId: string | null;
-  position: number;
-  isPlaying: boolean;
-  pulse: number;
-  startedAt: Date;
-  updatedAt: Date;
-}): PartyView {
+interface TrackSnapshot {
+  trackTitle: string | null;
+  trackArtist: string | null;
+  trackCoverArtHash: string | null;
+  trackYtVideoId: string | null;
+}
+
+// Module-level cache so we look up a track in PG only when the broadcaster
+// actually changes songs, not on every 500ms PATCH. Keyed by trackId.
+let cachedTrack: { id: string; snap: TrackSnapshot } | null = null;
+
+async function loadTrackSnapshot(trackId: string | null): Promise<TrackSnapshot> {
+  if (!trackId) {
+    return {
+      trackTitle: null,
+      trackArtist: null,
+      trackCoverArtHash: null,
+      trackYtVideoId: null,
+    };
+  }
+  if (cachedTrack && cachedTrack.id === trackId) return cachedTrack.snap;
+  const row = await db.track.findUnique({
+    where: { id: trackId },
+    select: {
+      title: true,
+      ytVideoId: true,
+      primaryArtist: { select: { name: true } },
+      album: { select: { coverArtHash: true } },
+    },
+  });
+  const snap: TrackSnapshot = {
+    trackTitle: row?.title ?? null,
+    trackArtist: row?.primaryArtist.name ?? null,
+    trackCoverArtHash: row?.album?.coverArtHash ?? null,
+    trackYtVideoId: row?.ytVideoId ?? null,
+  };
+  cachedTrack = { id: trackId, snap };
+  return snap;
+}
+
+function toView(
+  row: {
+    id: string;
+    active: boolean;
+    startedBy: string;
+    trackId: string | null;
+    position: number;
+    isPlaying: boolean;
+    pulse: number;
+    startedAt: Date;
+    updatedAt: Date;
+  },
+  snap: TrackSnapshot,
+): PartyView {
   return {
     id: row.id,
     active: row.active,
@@ -42,6 +94,7 @@ function toView(row: {
     pulse: row.pulse,
     startedAt: row.startedAt.toISOString(),
     ageMs: Math.max(0, Date.now() - row.updatedAt.getTime()),
+    ...snap,
   };
 }
 
@@ -87,7 +140,9 @@ export async function getActiveParty(): Promise<PartyView | null> {
     where: { active: true },
     orderBy: { updatedAt: "desc" },
   });
-  return row ? toView(row) : null;
+  if (!row) return null;
+  const snap = await loadTrackSnapshot(row.trackId);
+  return toView(row, snap);
 }
 
 export interface StartPartyInput {
@@ -111,7 +166,8 @@ export async function startParty(input: StartPartyInput): Promise<PartyView> {
       pulse: 1,
     },
   });
-  const view = toView(created);
+  const snap = await loadTrackSnapshot(created.trackId);
+  const view = toView(created, snap);
   emit(view);
 
   // Fire WhatsApp notification — never block the party creation on this.
@@ -168,5 +224,6 @@ export async function updateParty(input: UpdatePartyInput): Promise<void> {
       pulse: { increment: 1 },
     },
   });
-  emit(toView(updated));
+  const snap = await loadTrackSnapshot(updated.trackId);
+  emit(toView(updated, snap));
 }

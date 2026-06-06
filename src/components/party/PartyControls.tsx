@@ -24,6 +24,10 @@ interface ReceiverSync {
   position: number;
   isPlaying: boolean;
   trackId: string | null;
+  trackTitle: string | null;
+  trackArtist: string | null;
+  trackCoverArtHash: string | null;
+  trackYtVideoId: string | null;
 }
 
 export function PartyControls() {
@@ -57,6 +61,10 @@ export function PartyControls() {
           position: data.position,
           isPlaying: data.isPlaying,
           trackId: data.trackId,
+          trackTitle: data.trackTitle,
+          trackArtist: data.trackArtist,
+          trackCoverArtHash: data.trackCoverArtHash,
+          trackYtVideoId: data.trackYtVideoId,
         };
       } else if (following) {
         setFollowing(false);
@@ -113,7 +121,9 @@ export function PartyControls() {
         } catch {
           return;
         }
-        applyState(data);
+        // SSE delivery is a single TCP write; treat ageMs as-is (no
+        // round-trip term).
+        applyState(data, 0);
       };
       es.onerror = () => {
         // EventSource auto-reconnects with a backoff after a healthy open,
@@ -211,16 +221,19 @@ export function PartyControls() {
     const localPlayer = usePlayerStore.getState();
     const currentLocalId = localPlayer.queue[localPlayer.currentIndex]?.id ?? null;
     if (sync.trackId && sync.trackId !== currentLocalId) {
+      // Enriched placeholder — uses the broadcaster's actual track
+      // metadata so PlayerBar / lyrics panel / video tile show the real
+      // song info instead of '(synced)'.
       usePlayerStore.getState().setQueue(
         [
           {
             id: sync.trackId,
-            title: "(synced)",
+            title: sync.trackTitle ?? "Now playing",
             duration: 0,
-            artist: "",
+            artist: sync.trackArtist ?? "",
             album: "",
-            coverArtHash: null,
-            ytVideoId: null,
+            coverArtHash: sync.trackCoverArtHash,
+            ytVideoId: sync.trackYtVideoId,
           },
         ],
         0,

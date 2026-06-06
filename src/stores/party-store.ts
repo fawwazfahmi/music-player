@@ -10,6 +10,10 @@ export interface PartyView {
   pulse: number;
   startedAt: string;
   ageMs: number;
+  trackTitle: string | null;
+  trackArtist: string | null;
+  trackCoverArtHash: string | null;
+  trackYtVideoId: string | null;
 }
 
 interface PartyState {

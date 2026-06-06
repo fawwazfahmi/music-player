@@ -41,25 +41,30 @@ export function AppShell() {
   const historyIdRef = useRef<string | null>(null);
   const lastReportedSecondRef = useRef(0);
 
-  // Audio engine: load track when the selected playback attempt changes
-  // (don't auto-play here — the videoLoading gate effect below handles that)
+  // Audio engine: load track when the selected playback attempt changes.
+  // Deliberately does NOT depend on `player.queue` — pushing onto the queue
+  // (addToQueue / playNext) creates a new array reference but doesn't change
+  // which track is current, and we don't want that to yank el.src back to
+  // the beginning of the currently-playing song.
   useEffect(() => {
     const engine = getEngine();
-    const track = player.queue[player.currentIndex];
+    const track = usePlayerStore.getState().queue[player.currentIndex];
     if (!track) return;
     engine.loadTrack(track.id);
     updateMediaMetadata(track);
-  }, [player.currentIndex, player.playbackKey, player.queue]);
+  }, [player.currentIndex, player.playbackKey]);
 
-  // Play/pause sync — soft gate. For YT tracks, briefly wait for the iframe
-  // so lip-sync / lyric videos stay in sync from t=0. The hard cap in
-  // YtVideoPanel releases the gate after ~1.5s if YT hasn't loaded by then,
-  // so a slow iframe never blocks startup for long.
+  // Play/pause sync — soft gate. Includes playbackKey so that when the
+  // current track changes (next/prev/setQueue) but isPlaying stays true
+  // and videoLoading stays the same, this effect still re-runs and starts
+  // the new track. Without playbackKey here, fawwaz silently failed to
+  // hear ainul's next song because his setQueue with the same flags
+  // never re-triggered engine.play().
   useEffect(() => {
     const engine = getEngine();
     if (player.isPlaying && !player.videoLoading) void engine.play();
     else engine.pause();
-  }, [player.isPlaying, player.videoLoading]);
+  }, [player.isPlaying, player.videoLoading, player.playbackKey]);
 
   // Volume sync
   useEffect(() => {
@@ -68,8 +73,9 @@ export function AppShell() {
 
   // Start a history row when a track starts playing
   useEffect(() => {
-    const track = player.queue[player.currentIndex];
-    if (!track || !player.isPlaying) return;
+    const state = usePlayerStore.getState();
+    const track = state.queue[state.currentIndex];
+    if (!track || !state.isPlaying) return;
     let cancelled = false;
     void startPlay(track.id).then((id) => {
       if (cancelled) return;
@@ -79,15 +85,18 @@ export function AppShell() {
     return () => {
       cancelled = true;
     };
-  }, [player.currentIndex, player.isPlaying, player.queue]);
+  }, [player.currentIndex, player.isPlaying, player.playbackKey]);
 
-  // Time tick → store + throttled history update
+  // Time tick → store + throttled history update. Single mount, reads
+  // fresh state inside the callback so queue mutations don't have to
+  // rebind the listener.
   useEffect(() => {
     const engine = getEngine();
     return engine.on("timeupdate", () => {
       const t = engine.getCurrentTime();
       usePlayerStore.getState().setPosition(t);
-      const track = player.queue[player.currentIndex];
+      const state = usePlayerStore.getState();
+      const track = state.queue[state.currentIndex];
       if (historyIdRef.current && track && track.duration > 0) {
         if (Math.floor(t) - lastReportedSecondRef.current >= 5) {
           const completed = t / track.duration >= 0.8;
@@ -96,7 +105,7 @@ export function AppShell() {
         }
       }
     });
-  }, [player.currentIndex, player.queue]);
+  }, []);
 
   // Auto-advance on end
   useEffect(() => {
