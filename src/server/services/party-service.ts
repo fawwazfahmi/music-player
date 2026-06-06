@@ -14,6 +14,11 @@ export interface PartyView {
   isPlaying: boolean;
   pulse: number;
   startedAt: string;
+  /** Milliseconds between when this state was written by the broadcaster
+      and when the server is responding to the receiver's poll. Lets the
+      client compute the broadcaster's *current* position rather than the
+      stale one it received. */
+  ageMs: number;
 }
 
 function toView(row: {
@@ -25,6 +30,7 @@ function toView(row: {
   isPlaying: boolean;
   pulse: number;
   startedAt: Date;
+  updatedAt: Date;
 }): PartyView {
   return {
     id: row.id,
@@ -35,6 +41,7 @@ function toView(row: {
     isPlaying: row.isPlaying,
     pulse: row.pulse,
     startedAt: row.startedAt.toISOString(),
+    ageMs: Math.max(0, Date.now() - row.updatedAt.getTime()),
   };
 }
 

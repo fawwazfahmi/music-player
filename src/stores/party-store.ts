@@ -9,6 +9,7 @@ export interface PartyView {
   isPlaying: boolean;
   pulse: number;
   startedAt: string;
+  ageMs: number;
 }
 
 interface PartyState {
