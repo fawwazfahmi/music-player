@@ -114,7 +114,15 @@ export async function createPendingDownload(
       status: "DOWNLOADING",
       attempts: 1,
     },
-    update: { status: "DOWNLOADING", attempts: { increment: 1 } },
+    // Reset errorMessage and completedAt so a previously-failed entry that
+    // we're retrying doesn't visually look both READY and 'had an error' once
+    // the new attempt succeeds.
+    update: {
+      status: "DOWNLOADING",
+      attempts: { increment: 1 },
+      errorMessage: null,
+      completedAt: null,
+    },
   });
 
   return { trackId, cached: false };
@@ -188,7 +196,13 @@ export async function runDownloadJob(
     });
     await db.ytCacheEntry.update({
       where: { ytVideoId: result.videoId },
-      data: { status: "READY", completedAt: new Date(), localFilePath: filePath },
+      data: {
+        status: "READY",
+        completedAt: new Date(),
+        localFilePath: filePath,
+        // Clear any leftover errorMessage from a previous failed attempt.
+        errorMessage: null,
+      },
     });
     log("end:ok", { totalMs: Date.now() - t0 });
   } catch (err) {
