@@ -42,7 +42,8 @@ export async function getAllAlbums() {
 }
 
 export async function getAllSongs() {
-  return db.track.findMany({
+  const t0 = Date.now();
+  const rows = await db.track.findMany({
     where: { playable: true },
     orderBy: { title: "asc" },
     select: {
@@ -55,6 +56,8 @@ export async function getAllSongs() {
       album: { select: { id: true, title: true, coverArtPath: true, coverArtHash: true } },
     },
   });
+  console.log(`[mu] getAllSongs → ${rows.length} rows in ${Date.now() - t0}ms`);
+  return rows;
 }
 
 export async function getTracksByAlbum(albumId: string) {

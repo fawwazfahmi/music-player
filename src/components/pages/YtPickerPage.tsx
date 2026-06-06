@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { searchYt, selectYtResult } from "@/server/actions/search";
+import { searchYt } from "@/server/actions/search";
 import type { YtSearchResult } from "@/server/services/yt-service";
 import { useIpodStore } from "@/stores/ipod-store";
 import { usePlayerStore } from "@/stores/player-store";
@@ -48,7 +48,19 @@ export function YtPickerPage({ query }: Props) {
       artist: r.uploader,
     });
     try {
-      const { trackId } = await selectYtResult(r);
+      // Plain fetch — NOT a server action — so other server actions like
+      // getAllSongs aren't blocked behind this 30-100s download by React's
+      // server-action queue.
+      const res = await fetch("/api/yt-download", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(r),
+      });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => null)) as { message?: string } | null;
+        throw new Error(j?.message ?? `Download failed (HTTP ${res.status})`);
+      }
+      const { trackId } = (await res.json()) as { trackId: string };
       usePlayerStore.getState().setQueue(
         [
           buildQueueTrack({

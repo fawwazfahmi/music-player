@@ -111,6 +111,19 @@ export function PageHeader({
   );
 }
 
+/** Lightweight loading placeholder shown while a list page's initial fetch
+    is in flight. Keeps pages from rendering the empty-state "no items"
+    message during the data-loading window after a download finishes (when
+    the server is briefly busy with metadata enrichment). */
+export function PageLoading({ message = "Loading…" }: { message?: string } = {}) {
+  return (
+    <div className="flex items-center justify-center gap-2 py-16 text-sm text-zinc-500">
+      <span className="inline-block h-3 w-3 animate-pulse rounded-full bg-emerald-500/70" />
+      <span>{message}</span>
+    </div>
+  );
+}
+
 export function buildQueueTrack(t: {
   id: string;
   title: string;
