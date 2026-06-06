@@ -78,6 +78,12 @@ export async function createPendingDownload(
   let trackId: string;
   if (existing) {
     trackId = existing.id;
+    // Existing row from a previously-failed attempt — hide it from lists
+    // until this fresh attempt completes.
+    await db.track.update({
+      where: { id: trackId },
+      data: { playable: false },
+    });
   } else {
     const newTrack = await db.track.create({
       data: {
@@ -87,7 +93,9 @@ export async function createPendingDownload(
         albumId: album.id,
         ytVideoId: result.videoId,
         source: "YT_STREAMING",
-        playable: true,
+        // Hide from library lists until the m4a actually lands. Once
+        // runDownloadJob finishes successfully we flip this back to true.
+        playable: false,
         discoveredAt: new Date(),
       },
       select: { id: true },
@@ -144,6 +152,8 @@ export async function runDownloadJob(
         fileSize: BigInt(stats.size),
         sha256: sha,
         source: "YT_CACHED",
+        // File is now on disk — surface in the library list.
+        playable: true,
       },
     });
     await db.ytCacheEntry.update({
@@ -170,6 +180,38 @@ export interface YtStatus {
   trackId: string | null;
   status: "DOWNLOADING" | "READY" | "FAILED" | "UNKNOWN";
   errorMessage: string | null;
+}
+
+/**
+ * Crash recovery — run on app boot. Marks any YtCacheEntry stuck in
+ * DOWNLOADING as FAILED (the yt-dlp child process was killed when the
+ * Node process restarted), and flips the Track row to playable=false
+ * so it no longer shows up in the library list. The user can re-pick
+ * the same YT result to retry.
+ */
+export async function resetStuckDownloads(): Promise<{ marked: number }> {
+  const stuck = await db.ytCacheEntry.findMany({
+    where: { status: "DOWNLOADING" },
+    select: { ytVideoId: true, trackId: true },
+  });
+  if (stuck.length === 0) return { marked: 0 };
+
+  await db.ytCacheEntry.updateMany({
+    where: { ytVideoId: { in: stuck.map((s) => s.ytVideoId) } },
+    data: {
+      status: "FAILED",
+      errorMessage: "Server restarted while download was in flight",
+    },
+  });
+  await db.track.updateMany({
+    where: {
+      id: { in: stuck.map((s) => s.trackId).filter((x): x is string => !!x) },
+      filePath: null,
+    },
+    data: { playable: false },
+  });
+  console.log(`[mu] yt-download: reset ${stuck.length} stuck DOWNLOADING entries`);
+  return { marked: stuck.length };
 }
 
 export async function getYtStatus(ytVideoId: string): Promise<YtStatus> {
