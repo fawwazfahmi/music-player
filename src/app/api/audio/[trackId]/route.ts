@@ -22,15 +22,21 @@ export async function GET(
     where: { id: trackId },
     select: { filePath: true, fileFormat: true, source: true },
   });
-  if (!track) return NextResponse.json({ error: "not_found" }, { status: 404 });
+  if (!track) {
+    console.warn(`[mu] /api/audio/${trackId} → 404 (no track row)`);
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
 
   if (!track.filePath) {
-    // YT downloads are now synchronous (await in selectYtResult), so a track
-    // reaching the audio engine without a filePath means the download didn't
-    // complete. Surfacing as 501 — user should re-search and pick again.
+    // Track row exists but the audio file isn't materialized yet. Happens
+    // when the YT download is still in flight or the row is stale from a
+    // failed prior attempt. 425 = Too Early; the audio engine retries.
+    console.warn(
+      `[mu] /api/audio/${trackId} → 425 (no filePath, source=${track.source})`,
+    );
     return NextResponse.json(
       { error: "download_incomplete", source: track.source },
-      { status: 501 },
+      { status: 425 },
     );
   }
 
@@ -38,6 +44,9 @@ export async function GET(
   try {
     stats = await stat(track.filePath);
   } catch {
+    console.warn(
+      `[mu] /api/audio/${trackId} → 410 (file gone from disk: ${track.filePath})`,
+    );
     return NextResponse.json({ error: "file_missing" }, { status: 410 });
   }
 

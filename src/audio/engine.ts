@@ -8,17 +8,72 @@ export interface AudioEngine {
   getCurrentTime: () => number;
   getVolume: () => number;
   getDuration: () => number;
-  on: (event: "timeupdate" | "ended" | "play" | "pause", handler: () => void) => () => void;
+  on: (event: "timeupdate" | "ended" | "play" | "pause" | "error" | "loaded", handler: () => void) => () => void;
   destroy: () => void;
 }
 
+const MAX_RETRIES = 8;
+const BASE_RETRY_MS = 400;
+const MAX_RETRY_MS = 3000;
+
 export function createEngine(): AudioEngine {
-  const el = typeof document !== "undefined" ? document.createElement("audio") : ({} as HTMLAudioElement);
+  const el =
+    typeof document !== "undefined" ? document.createElement("audio") : ({} as HTMLAudioElement);
   el.preload = "metadata";
   let rawSrc = "";
+  let retryCount = 0;
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
+  let currentLoadId = 0;
+
+  function clearRetry() {
+    if (retryTimer !== null) {
+      clearTimeout(retryTimer);
+      retryTimer = null;
+    }
+  }
+
+  function tryLoad(src: string, myLoadId: number) {
+    if (myLoadId !== currentLoadId) return; // a newer track took over
+    el.src = src;
+  }
+
+  function onMediaError() {
+    if (!rawSrc) return;
+    // MediaError codes: 1=ABORTED, 2=NETWORK, 3=DECODE, 4=SRC_NOT_SUPPORTED
+    // We see 4 when /api/audio returned 425 (track row exists but filePath
+    // not populated yet — usually because the YT download just landed and
+    // DB consistency lags by a beat) or non-200.
+    if (retryCount >= MAX_RETRIES) {
+      console.warn(`[mu] audio: gave up after ${MAX_RETRIES} retries on ${rawSrc}`);
+      return;
+    }
+    const delay = Math.min(BASE_RETRY_MS * Math.pow(1.5, retryCount), MAX_RETRY_MS);
+    retryCount++;
+    console.log(`[mu] audio: retry ${retryCount}/${MAX_RETRIES} in ${delay}ms (${rawSrc})`);
+    const myLoadId = currentLoadId;
+    retryTimer = setTimeout(() => {
+      retryTimer = null;
+      tryLoad(rawSrc, myLoadId);
+    }, delay);
+  }
+
+  function onLoadedData() {
+    if (retryCount > 0) {
+      console.log(`[mu] audio: loaded after ${retryCount} retries (${rawSrc})`);
+    }
+    retryCount = 0;
+  }
+
+  if (typeof document !== "undefined") {
+    el.addEventListener("error", onMediaError);
+    el.addEventListener("loadeddata", onLoadedData);
+  }
 
   return {
     loadTrack: (trackId) => {
+      currentLoadId++;
+      clearRetry();
+      retryCount = 0;
       rawSrc = `/api/audio/${trackId}`;
       el.src = rawSrc;
     },
@@ -41,10 +96,13 @@ export function createEngine(): AudioEngine {
     getVolume: () => el.volume,
     getDuration: () => el.duration || 0,
     on: (event, handler) => {
-      el.addEventListener(event, handler);
-      return () => el.removeEventListener(event, handler);
+      // "loaded" maps to loadeddata for legacy callers
+      const eventName = event === "loaded" ? "loadeddata" : event;
+      el.addEventListener(eventName, handler);
+      return () => el.removeEventListener(eventName, handler);
     },
     destroy: () => {
+      clearRetry();
       el.pause();
       el.removeAttribute("src");
     },

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getAllSongs } from "@/server/actions/views";
 import { usePlayerStore } from "@/stores/player-store";
+import { useDownloadStore } from "@/stores/download-store";
 import { PageHeader, PageLoading, SongRow, buildQueueTrack } from "./_shared";
 
 export function SongsPage() {
@@ -11,6 +12,13 @@ export function SongsPage() {
   // is in flight (which can be a few seconds while a YT download is busy
   // on the server).
   const [songs, setSongs] = useState<Awaited<ReturnType<typeof getAllSongs>> | null>(null);
+
+  // Refetch when a download finishes — the previous fetch may have captured
+  // the new track row with filePath=null and no cover art, so clicking it
+  // would land on /api/audio before the m4a was materialized. Watching the
+  // download id covers both 'download started during this view' and
+  // 'download in flight when this view mounted' cases.
+  const downloadId = useDownloadStore((s) => s.active?.id ?? null);
 
   useEffect(() => {
     let cancelled = false;
@@ -29,7 +37,18 @@ export function SongsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [downloadId]); // refire when a download starts or ends
+
+  // After a download finishes, the metadata worker still runs (MusicBrainz +
+  // Cover Art Archive) — give it a moment, then refetch so the cover art
+  // populates without the user having to navigate away.
+  useEffect(() => {
+    if (downloadId !== null) return; // only when idle
+    const handle = setTimeout(() => {
+      void getAllSongs().then((r) => setSongs(r));
+    }, 8000);
+    return () => clearTimeout(handle);
+  }, [downloadId]);
 
   const queue =
     songs?.map((s) =>
