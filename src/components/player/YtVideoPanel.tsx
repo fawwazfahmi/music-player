@@ -43,7 +43,7 @@ declare global {
 }
 
 let apiPromise: Promise<void> | null = null;
-function loadIframeAPI(): Promise<void> {
+export function loadIframeAPI(): Promise<void> {
   if (typeof window === "undefined") return Promise.resolve();
   if (window.YT && (window.YT as unknown as { Player?: YtPlayerConstructor }).Player) {
     return Promise.resolve();

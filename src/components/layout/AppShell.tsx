@@ -12,6 +12,7 @@ import { RightPanel } from "./RightPanel";
 import { PlayerBar } from "@/components/player/PlayerBar";
 import { MainContent } from "@/components/pages/MainContent";
 import { VideoStage } from "@/components/player/VideoStage";
+import { loadIframeAPI } from "@/components/player/YtVideoPanel";
 import { DownloadIndicator } from "@/components/player/DownloadIndicator";
 import { PartyControls } from "@/components/party/PartyControls";
 import { PartyBanner } from "@/components/party/PartyBanner";
@@ -31,6 +32,12 @@ export function AppShell() {
   // ?=help, /=search. Disabled while typing in inputs.
   const { helpOpen, closeHelp } = useKeyboardShortcuts();
 
+  // Pre-warm the YT IFrame API script so the first YT track doesn't pay
+  // its ~500ms script-load cost on top of the iframe-load cost.
+  useEffect(() => {
+    void loadIframeAPI();
+  }, []);
+
   const historyIdRef = useRef<string | null>(null);
   const lastReportedSecondRef = useRef(0);
 
@@ -44,13 +51,17 @@ export function AppShell() {
     updateMediaMetadata(track);
   }, [player.currentIndex, player.playbackKey, player.queue]);
 
-  // Play/pause sync — gated on videoLoading so audio waits for YT iframe
-  // to load before starting. Once videoLoading flips false, audio starts.
+  // Play/pause sync — audio plays the moment isPlaying is true. We used to
+  // gate this on videoLoading so audio waited for the YT iframe to be ready,
+  // but for a music app the user cares about audio start time, not perfect
+  // A/V sync. The YT iframe's own onReady seeks to the current audio position
+  // so video catches up within a second or two — until then the player bar
+  // just shows the audio playing and the (still-blank) iframe sits there.
   useEffect(() => {
     const engine = getEngine();
-    if (player.isPlaying && !player.videoLoading) void engine.play();
+    if (player.isPlaying) void engine.play();
     else engine.pause();
-  }, [player.isPlaying, player.videoLoading]);
+  }, [player.isPlaying]);
 
   // Volume sync
   useEffect(() => {

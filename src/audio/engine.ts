@@ -19,7 +19,12 @@ const MAX_RETRY_MS = 3000;
 export function createEngine(): AudioEngine {
   const el =
     typeof document !== "undefined" ? document.createElement("audio") : ({} as HTMLAudioElement);
-  el.preload = "metadata";
+  // "auto" means the browser starts buffering audio data immediately on
+  // src assignment, not just metadata. By the time play() is called the
+  // first chunks are usually already in memory — kills most of the
+  // 'click → silence → start' lag. Costs a bit more bandwidth on tracks
+  // the user previews and skips, fine for personal use.
+  el.preload = "auto";
   let rawSrc = "";
   let retryCount = 0;
   let retryTimer: ReturnType<typeof setTimeout> | null = null;
