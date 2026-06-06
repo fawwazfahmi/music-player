@@ -161,6 +161,21 @@ export function PartyControls() {
     window.history.replaceState(null, "", url.toString());
   }, [identity, setFollowing]);
 
+  // ─── Follower roster ping ──────────────────────────────────────────────
+  // Tell the server when our identity enters / leaves follow mode so the
+  // broadcaster's banner can show who's actually listening. Best-effort —
+  // failure here just means the roster is slightly stale until next change.
+  useEffect(() => {
+    if (!identity) return;
+    if (following) {
+      void fetch("/api/party/follow", { method: "POST" }).catch(() => {});
+      // Leave on unmount or following=false transition.
+      return () => {
+        void fetch("/api/party/follow", { method: "DELETE" }).catch(() => {});
+      };
+    }
+  }, [identity, following]);
+
   // ─── BROADCASTER (ainul) ───────────────────────────────────────────────
   const isBroadcasting = identity === "ainul" && !!remote?.active;
   const playerCurrent = usePlayerStore((s) => s.queue[s.currentIndex] ?? null);

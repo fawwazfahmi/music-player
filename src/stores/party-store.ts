@@ -14,6 +14,7 @@ export interface PartyView {
   trackArtist: string | null;
   trackCoverArtHash: string | null;
   trackYtVideoId: string | null;
+  followers: string[];
 }
 
 interface PartyState {

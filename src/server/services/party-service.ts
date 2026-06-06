@@ -28,6 +28,9 @@ export interface PartyView {
   trackArtist: string | null;
   trackCoverArtHash: string | null;
   trackYtVideoId: string | null;
+  /** Names currently in follow mode. The broadcaster renders this in her
+      banner so she can see who's actually listening with her. */
+  followers: string[];
 }
 
 interface TrackSnapshot {
@@ -95,7 +98,37 @@ function toView(
     startedAt: row.startedAt.toISOString(),
     ageMs: Math.max(0, Date.now() - row.updatedAt.getTime()),
     ...snap,
+    followers: followerList(),
   };
+}
+
+// ───── In-memory follower roster ──────────────────────────────────────────
+// Tracks who is currently in 'following' mode (hard-locked to the
+// broadcaster). Just a Set<name> in module memory — resets if the Node
+// process restarts, which is fine: clients will re-follow on reconnect.
+const followers = new Set<string>();
+
+function followerList(): string[] {
+  return Array.from(followers).sort();
+}
+
+function clearFollowers() {
+  followers.clear();
+}
+
+export async function followParty(name: string): Promise<void> {
+  if (!name) return;
+  followers.add(name);
+  // Re-emit so the broadcaster sees an updated roster immediately.
+  const view = await getActiveParty();
+  emit(view);
+}
+
+export async function unfollowParty(name: string): Promise<void> {
+  if (!name) return;
+  followers.delete(name);
+  const view = await getActiveParty();
+  emit(view);
 }
 
 // ───── In-memory pub-sub for SSE subscribers ──────────────────────────────
@@ -156,6 +189,9 @@ export interface StartPartyInput {
 
 export async function startParty(input: StartPartyInput): Promise<PartyView> {
   await endAllActive();
+  // Fresh party = fresh roster. Avoids ghost followers from a previous
+  // party staying 'in the list' after ainul ends and restarts.
+  clearFollowers();
   const created = await db.listeningParty.create({
     data: {
       active: true,
@@ -202,6 +238,7 @@ export async function endParty(id: string): Promise<void> {
     where: { id, active: true },
     data: { active: false, endedAt: new Date() },
   });
+  clearFollowers();
   // Tell every SSE subscriber that the party is over so receivers can leave
   // follow mode immediately instead of waiting for their next poll.
   emit(null);

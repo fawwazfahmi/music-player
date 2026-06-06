@@ -1,6 +1,21 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
+// Identity-scope the localStorage key so two tabs in the same browser
+// running the app as different people (ainul vs fawwaz) keep separate
+// volume / shuffle / repeat preferences. Read the mu_name cookie once at
+// module load — fall back to a shared "default" key when no cookie is
+// present (SSR or pre-login).
+function getPersistName(): string {
+  if (typeof document === "undefined") return "music-universe-player:ssr";
+  const m = /(?:^|;\s*)mu_name=([^;]+)/.exec(document.cookie);
+  if (m) {
+    const name = decodeURIComponent(m[1]!).toLowerCase();
+    return `music-universe-player:${name}`;
+  }
+  return "music-universe-player:default";
+}
+
 export interface QueueTrack {
   id: string;
   title: string;
@@ -275,7 +290,7 @@ export const usePlayerStore = create<PlayerState>()(
     {
       // Per-device persistence: localStorage on the user's own machine.
       // Only saves preferences (volume, shuffle, repeat) — never queue/playback state.
-      name: "music-universe-player",
+      name: getPersistName(),
       storage: createJSONStorage(() =>
         typeof window === "undefined"
           ? {

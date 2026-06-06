@@ -3,17 +3,56 @@
 import { useIdentity } from "@/hooks/use-identity";
 import { usePartyStore } from "@/stores/party-store";
 
-// Hard-follow banner shown to fawwaz while he's in a listening party.
-// 'Leave party' restores local control without ending the party for ainul.
+// Top-of-app banner for both sides of a listening party:
+//   ainul (broadcaster):
+//     - hidden when no active party
+//     - shows the live roster of followers once the party is live
+//   fawwaz (receiver):
+//     - shows a Join CTA when ainul has an active party but he isn't
+//       following yet
+//     - shows the 'Listening with ainul' state + Leave button while
+//       following
 export function PartyBanner() {
   const identity = useIdentity();
   const remote = usePartyStore((s) => s.remote);
   const following = usePartyStore((s) => s.following);
   const setFollowing = usePartyStore((s) => s.setFollowing);
 
-  // Show a join CTA for fawwaz when an active party exists but he hasn't
-  // joined yet. Show the live banner once following.
-  if (identity !== "fawwaz") return null;
+  // No identity → no banner. Avoids a flash before useIdentity hydrates.
+  if (!identity) return null;
+
+  // ainul branch — only show while she has an active party of her own.
+  if (identity === "ainul") {
+    if (!remote?.active || remote.startedBy !== "ainul") return null;
+    const others = remote.followers.filter((f) => f !== "ainul");
+    return (
+      <div className="flex items-center justify-between gap-3 border-b border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-sm">
+        <div className="flex items-center gap-2">
+          <span
+            className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400"
+            aria-hidden
+          />
+          <span className="text-zinc-100">
+            {others.length === 0 ? (
+              <>Listening party live — waiting for fawwaz…</>
+            ) : (
+              <>
+                Listening with{" "}
+                {others.map((n, i) => (
+                  <span key={n} className="font-semibold capitalize">
+                    {n}
+                    {i < others.length - 1 ? ", " : ""}
+                  </span>
+                ))}
+              </>
+            )}
+          </span>
+        </div>
+      </div>
+    );
+  }
+
+  // fawwaz branch — Join CTA + follow banner.
   if (!remote?.active && !following) return null;
 
   if (!following && remote?.active) {
