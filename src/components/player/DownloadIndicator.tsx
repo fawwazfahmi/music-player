@@ -19,6 +19,13 @@ export function DownloadIndicator() {
       return;
     }
     if (active.error) return; // freeze progress when failed
+    // If the poller has handed us a real progress reading, just show that —
+    // skip the fake animation entirely. Otherwise (the first beat before
+    // yt-dlp emits, or any stale fallback), animate up toward 95%.
+    if (typeof active.progressPct === "number") {
+      setPct(active.progressPct);
+      return;
+    }
     let raf = 0;
     const t0 = active.startedAt;
     const tick = () => {

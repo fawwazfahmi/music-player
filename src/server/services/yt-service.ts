@@ -10,13 +10,65 @@ export interface YtSearchResult {
   thumbnail: string | null;
 }
 
-function runYtDlp(args: string[]): Promise<string> {
+const SIZE_UNITS: Record<string, number> = {
+  B: 1,
+  KiB: 1024,
+  MiB: 1024 ** 2,
+  GiB: 1024 ** 3,
+  KB: 1000,
+  MB: 1000 ** 2,
+  GB: 1000 ** 3,
+};
+
+export interface YtDlpProgress {
+  /** 0..100 — percent complete reported by yt-dlp. */
+  pct: number;
+  /** Total bytes if yt-dlp could compute it ahead of the download. */
+  totalBytes: number | null;
+}
+
+// yt-dlp emits lines like:
+//   [download]  17.3% of  4.32MiB at  500.00KiB/s ETA 00:05
+//   [download] 100% of  4.32MiB in 00:08
+const PROGRESS_RE =
+  /^\[download\]\s+(\d+(?:\.\d+)?)%\s+of\s+~?\s*([\d.]+)\s*([KMG]?i?B)/;
+
+function parseProgress(line: string): YtDlpProgress | null {
+  const m = PROGRESS_RE.exec(line.trim());
+  if (!m) return null;
+  const pct = parseFloat(m[1]!);
+  const size = parseFloat(m[2]!);
+  const unit = SIZE_UNITS[m[3]!] ?? null;
+  return {
+    pct: Math.min(100, Math.max(0, pct)),
+    totalBytes: unit !== null && Number.isFinite(size) ? Math.round(size * unit) : null,
+  };
+}
+
+function runYtDlp(
+  args: string[],
+  opts: { onProgress?: (p: YtDlpProgress) => void } = {},
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const proc = spawn(env.YT_DLP_PATH, args, { stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
+    let buf = "";
+    function feed(chunk: Buffer) {
+      buf += chunk.toString("utf8");
+      let i: number;
+      while ((i = buf.search(/[\r\n]/)) !== -1) {
+        const line = buf.slice(0, i);
+        buf = buf.slice(i + 1);
+        if (line && opts.onProgress) {
+          const p = parseProgress(line);
+          if (p) opts.onProgress(p);
+        }
+      }
+    }
     proc.stdout?.on("data", (chunk: Buffer) => {
       stdout += chunk.toString("utf8");
+      if (opts.onProgress) feed(chunk);
     });
     proc.stderr?.on("data", (chunk: Buffer) => {
       stderr += chunk.toString("utf8");
@@ -128,18 +180,29 @@ export interface DownloadResult {
   fileFormat: string;
 }
 
-export async function downloadAudio(videoId: string, destDir: string): Promise<DownloadResult> {
+export async function downloadAudio(
+  videoId: string,
+  destDir: string,
+  onProgress?: (p: YtDlpProgress) => void,
+): Promise<DownloadResult> {
   const url = `https://www.youtube.com/watch?v=${videoId}`;
   const outputTemplate = `${destDir}/${videoId}.%(ext)s`;
-  await runYtDlp([
-    url,
-    "-x",
-    "--audio-format",
-    "m4a",
-    "-o",
-    outputTemplate,
-    "--no-warnings",
-    "--embed-metadata",
-  ]);
+  await runYtDlp(
+    [
+      url,
+      "-x",
+      "--audio-format",
+      "m4a",
+      "-o",
+      outputTemplate,
+      "--no-warnings",
+      "--embed-metadata",
+      // --newline forces yt-dlp to emit each progress update on its own line
+      // instead of overwriting with \r, which lets our line-buffered parser see
+      // every tick.
+      "--newline",
+    ],
+    { onProgress },
+  );
   return { filePath: `${destDir}/${videoId}.m4a`, fileFormat: "m4a" };
 }

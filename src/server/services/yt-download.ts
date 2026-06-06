@@ -139,8 +139,38 @@ export async function runDownloadJob(
   try {
     await fs.mkdir(CACHE_DIR, { recursive: true });
     const tDl = Date.now();
-    const { filePath, fileFormat } = await downloadAudio(result.videoId, CACHE_DIR);
-    log("download-done", { ms: Date.now() - tDl });
+
+    // Throttle DB progress writes — yt-dlp emits a progress line every ~1s
+    // but writing every tick to PG is wasteful. Write at most every 750ms.
+    let lastWrite = 0;
+    let lastPct = -1;
+    const tDl0 = Date.now();
+    const { filePath, fileFormat } = await downloadAudio(
+      result.videoId,
+      CACHE_DIR,
+      (p) => {
+        const now = Date.now();
+        // Always write the first tick (so client sees totalBytes ASAP) and
+        // every 750ms thereafter, or whenever pct jumps >= 5 points.
+        if (now - lastWrite < 750 && Math.abs(p.pct - lastPct) < 5) return;
+        lastWrite = now;
+        lastPct = p.pct;
+        const downloadedBytes =
+          p.totalBytes !== null ? Math.round((p.pct / 100) * p.totalBytes) : 0;
+        void db.ytCacheEntry
+          .update({
+            where: { ytVideoId: result.videoId },
+            data: {
+              downloadedBytes: BigInt(downloadedBytes),
+              totalBytes: p.totalBytes !== null ? BigInt(p.totalBytes) : null,
+            },
+          })
+          .catch(() => {
+            /* transient DB blip — next tick will catch up */
+          });
+      },
+    );
+    log("download-done", { ms: Date.now() - tDl, sinceFirstTick: Date.now() - tDl0 });
 
     const sha = await sha256(filePath);
     const stats = await fs.stat(filePath);
@@ -180,6 +210,10 @@ export interface YtStatus {
   trackId: string | null;
   status: "DOWNLOADING" | "READY" | "FAILED" | "UNKNOWN";
   errorMessage: string | null;
+  /** 0..100 — real progress reported by yt-dlp. Null when yt-dlp hasn't
+      emitted its first tick yet (so the client can show an indeterminate
+      state for a beat). */
+  progressPct: number | null;
 }
 
 /**
@@ -217,15 +251,32 @@ export async function resetStuckDownloads(): Promise<{ marked: number }> {
 export async function getYtStatus(ytVideoId: string): Promise<YtStatus> {
   const entry = await db.ytCacheEntry.findUnique({
     where: { ytVideoId },
-    select: { ytVideoId: true, trackId: true, status: true, errorMessage: true },
+    select: {
+      ytVideoId: true,
+      trackId: true,
+      status: true,
+      errorMessage: true,
+      downloadedBytes: true,
+      totalBytes: true,
+    },
   });
   if (!entry) {
-    return { ytVideoId, trackId: null, status: "UNKNOWN", errorMessage: null };
+    return {
+      ytVideoId,
+      trackId: null,
+      status: "UNKNOWN",
+      errorMessage: null,
+      progressPct: null,
+    };
   }
+  const dl = Number(entry.downloadedBytes ?? 0n);
+  const total = entry.totalBytes !== null ? Number(entry.totalBytes) : null;
+  const progressPct = total && total > 0 ? Math.min(100, Math.round((dl / total) * 100)) : null;
   return {
     ytVideoId: entry.ytVideoId,
     trackId: entry.trackId,
     status: entry.status as YtStatus["status"],
     errorMessage: entry.errorMessage,
+    progressPct,
   };
 }

@@ -108,6 +108,7 @@ export function AppShell() {
           const status = (await res.json()) as {
             status: "DOWNLOADING" | "READY" | "FAILED" | "UNKNOWN";
             errorMessage: string | null;
+            progressPct: number | null;
           };
           if (stopped) return;
           if (status.status === "READY") {
@@ -121,6 +122,9 @@ export function AppShell() {
               .fail(status.errorMessage ?? "Download failed");
             return;
           }
+          // DOWNLOADING — surface the live progress so the indicator stops
+          // lying with its fake bar.
+          useDownloadStore.getState().setProgress(status.progressPct);
         }
       } catch {
         /* network blip — try again */

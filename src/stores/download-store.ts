@@ -19,6 +19,9 @@ export interface DownloadJob {
   queueTrack: QueueTrack;
   /** Error message if the download failed. UI surfaces this then auto-clears. */
   error?: string;
+  /** 0..100 — latest real progress from /api/yt-status. Null until the first
+      tick lands; UI falls back to its fake-progress animation. */
+  progressPct?: number | null;
 }
 
 interface DownloadState {
@@ -30,6 +33,9 @@ interface DownloadState {
   finish: () => void;
   /** Mark failed and surface the error. Clears `active` so the UI dismisses. */
   fail: (message: string) => void;
+  /** Write the latest real progress reading from the poller. No-op if no
+      active job (avoids late-arriving updates after a finish/cancel). */
+  setProgress: (pct: number | null) => void;
 }
 
 export const useDownloadStore = create<DownloadState>((set) => ({
@@ -38,4 +44,6 @@ export const useDownloadStore = create<DownloadState>((set) => ({
   finish: () => set({ active: null }),
   fail: (message) =>
     set((s) => (s.active ? { active: { ...s.active, error: message } } : s)),
+  setProgress: (pct) =>
+    set((s) => (s.active ? { active: { ...s.active, progressPct: pct } } : s)),
 }));
