@@ -262,6 +262,9 @@ export interface PlaylistTrack {
 
 export interface PlaylistEnqueueResult {
   total: number;
+  /** How many entries the playlist had in total (before our PLAYLIST_MAX_TRACKS
+      cap kicked in). 0 when the URL didn't resolve to a real playlist. */
+  available: number;
   tracks: PlaylistTrack[];
 }
 
@@ -273,9 +276,21 @@ export interface PlaylistEnqueueResult {
  * Returns as soon as the rows exist — the actual downloads keep running
  * in the Node process well after this resolves.
  */
+/** YT auto-generated radio / mix URLs (RD prefix) come back from yt-dlp
+    with 200-300+ entries because they're algorithmically infinite. Capping
+    keeps a single 'Add playlist' click from queueing 5 hours of downloads
+    behind 30 minutes of music. User can paste the URL again to grab the
+    next batch. */
+const PLAYLIST_MAX_TRACKS = 30;
+
 export async function enqueuePlaylist(url: string): Promise<PlaylistEnqueueResult> {
-  const videos = await fetchPlaylist(url);
-  if (videos.length === 0) return { total: 0, tracks: [] };
+  const all = await fetchPlaylist(url);
+  if (all.length === 0) return { total: 0, available: 0, tracks: [] };
+  const videos = all.slice(0, PLAYLIST_MAX_TRACKS);
+  const skipped = all.length - videos.length;
+  if (skipped > 0) {
+    console.log(`[mu] playlist: capping at ${PLAYLIST_MAX_TRACKS} (skipped ${skipped})`);
+  }
 
   const tracks: PlaylistTrack[] = [];
   for (const v of videos) {
@@ -309,7 +324,7 @@ export async function enqueuePlaylist(url: string): Promise<PlaylistEnqueueResul
       .filter((x): x is { video: YtSearchResult; trackId: string } => x !== null),
   );
 
-  return { total: tracks.length, tracks };
+  return { total: tracks.length, available: all.length, tracks };
 }
 
 async function runPlaylistDownloadChain(

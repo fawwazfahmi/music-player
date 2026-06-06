@@ -57,7 +57,11 @@ export function SearchPage() {
         const j = (await res.json().catch(() => null)) as { message?: string; error?: string } | null;
         throw new Error(j?.message ?? j?.error ?? `HTTP ${res.status}`);
       }
-      const data = (await res.json()) as { total: number; tracks: PlaylistTrackResp[] };
+      const data = (await res.json()) as {
+        total: number;
+        available: number;
+        tracks: PlaylistTrackResp[];
+      };
       const queueTracks = data.tracks.map((t) =>
         buildQueueTrack({
           id: t.trackId,
@@ -73,9 +77,13 @@ export function SearchPage() {
       } else {
         usePlayerStore.getState().addManyToQueue(queueTracks);
       }
+      const tail =
+        data.available > data.total
+          ? ` (mix has ${data.available} — capped to keep downloads reasonable; paste again for more)`
+          : "";
       setToast({
         kind: "ok",
-        text: `${data.total} song${data.total === 1 ? "" : "s"} added — downloading in the background`,
+        text: `${data.total} song${data.total === 1 ? "" : "s"} added — downloading in the background${tail}`,
       });
       setQuery("");
     } catch (err) {
