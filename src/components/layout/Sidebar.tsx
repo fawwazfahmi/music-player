@@ -18,6 +18,7 @@ import {
   StatsIcon,
   TagIcon,
 } from "@/components/icons";
+import { PartyButton } from "@/components/party/PartyButton";
 
 interface NavItemProps {
   label: string;
@@ -173,6 +174,8 @@ export function Sidebar() {
       ))}
 
       <div className="flex-1" />
+      {/* ainul-only "Start listening party" — invisible to everyone else. */}
+      <PartyButton />
       <NavItem
         label="Settings"
         icon={<SettingsIcon size={18} />}

@@ -8,6 +8,14 @@ const Schema = z.object({
   MUSICBRAINZ_USER_AGENT: z.string().min(1),
   APP_PASSWORD_HASH: z.string().min(20),
   COOKIE_SECRET: z.string().min(32),
+  // Listening Party WhatsApp via CallMeBot. Optional — when unset, party
+  // still works locally, we just skip the notification.
+  CALLMEBOT_API_KEY: z.string().optional(),
+  NOTIFY_WHATSAPP_NUMBER: z.string().optional(),
+  // Public URL used when generating WhatsApp join links — set to the
+  // Cloudflare Tunnel hostname in production, or http://localhost:3000 in
+  // dev.
+  PUBLIC_APP_URL: z.string().url().default("https://kyote.fawwaz.fun"),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 });
 

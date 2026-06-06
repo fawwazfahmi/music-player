@@ -3,8 +3,12 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 
+const NAMES = ["ainul", "fawwaz"] as const;
+type Name = (typeof NAMES)[number];
+
 export default function LoginPage() {
   const router = useRouter();
+  const [name, setName] = useState<Name>("fawwaz");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
@@ -16,7 +20,7 @@ export default function LoginPage() {
     const res = await fetch("/api/login", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ password }),
+      body: JSON.stringify({ name, password }),
     });
     setPending(false);
     if (!res.ok) {
@@ -55,6 +59,27 @@ export default function LoginPage() {
           onSubmit={onSubmit}
           className="rounded-2xl border border-zinc-800/70 bg-zinc-900/60 p-6 shadow-2xl backdrop-blur"
         >
+          <label className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+            You are
+          </label>
+          <div className="mt-2 mb-5 grid grid-cols-2 gap-2">
+            {NAMES.map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setName(n)}
+                className={
+                  "rounded-lg border px-4 py-2 text-sm font-semibold capitalize transition " +
+                  (name === n
+                    ? "border-emerald-500 bg-emerald-500/15 text-emerald-200"
+                    : "border-zinc-800 bg-zinc-950/60 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200")
+                }
+              >
+                {n}
+              </button>
+            ))}
+          </div>
+
           <label htmlFor="password" className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
             Password
           </label>

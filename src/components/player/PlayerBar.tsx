@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePlayerStore } from "@/stores/player-store";
+import { usePartyStore } from "@/stores/party-store";
 import { getEngine } from "@/audio/engine";
 import { coverUrl } from "@/lib/cover-url";
 import { isFavorited, toggleFavorite } from "@/server/actions/favorites";
@@ -41,6 +42,10 @@ export function PlayerBar() {
   const togglePlay = usePlayerStore((s) => s.togglePlay);
   const next = usePlayerStore((s) => s.next);
   const prev = usePlayerStore((s) => s.prev);
+
+  // Hard-follow lock: when fawwaz is in a listening party, his player
+  // controls are disabled — the broadcaster owns playback.
+  const partyLocked = usePartyStore((s) => s.following);
 
   const track = queue[currentIndex] ?? null;
   const [fav, setFav] = useState(false);
@@ -138,19 +143,20 @@ export function PlayerBar() {
           <button
             type="button"
             onClick={() => setShuffle(!shuffle)}
+            disabled={partyLocked}
             className={
-              "rounded p-1.5 transition " +
+              "rounded p-1.5 transition disabled:opacity-30 " +
               (shuffle ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-200")
             }
             aria-pressed={shuffle}
-            title="Shuffle"
+            title={partyLocked ? "Locked — listening party in progress" : "Shuffle"}
           >
             <ShuffleIcon size={16} />
           </button>
           <button
             type="button"
             onClick={prev}
-            disabled={!hasTrack}
+            disabled={!hasTrack || partyLocked}
             className="rounded p-1.5 text-zinc-300 transition hover:text-zinc-100 disabled:opacity-30 disabled:hover:text-zinc-300"
             aria-label="Previous"
           >
@@ -159,7 +165,7 @@ export function PlayerBar() {
           <button
             type="button"
             onClick={togglePlay}
-            disabled={!hasTrack}
+            disabled={!hasTrack || partyLocked}
             className="flex h-9 w-9 items-center justify-center rounded-full bg-zinc-100 text-zinc-950 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-zinc-100"
             aria-label={isPlaying ? "Pause" : "Play"}
           >
@@ -168,7 +174,7 @@ export function PlayerBar() {
           <button
             type="button"
             onClick={next}
-            disabled={!hasTrack}
+            disabled={!hasTrack || partyLocked}
             className="rounded p-1.5 text-zinc-300 transition hover:text-zinc-100 disabled:opacity-30 disabled:hover:text-zinc-300"
             aria-label="Next"
           >
@@ -177,12 +183,13 @@ export function PlayerBar() {
           <button
             type="button"
             onClick={cycleRepeat}
+            disabled={partyLocked}
             className={
-              "rounded p-1.5 transition " +
+              "rounded p-1.5 transition disabled:opacity-30 " +
               (repeat !== "off" ? "text-zinc-100" : "text-zinc-500 hover:text-zinc-200")
             }
             aria-label={`repeat ${repeat}`}
-            title={`Repeat: ${repeat}`}
+            title={partyLocked ? "Locked — listening party in progress" : `Repeat: ${repeat}`}
           >
             {repeat === "one" ? <RepeatOneIcon size={16} /> : <RepeatIcon size={16} />}
           </button>
@@ -195,7 +202,7 @@ export function PlayerBar() {
             max={Math.max(1, Math.floor(dur))}
             value={Math.min(Math.floor(pos), Math.floor(dur))}
             onChange={(e) => seekTo(Number(e.target.value))}
-            disabled={!hasTrack}
+            disabled={!hasTrack || partyLocked}
             className="flex-1 accent-zinc-300 disabled:opacity-40"
             aria-label="seek"
           />

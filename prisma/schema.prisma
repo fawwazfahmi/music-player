@@ -366,3 +366,29 @@ model AppSetting {
   key   String @id
   value String
 }
+
+// ===== Listening Party =====
+
+// Singleton-ish: at most one row with active=true at a time. The server
+// enforces this when starting a new party (ends any existing one first).
+//
+// All clients on the receiver side poll for the row where active=true and
+// hard-sync their player to (trackId, position, isPlaying).
+model ListeningParty {
+  id            String   @id @default(cuid())
+  active        Boolean  @default(true)
+  startedBy     String
+  trackId       String?
+  /** Seconds into the current track. The broadcaster writes this on every
+      seek and roughly every second during playback. */
+  position      Float    @default(0)
+  isPlaying     Boolean  @default(false)
+  /** Increments on every broadcaster write so the receiver can detect new
+      updates without comparing all fields. */
+  pulse         Int      @default(0)
+  startedAt     DateTime @default(now())
+  endedAt       DateTime?
+  updatedAt     DateTime @updatedAt
+
+  @@index([active, updatedAt])
+}

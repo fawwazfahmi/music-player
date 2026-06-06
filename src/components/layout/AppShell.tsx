@@ -13,6 +13,8 @@ import { PlayerBar } from "@/components/player/PlayerBar";
 import { MainContent } from "@/components/pages/MainContent";
 import { VideoStage } from "@/components/player/VideoStage";
 import { DownloadIndicator } from "@/components/player/DownloadIndicator";
+import { PartyControls } from "@/components/party/PartyControls";
+import { PartyBanner } from "@/components/party/PartyBanner";
 import { KeyboardHelpDialog } from "@/components/player/KeyboardHelpDialog";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { ChevronLeftIcon, MenuIcon, CloseIcon } from "@/components/icons";
@@ -183,6 +185,9 @@ export function AppShell() {
         </button>
       </header>
 
+      {/* Listening Party banner (fawwaz only, when a party is active) */}
+      <PartyBanner />
+
       <div className="flex min-h-0 flex-1 overflow-hidden">
         {/* Sidebar */}
         <div
@@ -247,6 +252,8 @@ export function AppShell() {
       <VideoStage />
       {/* Floating "downloading…" toast that persists across nav */}
       <DownloadIndicator />
+      {/* Polls + broadcasts party state. Invisible — just side-effects. */}
+      <PartyControls />
       <KeyboardHelpDialog open={helpOpen} onClose={closeHelp} />
     </div>
   );

@@ -38,3 +38,13 @@ export async function verifyPassword(plain: string): Promise<boolean> {
 
 export const SESSION_COOKIE_NAME = "mu_session";
 export const SESSION_COOKIE_VALUE = "ok"; // single-user; presence + signature is what counts
+
+// Identity cookie — not security-relevant (anyone with the password can
+// claim either name), purely UX: which side of the listening-party flow to
+// show. Stored as a plain cookie because we don't need to detect tampering.
+export const NAME_COOKIE_NAME = "mu_name";
+export const VALID_NAMES = ["ainul", "fawwaz"] as const;
+export type AppUserName = (typeof VALID_NAMES)[number];
+export function isValidName(s: string): s is AppUserName {
+  return (VALID_NAMES as readonly string[]).includes(s);
+}
