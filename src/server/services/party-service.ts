@@ -45,6 +45,35 @@ function toView(row: {
   };
 }
 
+// ───── In-memory pub-sub for SSE subscribers ──────────────────────────────
+// Module-level registry of currently-connected receivers. Each subscribe
+// callback receives the latest PartyView (with fresh ageMs computed at
+// emit time, never stale) whenever it changes.
+//
+// Lives in this Node process only. There's just one prod worker so there's
+// no need for Redis / cross-process broadcasting.
+
+type PartySubscriber = (view: PartyView | null) => void;
+const subscribers = new Set<PartySubscriber>();
+
+export function subscribeToParty(cb: PartySubscriber): () => void {
+  subscribers.add(cb);
+  return () => {
+    subscribers.delete(cb);
+  };
+}
+
+function emit(view: PartyView | null) {
+  for (const cb of subscribers) {
+    try {
+      cb(view);
+    } catch (err) {
+      console.error("[mu] party emit error", err);
+      subscribers.delete(cb);
+    }
+  }
+}
+
 /** End any currently-active parties. Idempotent. */
 async function endAllActive() {
   await db.listeningParty.updateMany({
@@ -82,6 +111,8 @@ export async function startParty(input: StartPartyInput): Promise<PartyView> {
       pulse: 1,
     },
   });
+  const view = toView(created);
+  emit(view);
 
   // Fire WhatsApp notification — never block the party creation on this.
   // CallMeBot can take 5-15s and may fail entirely; the party should still
@@ -92,7 +123,7 @@ export async function startParty(input: StartPartyInput): Promise<PartyView> {
     partyId: created.id,
   });
 
-  return toView(created);
+  return view;
 }
 
 async function notifyPartyStart(opts: {
@@ -115,6 +146,9 @@ export async function endParty(id: string): Promise<void> {
     where: { id, active: true },
     data: { active: false, endedAt: new Date() },
   });
+  // Tell every SSE subscriber that the party is over so receivers can leave
+  // follow mode immediately instead of waiting for their next poll.
+  emit(null);
 }
 
 export interface UpdatePartyInput {
@@ -125,7 +159,7 @@ export interface UpdatePartyInput {
 }
 
 export async function updateParty(input: UpdatePartyInput): Promise<void> {
-  await db.listeningParty.update({
+  const updated = await db.listeningParty.update({
     where: { id: input.id },
     data: {
       trackId: input.trackId,
@@ -134,4 +168,5 @@ export async function updateParty(input: UpdatePartyInput): Promise<void> {
       pulse: { increment: 1 },
     },
   });
+  emit(toView(updated));
 }
