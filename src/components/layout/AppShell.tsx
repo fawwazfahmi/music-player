@@ -51,17 +51,15 @@ export function AppShell() {
     updateMediaMetadata(track);
   }, [player.currentIndex, player.playbackKey, player.queue]);
 
-  // Play/pause sync — audio plays the moment isPlaying is true. We used to
-  // gate this on videoLoading so audio waited for the YT iframe to be ready,
-  // but for a music app the user cares about audio start time, not perfect
-  // A/V sync. The YT iframe's own onReady seeks to the current audio position
-  // so video catches up within a second or two — until then the player bar
-  // just shows the audio playing and the (still-blank) iframe sits there.
+  // Play/pause sync — soft gate. For YT tracks, briefly wait for the iframe
+  // so lip-sync / lyric videos stay in sync from t=0. The hard cap in
+  // YtVideoPanel releases the gate after ~1.5s if YT hasn't loaded by then,
+  // so a slow iframe never blocks startup for long.
   useEffect(() => {
     const engine = getEngine();
-    if (player.isPlaying) void engine.play();
+    if (player.isPlaying && !player.videoLoading) void engine.play();
     else engine.pause();
-  }, [player.isPlaying]);
+  }, [player.isPlaying, player.videoLoading]);
 
   // Volume sync
   useEffect(() => {

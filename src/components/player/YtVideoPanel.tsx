@@ -269,11 +269,13 @@ export function YtVideoPanel() {
       currentVideoRef.current = ytVideoId;
     });
 
-    // Hard safety: if YT iframe never loads (network block, etc.), release
-    // the audio gate after 8 s so playback isn't blocked forever.
+    // Hard safety: if YT iframe hasn't fired its first state change within
+    // a beat, release the audio gate and let audio start. Lyric / lip-sync
+    // videos that DO load in time get tight sync; slow iframes don't block
+    // playback for long.
     const hardTimeout = window.setTimeout(() => {
       usePlayerStore.getState().setVideoLoading(false);
-    }, 8000);
+    }, 1500);
 
     return () => {
       cancelled = true;
