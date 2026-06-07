@@ -16,19 +16,24 @@ const MAX_RETRIES = 8;
 const BASE_RETRY_MS = 400;
 const MAX_RETRY_MS = 3000;
 
+// When timeupdate reports a backwards jump bigger than this many seconds we
+// log it. Lets the user paste a clean log line when they see the
+// '0:57 → 0:59 → 0:57' loop behavior so we can correlate with the underlying
+// buffer event.
+const BACKWARDS_JUMP_THRESHOLD = 0.5;
+
 export function createEngine(): AudioEngine {
   const el =
     typeof document !== "undefined" ? document.createElement("audio") : ({} as HTMLAudioElement);
-  // "auto" means the browser starts buffering audio data immediately on
-  // src assignment, not just metadata. By the time play() is called the
-  // first chunks are usually already in memory — kills most of the
-  // 'click → silence → start' lag. Costs a bit more bandwidth on tracks
-  // the user previews and skips, fine for personal use.
   el.preload = "auto";
   let rawSrc = "";
   let retryCount = 0;
   let retryTimer: ReturnType<typeof setTimeout> | null = null;
   let currentLoadId = 0;
+  // Position to restore on the NEXT loadeddata — used by the retry path so a
+  // transient mid-track error doesn't yank playback back to t=0.
+  let pendingResumeAt = 0;
+  let lastReportedTime = 0;
 
   function clearRetry() {
     if (retryTimer !== null) {
@@ -44,17 +49,19 @@ export function createEngine(): AudioEngine {
 
   function onMediaError() {
     if (!rawSrc) return;
-    // MediaError codes: 1=ABORTED, 2=NETWORK, 3=DECODE, 4=SRC_NOT_SUPPORTED
-    // We see 4 when /api/audio returned 425 (track row exists but filePath
-    // not populated yet — usually because the YT download just landed and
-    // DB consistency lags by a beat) or non-200.
     if (retryCount >= MAX_RETRIES) {
       console.warn(`[mu] audio: gave up after ${MAX_RETRIES} retries on ${rawSrc}`);
       return;
     }
+    // Save the playhead so the retry can resume mid-track instead of resetting
+    // to 0. Particularly important when the error fires mid-playback (e.g.
+    // transient network blip, Cloudflare hiccup) rather than on initial load.
+    pendingResumeAt = el.currentTime || 0;
     const delay = Math.min(BASE_RETRY_MS * Math.pow(1.5, retryCount), MAX_RETRY_MS);
     retryCount++;
-    console.log(`[mu] audio: retry ${retryCount}/${MAX_RETRIES} in ${delay}ms (${rawSrc})`);
+    console.log(
+      `[mu] audio: retry ${retryCount}/${MAX_RETRIES} in ${delay}ms (${rawSrc}) — resume at ${pendingResumeAt.toFixed(2)}s`,
+    );
     const myLoadId = currentLoadId;
     retryTimer = setTimeout(() => {
       retryTimer = null;
@@ -67,11 +74,60 @@ export function createEngine(): AudioEngine {
       console.log(`[mu] audio: loaded after ${retryCount} retries (${rawSrc})`);
     }
     retryCount = 0;
+    // If we saved a pre-retry position, jump back to it now that we have data.
+    // Only honor positive resume times — the "fresh loadTrack" path explicitly
+    // sets this to 0 and we don't want to seek to 0 explicitly.
+    if (pendingResumeAt > 0.05) {
+      try {
+        el.currentTime = pendingResumeAt;
+        console.log(`[mu] audio: resumed at ${pendingResumeAt.toFixed(2)}s after retry`);
+      } catch {
+        /* ignore — element might not be seekable yet */
+      }
+    }
+    pendingResumeAt = 0;
+  }
+
+  // ─── Diagnostic listeners ─────────────────────────────────────────────
+  // Browser buffer events — fire when the network can't keep up with audio
+  // playback. Helps pinpoint the '0:57 looping' bug as a buffer-underrun
+  // problem rather than a code bug. Logs are dev-only by being scoped to the
+  // browser console; no remote shipping.
+  function logEvent(name: string) {
+    console.log(`[mu] audio.${name} @ ${el.currentTime.toFixed(2)}s readyState=${el.readyState} buffered=${describeBuffered()}`);
+  }
+  function describeBuffered() {
+    try {
+      const r = el.buffered;
+      if (r.length === 0) return "[]";
+      const parts: string[] = [];
+      for (let i = 0; i < r.length; i++) {
+        parts.push(`${r.start(i).toFixed(1)}-${r.end(i).toFixed(1)}`);
+      }
+      return `[${parts.join(",")}]`;
+    } catch {
+      return "n/a";
+    }
+  }
+  function onTimeUpdateDiag() {
+    const t = el.currentTime;
+    if (lastReportedTime > 0 && lastReportedTime - t > BACKWARDS_JUMP_THRESHOLD) {
+      console.warn(
+        `[mu] audio: BACKWARDS jump ${lastReportedTime.toFixed(2)}s → ${t.toFixed(2)}s readyState=${el.readyState} buffered=${describeBuffered()}`,
+      );
+    }
+    lastReportedTime = t;
   }
 
   if (typeof document !== "undefined") {
     el.addEventListener("error", onMediaError);
     el.addEventListener("loadeddata", onLoadedData);
+    el.addEventListener("waiting", () => logEvent("waiting"));
+    el.addEventListener("stalled", () => logEvent("stalled"));
+    el.addEventListener("suspend", () => logEvent("suspend"));
+    el.addEventListener("seeking", () => logEvent("seeking"));
+    el.addEventListener("seeked", () => logEvent("seeked"));
+    el.addEventListener("timeupdate", onTimeUpdateDiag);
   }
 
   return {
@@ -79,6 +135,8 @@ export function createEngine(): AudioEngine {
       currentLoadId++;
       clearRetry();
       retryCount = 0;
+      pendingResumeAt = 0;
+      lastReportedTime = 0;
       rawSrc = `/api/audio/${trackId}`;
       el.src = rawSrc;
     },
@@ -101,7 +159,6 @@ export function createEngine(): AudioEngine {
     getVolume: () => el.volume,
     getDuration: () => el.duration || 0,
     on: (event, handler) => {
-      // "loaded" maps to loadeddata for legacy callers
       const eventName = event === "loaded" ? "loadeddata" : event;
       el.addEventListener(eventName, handler);
       return () => el.removeEventListener(eventName, handler);
