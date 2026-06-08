@@ -11,10 +11,21 @@ import { getEngine } from "@/audio/engine";
 // hard — receivers see updates the instant the server processes the PATCH.
 const BROADCAST_MS = 500;
 
-// Drift over this many seconds → re-seek. Tighter than the previous polling
-// implementation because SSE delivers updates near-instantly, so when we
-// notice drift it's usually real (not stale data).
-const POSITION_DRIFT_TOLERANCE = 0.3;
+// Drift over this many seconds → re-seek.
+//
+// PREVIOUSLY 0.3 — too tight for HTTP-streamed audio. Every seek halted the
+// element for ~150-300ms while it rebuffered at the new position. The next
+// SSE pulse 500ms later would project forward another ~500ms — and audio
+// had barely advanced, so drift exceeded 0.3 again, → another seek, →
+// audio frozen in a re-seek loop. Browser logs showed seek→waiting→seeked
+// repeating every 0.5s with the audio element never actually advancing.
+//
+// 1.5s gives the element time to recover and play normally between
+// corrections. Real desync events (ainul pauses / skips / scrubs) still
+// trigger an immediate sync since those produce drifts of multiple seconds.
+// Casual sync within ~1.5s — perfectly fine for two people listening to
+// the same music; only lip-sync content would notice.
+const POSITION_DRIFT_TOLERANCE = 1.5;
 
 interface ReceiverSync {
   /** Wall-clock when we received this snapshot. */
