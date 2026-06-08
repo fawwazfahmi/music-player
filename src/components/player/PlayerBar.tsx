@@ -7,6 +7,7 @@ import { getEngine } from "@/audio/engine";
 import { coverUrl } from "@/lib/cover-url";
 import { isFavorited, toggleFavorite } from "@/server/actions/favorites";
 import {
+  BoltIcon,
   HeartIcon,
   HeartOutlineIcon,
   PauseIcon,
@@ -19,6 +20,36 @@ import {
   VolumeMuteIcon,
   VolumeUpIcon,
 } from "@/components/icons";
+
+// Small icon toggle in the player bar. ON → no YT iframe, no smooth-scroll
+// lyrics, no decorative animations. Designed for a user who wants the app
+// running in a second tab while gaming (Apex / wherever) — the iframe is
+// by far the heaviest cost (full video decode keeps the GPU busy even when
+// muted).
+function PerformanceToggle() {
+  const perf = usePlayerStore((s) => s.performanceMode);
+  const toggle = usePlayerStore((s) => s.togglePerformanceMode);
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-pressed={perf}
+      title={
+        perf
+          ? "Performance mode on — video preview hidden. Click to disable."
+          : "Performance mode off — full UI. Click to enable for gaming."
+      }
+      className={
+        "rounded-full p-1.5 transition " +
+        (perf
+          ? "bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
+          : "text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200")
+      }
+    >
+      <BoltIcon size={16} />
+    </button>
+  );
+}
 
 function formatTime(s: number): string {
   if (!Number.isFinite(s) || s < 0) return "0:00";
@@ -210,8 +241,9 @@ export function PlayerBar() {
         </div>
       </div>
 
-      {/* Right: volume */}
+      {/* Right: performance toggle + volume */}
       <div className="flex items-center justify-end gap-2 text-zinc-500">
+        <PerformanceToggle />
         {volume === 0 ? <VolumeMuteIcon size={16} /> : <VolumeUpIcon size={16} />}
         <input
           type="range"

@@ -42,6 +42,10 @@ interface PlayerState {
   // Increments whenever playback is intentionally restarted or moved to a new
   // queue item, even if the YouTube video id is the same.
   playbackKey: number;
+  /** Performance mode — turns off the YouTube iframe video, smooth-scroll
+      animations, and other GPU/CPU expensive eye candy. Designed for users
+      who want music in a second tab while gaming. Persisted per-device. */
+  performanceMode: boolean;
   currentTrack: () => QueueTrack | null;
   setQueue: (queue: QueueTrack[], startIndex?: number) => void;
   /** Append a track to the end of the queue. If the queue is empty, starts
@@ -72,6 +76,8 @@ interface PlayerState {
   setVolume: (v: number) => void;
   setPosition: (p: number) => void;
   setVideoLoading: (v: boolean) => void;
+  setPerformanceMode: (v: boolean) => void;
+  togglePerformanceMode: () => void;
 }
 
 export const usePlayerStore = create<PlayerState>()(
@@ -86,6 +92,7 @@ export const usePlayerStore = create<PlayerState>()(
       position: 0,
       videoLoading: false,
       playbackKey: 0,
+      performanceMode: false,
       currentTrack: () => {
         const s = get();
         return s.queue[s.currentIndex] ?? null;
@@ -305,6 +312,8 @@ export const usePlayerStore = create<PlayerState>()(
       setVolume: (v) => set({ volume: Math.max(0, Math.min(1, v)) }),
       setPosition: (p) => set({ position: Math.max(0, p) }),
       setVideoLoading: (v) => set({ videoLoading: v }),
+      setPerformanceMode: (v) => set({ performanceMode: v }),
+      togglePerformanceMode: () => set((s) => ({ performanceMode: !s.performanceMode })),
     }),
     {
       // Per-device persistence: localStorage on the user's own machine.
@@ -323,6 +332,7 @@ export const usePlayerStore = create<PlayerState>()(
         volume: state.volume,
         shuffle: state.shuffle,
         repeat: state.repeat,
+        performanceMode: state.performanceMode,
       }),
     },
   ),

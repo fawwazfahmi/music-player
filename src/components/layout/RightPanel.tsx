@@ -4,8 +4,9 @@ import { useState } from "react";
 import { useIpodStore } from "@/stores/ipod-store";
 import { LyricsPanel } from "@/components/player/LyricsPanel";
 import { QueuePanel } from "@/components/player/QueuePanel";
-import { ChevronRightIcon } from "@/components/icons";
+import { BoltIcon, ChevronRightIcon } from "@/components/icons";
 import { usePlayerStore } from "@/stores/player-store";
+import { coverUrl } from "@/lib/cover-url";
 
 type Tab = "lyrics" | "queue";
 
@@ -16,9 +17,14 @@ export function RightPanel() {
   const pop = useIpodStore((s) => s.pop);
   const inFullMode = currentName === "nowPlayingFull";
 
+  const performanceMode = usePlayerStore((s) => s.performanceMode);
+  const track = usePlayerStore((s) => s.queue[s.currentIndex] ?? null);
+
   return (
     <aside className="flex h-full w-full flex-col bg-zinc-950">
-      {/* Video slot — when in full mode, this position is empty and shows a hint */}
+      {/* Video slot — when in full mode, this position is empty and shows a hint.
+          When performance mode is on, show the album cover instead of the YT
+          iframe (which isn't mounted in that mode anyway). */}
       <div className="relative aspect-video w-full overflow-hidden bg-black">
         {inFullMode ? (
           <button
@@ -30,6 +36,8 @@ export function RightPanel() {
             <span className="text-xs">Video in fullscreen</span>
             <span className="text-[10px] text-zinc-500">Tap to exit</span>
           </button>
+        ) : performanceMode ? (
+          <PerformanceCover track={track} />
         ) : (
           <>
             {/* VideoStage positions the iframe (z-40) on top of this slot.
@@ -88,6 +96,28 @@ function TabButton({
       <span>{label}</span>
       {badge}
     </button>
+  );
+}
+
+function PerformanceCover({
+  track,
+}: {
+  track: ReturnType<typeof usePlayerStore.getState>["queue"][number] | null;
+}) {
+  const url = track ? coverUrl(track.coverArtHash, track.ytVideoId) : null;
+  return (
+    <div className="absolute inset-0 flex items-center justify-center bg-zinc-950">
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={url} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <div className="h-full w-full bg-gradient-to-br from-zinc-800 to-zinc-950" />
+      )}
+      <div className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-emerald-500/90 px-2 py-0.5 text-[10px] font-semibold text-zinc-950">
+        <BoltIcon size={10} />
+        Perf
+      </div>
+    </div>
   );
 }
 

@@ -213,7 +213,9 @@ export function LyricsPanel() {
   }, [data, position]);
 
   // Auto-scroll the active line into view — but never while editing, since
-  // scrolling under an open input is jarring.
+  // scrolling under an open input is jarring. In performance mode we use
+  // instant scroll instead of smooth to avoid the per-frame layout work.
+  const perfMode = usePlayerStore((s) => s.performanceMode);
   useEffect(() => {
     if (editingIdx !== null) return;
     if (activeIndex < 0 || !containerRef.current) return;
@@ -221,9 +223,9 @@ export function LyricsPanel() {
       `[data-line-idx="${activeIndex}"]`,
     );
     if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.scrollIntoView({ behavior: perfMode ? "auto" : "smooth", block: "center" });
     }
-  }, [activeIndex, editingIdx]);
+  }, [activeIndex, editingIdx, perfMode]);
 
   function jumpTo(line: number) {
     const seconds = data?.synced[line]?.time;

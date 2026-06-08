@@ -261,3 +261,11 @@ export function QueueIcon(props: IconProps) {
     </Icon>
   );
 }
+
+export function BoltIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M7 21h-1l1 -7h-4l5 -10h1l-1 7h4z" />
+    </Icon>
+  );
+}

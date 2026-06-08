@@ -266,8 +266,10 @@ export function AppShell() {
       </div>
 
       <PlayerBar />
-      {/* Single always-mounted YT iframe; positions itself over the active slot */}
-      <VideoStage />
+      {/* Single always-mounted YT iframe; positions itself over the active slot.
+          Skipped entirely in Performance Mode — biggest GPU saving for the
+          'use the app while gaming' case. */}
+      {!player.performanceMode && <VideoStage />}
       {/* Floating "downloading…" toast that persists across nav */}
       <DownloadIndicator />
       {/* Polls + broadcasts party state. Invisible — just side-effects. */}
