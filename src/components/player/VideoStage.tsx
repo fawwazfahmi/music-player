@@ -22,6 +22,16 @@ function findActiveSlot(): HTMLElement | null {
   return document.querySelector<HTMLElement>('[data-video-slot="small"]');
 }
 
+// Debug-flag: set window.__MU_DEBUG_VIDEO__ = true in the console to log
+// VideoStage placement decisions. Helps diagnose 'iframe blank black'
+// reports where the symptom is the slot mounting before the container
+// can attach, or the wrong slot being detected.
+function debugLog(...args: unknown[]) {
+  if (typeof window !== "undefined" && (window as unknown as { __MU_DEBUG_VIDEO__?: boolean }).__MU_DEBUG_VIDEO__) {
+    console.log("[mu] VideoStage:", ...args);
+  }
+}
+
 // Module-level singleton so we create exactly one container + React root for
 // the entire browser session. The YT iframe survives page transitions.
 let _container: HTMLDivElement | null = null;
@@ -86,12 +96,20 @@ export function VideoStage() {
         container.style.height = "360px";
         if (lastSlot !== null) {
           lastSlot = null;
+          debugLog("no slot — parking offscreen");
           emitSlotMoved();
         }
         return;
       }
       const r = slot.getBoundingClientRect();
-      if (r.width === 0 || r.height === 0) return; // not yet laid out
+      if (r.width === 0 || r.height === 0) {
+        debugLog("slot has zero size, skipping", {
+          slot: slot.getAttribute("data-video-slot"),
+          width: r.width,
+          height: r.height,
+        });
+        return; // not yet laid out
+      }
       container.style.top = `${r.top}px`;
       container.style.left = `${r.left}px`;
       container.style.width = `${r.width}px`;
@@ -99,6 +117,10 @@ export function VideoStage() {
 
       if (slot !== lastSlot) {
         lastSlot = slot;
+        debugLog("moved to slot", {
+          slot: slot.getAttribute("data-video-slot"),
+          rect: { top: r.top, left: r.left, w: r.width, h: r.height },
+        });
         // Rewire ResizeObserver to follow the new slot
         observer?.disconnect();
         observer = new ResizeObserver(scheduleApply);

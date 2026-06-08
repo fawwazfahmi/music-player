@@ -10,6 +10,12 @@ export interface AudioEngine {
   getDuration: () => number;
   on: (event: "timeupdate" | "ended" | "play" | "pause" | "error" | "loaded", handler: () => void) => () => void;
   destroy: () => void;
+  /** True when the element is currently performing a seek operation OR
+      doesn't have enough buffered data to play smoothly. Listening-party
+      follower uses this to skip its position-correction seek if the audio
+      isn't in a state to honor it cleanly — otherwise it'd just queue up
+      another seek on top of the in-flight one and never converge. */
+  isStableForSeek: () => boolean;
 }
 
 const MAX_RETRIES = 8;
@@ -167,6 +173,12 @@ export function createEngine(): AudioEngine {
       clearRetry();
       el.pause();
       el.removeAttribute("src");
+    },
+    isStableForSeek: () => {
+      // HAVE_FUTURE_DATA (3) or HAVE_ENOUGH_DATA (4) means the element has
+      // enough buffered to advance smoothly. !el.seeking means no other
+      // seek is in flight that ours would clobber.
+      return !el.seeking && el.readyState >= 3;
     },
   };
 }

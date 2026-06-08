@@ -258,6 +258,12 @@ export function PartyControls() {
       usePlayerStore.setState({ isPlaying: sync.isPlaying });
     }
     const engine = getEngine();
+    // Don't seek if the audio element isn't in a state to handle it cleanly
+    // (mid-seek, mid-buffer). The next pulse will check again. Without this
+    // guard a slow network → buffering audio → re-seek → more buffering loop
+    // is easy to fall into: each pulse triggers a fresh seek before the
+    // previous one settles, and audio appears to 'loop' a small region.
+    if (!engine.isStableForSeek()) return;
     if (Math.abs(engine.getCurrentTime() - projectedPos) > POSITION_DRIFT_TOLERANCE) {
       engine.seek(projectedPos);
       usePlayerStore.setState({ position: projectedPos });
