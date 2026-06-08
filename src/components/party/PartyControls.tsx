@@ -278,6 +278,12 @@ export function PartyControls() {
     if (Math.abs(engine.getCurrentTime() - projectedPos) > POSITION_DRIFT_TOLERANCE) {
       engine.seek(projectedPos);
       usePlayerStore.setState({ position: projectedPos });
+      // Defensive: if the broadcaster wants playback and the audio element
+      // is paused (e.g. it just finished and is sitting at duration while
+      // ainul's repeat-one is wrapping back to 0), seek alone doesn't
+      // resume — explicitly call play(). No-op when audio is already
+      // playing.
+      if (sync.isPlaying) void engine.play();
     }
   }, [following, remote?.trackId, remote?.isPlaying, remote?.pulse]);
 
