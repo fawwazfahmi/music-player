@@ -259,25 +259,30 @@ export const usePlayerStore = create<PlayerState>()(
       next: () =>
         set((s) => {
           if (s.queue.length === 0) return s;
-          if (s.currentIndex < s.queue.length - 1) {
-            const next = s.queue[s.currentIndex + 1];
-            return {
-              currentIndex: s.currentIndex + 1,
-              position: 0,
-              videoLoading: !!next?.ytVideoId,
-              playbackKey: s.playbackKey + 1,
-            };
+
+          let nextIdx: number;
+          if (s.shuffle && s.queue.length > 1) {
+            // Pick a random index that isn't the current one. Doesn't track
+            // history, so two adjacent shuffles can revisit a track — fine
+            // for casual listening, matches the Spotify default.
+            do {
+              nextIdx = Math.floor(Math.random() * s.queue.length);
+            } while (nextIdx === s.currentIndex);
+          } else if (s.currentIndex < s.queue.length - 1) {
+            nextIdx = s.currentIndex + 1;
+          } else if (s.repeat === "all") {
+            nextIdx = 0;
+          } else {
+            return { isPlaying: false };
           }
-          if (s.repeat === "all") {
-            const next = s.queue[0];
-            return {
-              currentIndex: 0,
-              position: 0,
-              videoLoading: !!next?.ytVideoId,
-              playbackKey: s.playbackKey + 1,
-            };
-          }
-          return { isPlaying: false };
+
+          const next = s.queue[nextIdx];
+          return {
+            currentIndex: nextIdx,
+            position: 0,
+            videoLoading: !!next?.ytVideoId,
+            playbackKey: s.playbackKey + 1,
+          };
         }),
       prev: () =>
         set((s) => {

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useIpodStore } from "@/stores/ipod-store";
 import { usePlayerStore } from "@/stores/player-store";
 import { useDownloadStore } from "@/stores/download-store";
+import { usePartyStore } from "@/stores/party-store";
 import { getEngine } from "@/audio/engine";
 import { bindMediaSession, updateMediaMetadata } from "@/audio/media-session";
 import { startPlay, updatePlayProgress } from "@/server/actions/playback";
@@ -107,10 +108,24 @@ export function AppShell() {
     });
   }, []);
 
-  // Auto-advance on end
+  // Auto-advance on end. Three branches:
+  //   1. Following a listening party — let the broadcaster's SSE drive the
+  //      next track. Calling next() locally would briefly load a wrong track
+  //      before the broadcaster's update arrives.
+  //   2. repeat = "one" — seek back to 0 and replay the same track.
+  //   3. anything else — sequential / shuffled advance via next().
   useEffect(() => {
     return getEngine().on("ended", () => {
-      usePlayerStore.getState().next();
+      if (usePartyStore.getState().following) return;
+      const player = usePlayerStore.getState();
+      if (player.repeat === "one") {
+        const engine = getEngine();
+        engine.seek(0);
+        void engine.play();
+        usePlayerStore.setState({ position: 0 });
+        return;
+      }
+      player.next();
     });
   }, []);
 
