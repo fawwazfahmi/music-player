@@ -62,6 +62,15 @@ export async function createPendingDownload(
     }
   }
 
+  // Adopt-from-disk: even with no DB row referencing it, the m4a file may
+  // already exist in CACHE_DIR (typical after a DB wipe — audio files in
+  // .cache/yt/ outlive the postgres data). If we find one, finalize the
+  // Track + YtCacheEntry rows immediately and return cached=true so the
+  // caller skips the yt-dlp download entirely.
+  const candidatePath = path.join(CACHE_DIR, `${result.videoId}.m4a`);
+  const onDisk = await fs.stat(candidatePath).catch(() => null);
+  const adoptFromDisk = !!onDisk && onDisk.isFile() && onDisk.size > 0;
+
   const parsed = parseYtTitle(result.title, result.uploader);
 
   const artist = await db.artist.upsert({
@@ -104,6 +113,46 @@ export async function createPendingDownload(
     await db.metadataJob.create({
       data: { entityType: "TRACK", trackId, status: "QUEUED" },
     });
+  }
+
+  if (adoptFromDisk && onDisk) {
+    // File is already on disk — finalize the rows as YT_CACHED immediately.
+    // sha256 of an existing m4a takes ~50ms for typical 3-5MB files; fast
+    // enough to do synchronously inline rather than fire-and-forget.
+    const sha = await sha256(candidatePath);
+    await db.track.update({
+      where: { id: trackId },
+      data: {
+        filePath: candidatePath,
+        fileFormat: "m4a",
+        fileSize: BigInt(onDisk.size),
+        sha256: sha,
+        source: "YT_CACHED",
+        playable: true,
+      },
+    });
+    await db.ytCacheEntry.upsert({
+      where: { ytVideoId: result.videoId },
+      create: {
+        ytVideoId: result.videoId,
+        trackId,
+        status: "READY",
+        attempts: 1,
+        completedAt: new Date(),
+        localFilePath: candidatePath,
+      },
+      update: {
+        status: "READY",
+        attempts: { increment: 1 },
+        completedAt: new Date(),
+        localFilePath: candidatePath,
+        errorMessage: null,
+      },
+    });
+    console.log(
+      `[mu] createPendingDownload/${result.videoId}: adopted existing file from disk (${onDisk.size} bytes) — skipped yt-dlp`,
+    );
+    return { trackId, cached: true };
   }
 
   await db.ytCacheEntry.upsert({
