@@ -36,6 +36,11 @@
     <dict>
         <key>PATH</key>
         <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <!-- Mirror today's db.dump (and Sunday's music.tar.gz) to iCloud
+             Drive so the only copy isn't on the same SSD as the source.
+             A dead disk would otherwise take both at once. -->
+        <key>OFFSITE_DIR</key>
+        <string>/Users/fwzfhmy/Library/Mobile Documents/com~apple~CloudDocs/MusicUniverse-Backups</string>
     </dict>
 
     <key>RunAtLoad</key>
