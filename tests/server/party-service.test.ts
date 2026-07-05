@@ -1,4 +1,4 @@
-import { describe, expect, it, afterEach, beforeEach } from "vitest";
+import { describe, expect, it, afterEach } from "vitest";
 import { IDLE_TIMEOUT_MS, isPartyIdle } from "@/server/services/party-service";
 
 describe("isPartyIdle", () => {
@@ -73,6 +73,52 @@ describe.skipIf(!RUN)("party-service lastPlayingAt refresh", () => {
 
     const after = await db.listeningParty.findUnique({ where: { id: p.id } });
     expect(after!.lastPlayingAt.getTime()).toBe(old.getTime());
+  });
+});
+
+describe.skipIf(!RUN)("endIdleParties sweep", () => {
+  afterEach(async () => {
+    const { db } = await import("@/server/db");
+    await db.listeningParty.deleteMany({
+      where: { startedBy: { startsWith: TEST_PREFIX } },
+    });
+  });
+
+  it("ends stale active parties but leaves fresh ones", async () => {
+    const { db } = await import("@/server/db");
+    const { endIdleParties } = await import("@/server/services/party-service");
+
+    const staleRow = await db.listeningParty.create({
+      data: {
+        active: true,
+        startedBy: `${TEST_PREFIX}sweep-stale`,
+        trackId: null,
+        position: 0,
+        isPlaying: true,
+        pulse: 0,
+        lastPlayingAt: new Date(Date.now() - (IDLE_TIMEOUT_MS + 60_000)),
+      },
+    });
+    const freshRow = await db.listeningParty.create({
+      data: {
+        active: true,
+        startedBy: `${TEST_PREFIX}sweep-fresh`,
+        trackId: null,
+        position: 0,
+        isPlaying: true,
+        pulse: 0,
+        lastPlayingAt: new Date(),
+      },
+    });
+
+    const count = await endIdleParties();
+    expect(count).toBeGreaterThanOrEqual(1);
+
+    const stale = await db.listeningParty.findUnique({ where: { id: staleRow.id } });
+    const fresh = await db.listeningParty.findUnique({ where: { id: freshRow.id } });
+    expect(stale!.active).toBe(false);
+    expect(stale!.endedAt).not.toBeNull();
+    expect(fresh!.active).toBe(true);
   });
 });
 

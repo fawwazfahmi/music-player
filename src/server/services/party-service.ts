@@ -264,6 +264,38 @@ export async function endParty(id: string): Promise<void> {
   emit(null);
 }
 
+/** Sweep: end every active party idle past the timeout. Used by both the
+    background sweeper and boot-time crash cleanup. Idempotent. Returns the
+    number ended. */
+export async function endIdleParties(): Promise<number> {
+  const cutoff = new Date(Date.now() - IDLE_TIMEOUT_MS);
+  const { count } = await db.listeningParty.updateMany({
+    where: { active: true, lastPlayingAt: { lt: cutoff } },
+    data: { active: false, endedAt: new Date() },
+  });
+  if (count > 0) {
+    clearFollowers();
+    emit(null);
+  }
+  return count;
+}
+
+// Guard so the sweeper can only run once per process (same pattern as the
+// library scanner's activeWatcher). Lives in this single Node worker.
+let idleSweeper: ReturnType<typeof setInterval> | null = null;
+
+/** Start the background idle sweep: once on boot (clears a party left active
+    by a crash) then every 60s. Safe to call multiple times. */
+export function startPartyIdleSweeper(): void {
+  if (idleSweeper) return;
+  const sweep = () =>
+    void endIdleParties().catch((err) =>
+      console.error("[mu] party idle sweep failed", err),
+    );
+  sweep();
+  idleSweeper = setInterval(sweep, 60_000);
+}
+
 export interface UpdatePartyInput {
   id: string;
   trackId: string | null;
