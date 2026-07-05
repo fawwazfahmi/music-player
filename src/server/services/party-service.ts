@@ -5,6 +5,16 @@ import { db } from "@/server/db";
 import { env } from "@/lib/env";
 import { sendWhatsApp } from "@/server/services/whatsapp-callmebot";
 
+/** A party is auto-ended after this long with no *playing* activity. */
+export const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
+
+/** True when the party has not been playing for longer than IDLE_TIMEOUT_MS.
+    Covers both "paused and walked away" and "tab closed / crashed" — in both
+    cases lastPlayingAt stops advancing. */
+export function isPartyIdle(lastPlayingAt: Date, now: number = Date.now()): boolean {
+  return now - lastPlayingAt.getTime() > IDLE_TIMEOUT_MS;
+}
+
 export interface PartyView {
   id: string;
   active: boolean;
