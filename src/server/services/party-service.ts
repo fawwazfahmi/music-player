@@ -210,6 +210,9 @@ export async function startParty(input: StartPartyInput): Promise<PartyView> {
       position: input.position,
       isPlaying: input.isPlaying,
       pulse: 1,
+      // Fresh party gets a full idle grace window even while she's still
+      // picking the first song (paused).
+      lastPlayingAt: new Date(),
     },
   });
   const snap = await loadTrackSnapshot(created.trackId);
@@ -269,6 +272,9 @@ export async function updateParty(input: UpdatePartyInput): Promise<void> {
       position: input.position,
       isPlaying: input.isPlaying,
       pulse: { increment: 1 },
+      // Only a *playing* update counts as activity. Paused heartbeats must not
+      // keep the party alive, so we leave lastPlayingAt untouched when paused.
+      ...(input.isPlaying ? { lastPlayingAt: new Date() } : {}),
     },
   });
   const snap = await loadTrackSnapshot(updated.trackId);
