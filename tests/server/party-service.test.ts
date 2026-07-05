@@ -75,3 +75,60 @@ describe.skipIf(!RUN)("party-service lastPlayingAt refresh", () => {
     expect(after!.lastPlayingAt.getTime()).toBe(old.getTime());
   });
 });
+
+describe.skipIf(!RUN)("getActiveParty lazy idle-end", () => {
+  afterEach(async () => {
+    const { db } = await import("@/server/db");
+    await db.listeningParty.deleteMany({
+      where: { startedBy: { startsWith: TEST_PREFIX } },
+    });
+  });
+
+  it("ends an idle party and does not return it", async () => {
+    const { db } = await import("@/server/db");
+    const { getActiveParty } = await import("@/server/services/party-service");
+    // Idle: last played over the timeout ago. Newest updatedAt (created last)
+    // so getActiveParty's findFirst returns THIS row.
+    const stale = new Date(Date.now() - (IDLE_TIMEOUT_MS + 60_000));
+    const p = await db.listeningParty.create({
+      data: {
+        active: true,
+        startedBy: `${TEST_PREFIX}stale`,
+        trackId: null,
+        position: 0,
+        isPlaying: true, // even "playing but frozen" (disconnected) must end
+        pulse: 0,
+        lastPlayingAt: stale,
+      },
+    });
+
+    const res = await getActiveParty();
+
+    expect(res?.id).not.toBe(p.id);
+    const row = await db.listeningParty.findUnique({ where: { id: p.id } });
+    expect(row!.active).toBe(false);
+    expect(row!.endedAt).not.toBeNull();
+  });
+
+  it("keeps a fresh active party", async () => {
+    const { db } = await import("@/server/db");
+    const { getActiveParty } = await import("@/server/services/party-service");
+    const p = await db.listeningParty.create({
+      data: {
+        active: true,
+        startedBy: `${TEST_PREFIX}fresh`,
+        trackId: null,
+        position: 0,
+        isPlaying: true,
+        pulse: 0,
+        lastPlayingAt: new Date(),
+      },
+    });
+
+    const res = await getActiveParty();
+
+    expect(res?.id).toBe(p.id);
+    const row = await db.listeningParty.findUnique({ where: { id: p.id } });
+    expect(row!.active).toBe(true);
+  });
+});

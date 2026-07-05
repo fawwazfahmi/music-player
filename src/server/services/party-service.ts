@@ -184,6 +184,13 @@ export async function getActiveParty(): Promise<PartyView | null> {
     orderBy: { updatedAt: "desc" },
   });
   if (!row) return null;
+  // Lazy idle cleanup: any read of party state also reaps a party that has
+  // gone quiet too long (paused-and-gone, or tab closed / crashed). endParty
+  // flips active=false, clears followers, and emits null to subscribers.
+  if (isPartyIdle(row.lastPlayingAt)) {
+    await endParty(row.id);
+    return null;
+  }
   const snap = await loadTrackSnapshot(row.trackId);
   return toView(row, snap);
 }
