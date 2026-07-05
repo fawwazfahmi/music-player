@@ -60,13 +60,13 @@ export async function PATCH(req: NextRequest) {
   if (typeof b.id !== "string") {
     return NextResponse.json({ error: "missing_id" }, { status: 400 });
   }
-  await updateParty({
+  const active = await updateParty({
     id: b.id,
     trackId: typeof b.trackId === "string" ? b.trackId : null,
     position: typeof b.position === "number" ? b.position : 0,
     isPlaying: typeof b.isPlaying === "boolean" ? b.isPlaying : false,
   });
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, active });
 }
 
 // DELETE — broadcaster ends the party.

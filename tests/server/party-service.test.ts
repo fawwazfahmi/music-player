@@ -178,3 +178,61 @@ describe.skipIf(!RUN)("getActiveParty lazy idle-end", () => {
     expect(row!.active).toBe(true);
   });
 });
+
+describe.skipIf(!RUN)("updateParty active-guard", () => {
+  afterEach(async () => {
+    const { db } = await import("@/server/db");
+    await db.listeningParty.deleteMany({
+      where: { startedBy: { startsWith: TEST_PREFIX } },
+    });
+  });
+
+  it("does not mutate an already-ended party and returns false", async () => {
+    const { db } = await import("@/server/db");
+    const { updateParty } = await import("@/server/services/party-service");
+    const frozen = new Date(Date.now() - 60 * 60 * 1000);
+    const p = await db.listeningParty.create({
+      data: {
+        active: false, // already ended
+        startedBy: `${TEST_PREFIX}ended`,
+        trackId: null,
+        position: 0,
+        isPlaying: false,
+        pulse: 7,
+        lastPlayingAt: frozen,
+        endedAt: new Date(),
+      },
+    });
+
+    const result = await updateParty({ id: p.id, trackId: null, position: 99, isPlaying: true });
+
+    expect(result).toBe(false);
+    const after = await db.listeningParty.findUnique({ where: { id: p.id } });
+    expect(after!.pulse).toBe(7); // unchanged — no write
+    expect(after!.position).toBe(0); // unchanged
+    expect(after!.lastPlayingAt.getTime()).toBe(frozen.getTime()); // not refreshed
+  });
+
+  it("updates an active party and returns true", async () => {
+    const { db } = await import("@/server/db");
+    const { updateParty } = await import("@/server/services/party-service");
+    const p = await db.listeningParty.create({
+      data: {
+        active: true,
+        startedBy: `${TEST_PREFIX}active`,
+        trackId: null,
+        position: 0,
+        isPlaying: false,
+        pulse: 1,
+        lastPlayingAt: new Date(),
+      },
+    });
+
+    const result = await updateParty({ id: p.id, trackId: null, position: 42, isPlaying: false });
+
+    expect(result).toBe(true);
+    const after = await db.listeningParty.findUnique({ where: { id: p.id } });
+    expect(after!.position).toBe(42);
+    expect(after!.pulse).toBe(2); // incremented
+  });
+});

@@ -303,19 +303,30 @@ export interface UpdatePartyInput {
   isPlaying: boolean;
 }
 
-export async function updateParty(input: UpdatePartyInput): Promise<void> {
-  const updated = await db.listeningParty.update({
-    where: { id: input.id },
+export async function updateParty(input: UpdatePartyInput): Promise<boolean> {
+  // Scope the write to still-active parties. If the party has already ended
+  // (idle-swept, lazily reaped in getActiveParty, or manually ended) a PATCH
+  // still in flight from the broadcaster must be a no-op, not a write to a
+  // dead row. The broadcaster's own SSE/poll receiver already saw emit(null)
+  // / a null poll and stopped its loop, so no client change is needed here.
+  const { count } = await db.listeningParty.updateMany({
+    where: { id: input.id, active: true },
     data: {
       trackId: input.trackId,
       position: input.position,
       isPlaying: input.isPlaying,
       pulse: { increment: 1 },
-      // Only a *playing* update counts as activity. Paused heartbeats must not
-      // keep the party alive, so we leave lastPlayingAt untouched when paused.
+      // Only a *playing* update counts as activity; a paused heartbeat must
+      // not refresh lastPlayingAt.
       ...(input.isPlaying ? { lastPlayingAt: new Date() } : {}),
     },
   });
-  const snap = await loadTrackSnapshot(updated.trackId);
-  emit(toView(updated, snap));
+  if (count === 0) return false;
+
+  const updated = await db.listeningParty.findUnique({ where: { id: input.id } });
+  if (updated) {
+    const snap = await loadTrackSnapshot(updated.trackId);
+    emit(toView(updated, snap));
+  }
+  return true;
 }
