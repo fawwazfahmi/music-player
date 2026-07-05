@@ -389,6 +389,10 @@ model ListeningParty {
   startedAt     DateTime @default(now())
   endedAt       DateTime?
   updatedAt     DateTime @updatedAt
+  /** Last moment the party was actually playing (isPlaying=true). Refreshed
+      only on playing updates, so a paused heartbeat does NOT refresh it. Used
+      to auto-end a party that's been idle (paused or disconnected) too long. */
+  lastPlayingAt DateTime @default(now())
 
   @@index([active, updatedAt])
 }

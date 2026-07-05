@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "ListeningParty" ADD COLUMN     "lastPlayingAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP;
