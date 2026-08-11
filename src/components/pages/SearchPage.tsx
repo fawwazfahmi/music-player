@@ -22,79 +22,14 @@ function detectYtPlaylistUrl(text: string): string | null {
   }
 }
 
-interface PlaylistTrackResp {
-  trackId: string;
-  cached: boolean;
-  videoId: string;
-  title: string;
-  uploader: string;
-  duration: number;
-  thumbnail: string | null;
-}
-
 export function SearchPage() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResults>({ tracks: [], artists: [], albums: [] });
   const [searching, setSearching] = useState(false);
-  const [playlistBusy, setPlaylistBusy] = useState(false);
-  const [toast, setToast] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const push = useIpodStore((s) => s.push);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const playlistUrl = useMemo(() => detectYtPlaylistUrl(query), [query]);
-
-  async function addPlaylist(mode: "play" | "append") {
-    if (!playlistUrl) return;
-    setPlaylistBusy(true);
-    setToast(null);
-    try {
-      const res = await fetch("/api/yt-playlist", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ url: playlistUrl }),
-      });
-      if (!res.ok) {
-        const j = (await res.json().catch(() => null)) as { message?: string; error?: string } | null;
-        throw new Error(j?.message ?? j?.error ?? `HTTP ${res.status}`);
-      }
-      const data = (await res.json()) as {
-        total: number;
-        available: number;
-        tracks: PlaylistTrackResp[];
-      };
-      const queueTracks = data.tracks.map((t) =>
-        buildQueueTrack({
-          id: t.trackId,
-          title: t.title,
-          duration: t.duration,
-          artistName: t.uploader,
-          albumTitle: "YouTube Mix",
-          ytVideoId: t.videoId,
-        }),
-      );
-      if (mode === "play") {
-        usePlayerStore.getState().setQueue(queueTracks, 0);
-      } else {
-        usePlayerStore.getState().addManyToQueue(queueTracks);
-      }
-      const tail =
-        data.available > data.total
-          ? ` (mix has ${data.available} — capped to keep downloads reasonable; paste again for more)`
-          : "";
-      setToast({
-        kind: "ok",
-        text: `${data.total} song${data.total === 1 ? "" : "s"} added — downloading in the background${tail}`,
-      });
-      setQuery("");
-    } catch (err) {
-      setToast({
-        kind: "err",
-        text: err instanceof Error ? err.message : "Playlist failed",
-      });
-    } finally {
-      setPlaylistBusy(false);
-    }
-  }
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -159,36 +94,16 @@ export function SearchPage() {
             <div className="mt-1 flex flex-wrap gap-2">
               <button
                 type="button"
-                disabled={playlistBusy}
-                onClick={() => void addPlaylist("play")}
-                className="rounded-full bg-emerald-500 px-4 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-emerald-400 disabled:opacity-50"
+                onClick={() => push({ name: "ytPlaylistPicker", url: playlistUrl })}
+                className="rounded-full bg-emerald-500 px-4 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-emerald-400"
               >
-                {playlistBusy ? "Adding…" : "Play playlist"}
-              </button>
-              <button
-                type="button"
-                disabled={playlistBusy}
-                onClick={() => void addPlaylist("append")}
-                className="rounded-full border border-emerald-500/60 px-4 py-1.5 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-500/20 disabled:opacity-50"
-              >
-                {playlistBusy ? "Adding…" : "Add to queue"}
+                Review songs
               </button>
             </div>
             <p className="text-[10px] text-zinc-500">
-              Downloads run sequentially in the background. First track might take 30-60s to be playable.
+              You&apos;ll see the full list and can untick anything you don&apos;t want before
+              anything downloads.
             </p>
-          </div>
-        )}
-        {toast && (
-          <div
-            className={
-              "mb-4 rounded-lg px-3 py-2 text-xs " +
-              (toast.kind === "ok"
-                ? "bg-emerald-500/15 text-emerald-200"
-                : "bg-red-500/15 text-red-200")
-            }
-          >
-            {toast.text}
           </div>
         )}
         {query.trim().length === 0 ? (

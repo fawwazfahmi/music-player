@@ -11,6 +11,8 @@ export type ScreenState =
   | { name: "nowPlaying" }
   | { name: "search" }
   | { name: "ytPicker"; query: string }
+  | { name: "ytPlaylistPicker"; url: string }
+  | { name: "downloads" }
   | { name: "settings" }
   | { name: "playlistList" }
   | { name: "playlistDetail"; playlistId: string }
@@ -30,6 +32,8 @@ export function screenKey(s: ScreenState): string {
       return `albumDetail:${s.albumId}`;
     case "ytPicker":
       return `ytPicker:${s.query}`;
+    case "ytPlaylistPicker":
+      return `ytPlaylistPicker:${s.url}`;
     case "playlistDetail":
       return `playlistDetail:${s.playlistId}`;
     case "notes":

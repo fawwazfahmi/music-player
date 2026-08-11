@@ -13,6 +13,8 @@ import { NewPlaylistPage } from "./NewPlaylistPage";
 import { SearchPage } from "./SearchPage";
 import { SettingsPage } from "./SettingsPage";
 import { YtPickerPage } from "./YtPickerPage";
+import { YtPlaylistPickerPage } from "./YtPlaylistPickerPage";
+import { DownloadsPage } from "./DownloadsPage";
 import { NotesPage } from "./NotesPage";
 import { NowPlayingFullPage } from "./NowPlayingFullPage";
 import { StatsPage } from "./StatsPage";
@@ -29,6 +31,12 @@ export function MainContent() {
       return <SearchPage />;
     case "ytPicker":
       return <YtPickerPage query={current.query} />;
+    case "ytPlaylistPicker":
+      // Keyed so switching to a different list remounts with clean state
+      // instead of resetting it synchronously inside an effect.
+      return <YtPlaylistPickerPage key={current.url} url={current.url} />;
+    case "downloads":
+      return <DownloadsPage />;
     case "songList":
       return <SongsPage />;
     case "artistList":

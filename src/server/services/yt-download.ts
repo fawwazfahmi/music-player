@@ -21,7 +21,7 @@ import crypto from "node:crypto";
 import { createReadStream } from "node:fs";
 import { db } from "@/server/db";
 import { env } from "@/lib/env";
-import { downloadAudio, fetchPlaylist, type YtSearchResult } from "@/server/services/yt-service";
+import { downloadAudio, type YtSearchResult } from "@/server/services/yt-service";
 import { parseYtTitle } from "@/server/services/yt-title-parser";
 
 const CACHE_DIR = path.join(env.MUSIC_LIBRARY_PATH, ".cache", "yt");
@@ -313,81 +313,49 @@ export async function resetStuckDownloads(): Promise<{ marked: number }> {
 
 // ─── Playlist / mix batch ─────────────────────────────────────────────────
 
-export interface PlaylistTrack {
-  trackId: string;
-  cached: boolean;
-  videoId: string;
-  title: string;
-  uploader: string;
-  duration: number;
-  thumbnail: string | null;
-}
-
-export interface PlaylistEnqueueResult {
+export interface EnqueueSelectedResult {
+  /** Rows created (or already present) for every selected video. */
   total: number;
-  /** How many entries the playlist had in total (before our PLAYLIST_MAX_TRACKS
-      cap kicked in). 0 when the URL didn't resolve to a real playlist. */
-  available: number;
-  tracks: PlaylistTrack[];
+  /** How many were already on disk and needed no download at all. */
+  alreadyCached: number;
+  trackIds: string[];
 }
 
 /**
- * Fetch a YT playlist / mix, create Track + YtCacheEntry rows for every
- * video (so the client can append them to the queue immediately), then kick
- * off a sequential background download chain for the non-cached ones.
+ * Create Track + YtCacheEntry rows for an explicit, user-pruned selection,
+ * then kick off the sequential background download chain for the ones not
+ * already on disk.
  *
- * Returns as soon as the rows exist — the actual downloads keep running
- * in the Node process well after this resolves.
+ * Deliberately does NOT touch the play queue. The user picks these up from
+ * the Downloads screen once they've landed, so starting a batch never
+ * interrupts what's currently playing or reorders anything queued.
+ *
+ * Returns as soon as the rows exist — downloads keep running in the Node
+ * process well after this resolves.
  */
-/** YT auto-generated radio / mix URLs (RD prefix) come back from yt-dlp
-    with 200-300+ entries because they're algorithmically infinite. Capping
-    keeps a single 'Add playlist' click from queueing 5 hours of downloads
-    behind 30 minutes of music. User can paste the URL again to grab the
-    next batch. */
-const PLAYLIST_MAX_TRACKS = 30;
+export async function enqueueSelected(
+  videos: YtSearchResult[],
+): Promise<EnqueueSelectedResult> {
+  const trackIds: string[] = [];
+  const pending: { video: YtSearchResult; trackId: string }[] = [];
+  let alreadyCached = 0;
 
-export async function enqueuePlaylist(url: string): Promise<PlaylistEnqueueResult> {
-  const { entries: all } = await fetchPlaylist(url);
-  if (all.length === 0) return { total: 0, available: 0, tracks: [] };
-  const videos = all.slice(0, PLAYLIST_MAX_TRACKS);
-  const skipped = all.length - videos.length;
-  if (skipped > 0) {
-    console.log(`[mu] playlist: capping at ${PLAYLIST_MAX_TRACKS} (skipped ${skipped})`);
-  }
-
-  const tracks: PlaylistTrack[] = [];
   for (const v of videos) {
     try {
       const { trackId, cached } = await createPendingDownload(v);
-      tracks.push({
-        trackId,
-        cached,
-        videoId: v.videoId,
-        title: v.title,
-        uploader: v.uploader,
-        duration: v.duration,
-        thumbnail: v.thumbnail,
-      });
+      trackIds.push(trackId);
+      if (cached) alreadyCached += 1;
+      else pending.push({ video: v, trackId });
     } catch (err) {
-      console.error(`[mu] playlist enqueue failed for ${v.videoId}`, err);
+      console.error(`[mu] enqueue failed for ${v.videoId}`, err);
     }
   }
 
-  // Background download chain — sequential so we don't fork 50 yt-dlp procs
-  // at once on a 50-song mix. Each job stays alive in the Node process
-  // independently of the HTTP request that triggered enqueuePlaylist.
-  void runPlaylistDownloadChain(
-    videos
-      .map((v) => {
-        const matched = tracks.find((t) => t.videoId === v.videoId);
-        return matched && !matched.cached
-          ? ({ video: v, trackId: matched.trackId } as const)
-          : null;
-      })
-      .filter((x): x is { video: YtSearchResult; trackId: string } => x !== null),
-  );
+  // Sequential so a 40-song selection doesn't fork 40 yt-dlp processes at
+  // once. Stays alive in the Node process independently of the HTTP request.
+  void runPlaylistDownloadChain(pending);
 
-  return { total: tracks.length, available: all.length, tracks };
+  return { total: trackIds.length, alreadyCached, trackIds };
 }
 
 async function runPlaylistDownloadChain(
@@ -401,6 +369,125 @@ async function runPlaylistDownloadChain(
     }
   }
   console.log(`[mu] playlist download chain finished (${items.length} videos)`);
+}
+
+// ─── Downloads screen ─────────────────────────────────────────────────────
+
+export interface DownloadRow {
+  ytVideoId: string;
+  trackId: string | null;
+  title: string;
+  artist: string;
+  status: "DOWNLOADING" | "READY" | "FAILED" | "PENDING";
+  progressPct: number | null;
+  errorMessage: string | null;
+  completedAt: string | null;
+  duration: number;
+  /** True once the file is on disk and the row is safe to queue. */
+  playable: boolean;
+}
+
+/** How far back the Downloads screen shows finished work. */
+const DOWNLOADS_HISTORY_MS = 24 * 60 * 60 * 1000;
+
+function pctOf(downloaded: bigint, total: bigint | null): number | null {
+  if (total === null) return null;
+  const t = Number(total);
+  if (!t) return null;
+  return Math.min(100, Math.round((Number(downloaded) / t) * 100));
+}
+
+/**
+ * Everything in flight or failed, plus anything completed in the last 24h.
+ * Read straight from YtCacheEntry so the view survives a page reload and
+ * reflects downloads started from any device — the client store only ever
+ * knew about jobs the current tab kicked off.
+ */
+export async function listDownloads(): Promise<DownloadRow[]> {
+  const cutoff = new Date(Date.now() - DOWNLOADS_HISTORY_MS);
+  const entries = await db.ytCacheEntry.findMany({
+    where: {
+      OR: [
+        { status: { in: ["DOWNLOADING", "PENDING", "FAILED"] } },
+        { status: "READY", completedAt: { gte: cutoff } },
+      ],
+    },
+    select: {
+      ytVideoId: true,
+      trackId: true,
+      status: true,
+      errorMessage: true,
+      completedAt: true,
+      createdAt: true,
+      downloadedBytes: true,
+      totalBytes: true,
+      track: {
+        select: {
+          title: true,
+          duration: true,
+          playable: true,
+          primaryArtist: { select: { name: true } },
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const rank: Record<string, number> = { DOWNLOADING: 0, PENDING: 0, FAILED: 1, READY: 2 };
+  return entries
+    .map((e): DownloadRow => ({
+      ytVideoId: e.ytVideoId,
+      trackId: e.trackId,
+      title: e.track?.title ?? e.ytVideoId,
+      artist: e.track?.primaryArtist?.name ?? "Unknown",
+      status: e.status as DownloadRow["status"],
+      progressPct: pctOf(e.downloadedBytes, e.totalBytes),
+      errorMessage: e.errorMessage,
+      completedAt: e.completedAt?.toISOString() ?? null,
+      duration: e.track?.duration ?? 0,
+      playable: e.track?.playable ?? false,
+    }))
+    .sort((a, b) => (rank[a.status] ?? 3) - (rank[b.status] ?? 3));
+}
+
+/**
+ * Re-run a failed download. Rebuilds the YtSearchResult from the Track row we
+ * already have, so the caller only needs the video id.
+ */
+export async function retryDownload(ytVideoId: string): Promise<void> {
+  const entry = await db.ytCacheEntry.findUnique({
+    where: { ytVideoId },
+    select: {
+      trackId: true,
+      track: {
+        select: { title: true, duration: true, primaryArtist: { select: { name: true } } },
+      },
+    },
+  });
+  if (!entry?.trackId || !entry.track) {
+    throw new Error("No download to retry for that video");
+  }
+  await db.ytCacheEntry.update({
+    where: { ytVideoId },
+    data: {
+      status: "DOWNLOADING",
+      errorMessage: null,
+      completedAt: null,
+      downloadedBytes: 0n,
+      totalBytes: null,
+      attempts: { increment: 1 },
+    },
+  });
+  void runDownloadJob(
+    {
+      videoId: ytVideoId,
+      title: entry.track.title,
+      uploader: entry.track.primaryArtist?.name ?? "Unknown",
+      duration: entry.track.duration,
+      thumbnail: null,
+    },
+    entry.trackId,
+  );
 }
 
 export async function getYtStatus(ytVideoId: string): Promise<YtStatus> {

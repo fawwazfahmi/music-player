@@ -16,6 +16,12 @@ const Schema = z.object({
   // Cloudflare Tunnel hostname in production, or http://localhost:3000 in
   // dev.
   PUBLIC_APP_URL: z.string().url().default("https://kyote.fawwaz.fun"),
+  // Where per-user YouTube cookie jars live. MUST be outside
+  // MUSIC_LIBRARY_PATH and outside Postgres — scripts/backup.sh tars the
+  // library and pg_dumps the DB, and both are mirrored offsite; a jar in
+  // either would ship live Google session credentials to the backup target.
+  // Defaults (in yt-cookies.ts) to ~/.config/music-universe/yt-cookies.
+  YT_COOKIES_DIR: z.string().min(1).optional(),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 });
 

@@ -8,6 +8,7 @@ import {
   AddIcon,
   AlbumIcon,
   ArtistIcon,
+  DownloadIcon,
   HeartIcon,
   HomeIcon,
   MusicNoteIcon,
@@ -131,6 +132,7 @@ export function Sidebar() {
         target={{ name: "tagList" }}
         active={activeName === "tagList" || activeName === "tagDetail"}
       />
+      <DownloadsNavItem activeName={activeName} />
 
       <div className="mt-4 flex items-center justify-between px-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
         <span>Playlists</span>
@@ -183,6 +185,68 @@ export function Sidebar() {
         active={activeName === "settings"}
       />
     </nav>
+  );
+}
+
+/** Downloads nav item with a live count of in-flight jobs. Polls slowly (5s)
+    because it's only a badge — the Downloads screen itself polls at 1s while
+    something is actually downloading. */
+function DownloadsNavItem({ activeName }: { activeName: string }) {
+  const [activeCount, setActiveCount] = useState(0);
+  const toRoot = useIpodStore((s) => s.toRoot);
+  const push = useIpodStore((s) => s.push);
+  const active = activeName === "downloads";
+
+  useEffect(() => {
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res = await fetch("/api/downloads", { cache: "no-store" });
+        if (!res.ok) return;
+        const json = (await res.json()) as {
+          downloads: { status: string }[];
+        };
+        if (cancelled) return;
+        setActiveCount(
+          json.downloads.filter((d) => d.status === "DOWNLOADING" || d.status === "PENDING")
+            .length,
+        );
+      } catch {
+        /* badge is cosmetic — a failed poll just leaves the last count */
+      }
+    };
+    void poll();
+    const h = setInterval(() => void poll(), 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(h);
+    };
+  }, []);
+
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        toRoot();
+        push({ name: "downloads" });
+      }}
+      className={
+        "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition " +
+        (active
+          ? "bg-zinc-800 text-zinc-100"
+          : "text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100")
+      }
+    >
+      <span className="text-zinc-300">
+        <DownloadIcon size={18} />
+      </span>
+      <span>Downloads</span>
+      {activeCount > 0 && (
+        <span className="ml-auto rounded-full bg-emerald-500 px-1.5 text-[10px] font-bold text-zinc-950 tabular-nums">
+          {activeCount}
+        </span>
+      )}
+    </button>
   );
 }
 

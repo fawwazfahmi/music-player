@@ -262,6 +262,22 @@ export function QueueIcon(props: IconProps) {
   );
 }
 
+export function DownloadIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 3v10.6l3.3-3.3 1.4 1.4-5.7 5.7-5.7-5.7 1.4-1.4 3.3 3.3V3h2zM5 19h14v2H5v-2z" />
+    </Icon>
+  );
+}
+
+export function RetryIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 5V2L8 6l4 4V7a5 5 0 1 1-5 5H5a7 7 0 1 0 7-7z" />
+    </Icon>
+  );
+}
+
 export function BoltIcon(props: IconProps) {
   return (
     <Icon {...props}>
