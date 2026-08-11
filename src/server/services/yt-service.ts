@@ -162,18 +162,6 @@ async function searchWithYtDlp(query: string, limit: number): Promise<YtSearchRe
     .slice(0, limit);
 }
 
-// yt-dlp can return a single video URL via --dump-single-json too, which
-// breaks the playlist parsing. Detect a playlist by looking for the
-// "?list=" or "&list=" query param in the URL.
-export function isPlaylistUrl(raw: string): boolean {
-  try {
-    const u = new URL(raw);
-    return /list=/.test(u.search);
-  } catch {
-    return false;
-  }
-}
-
 export interface FetchPlaylistOptions {
   /** Stop yt-dlp after N entries. Essential for mixes: a mix is an infinite
       algorithmic radio, so an unbounded fetch walks continuation pages
