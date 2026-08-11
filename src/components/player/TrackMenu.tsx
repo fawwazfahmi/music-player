@@ -8,16 +8,23 @@ import {
   QueueIcon,
   ChevronLeftIcon,
   DeleteIcon,
+  AlbumIcon,
+  NoteIcon,
 } from "@/components/icons";
 import { usePlayerStore, type QueueTrack } from "@/stores/player-store";
 import { deleteTrack } from "@/server/actions/library";
 import { addToPlaylist, getPlaylists } from "@/server/actions/playlists";
+import { transcribeTrack } from "@/server/actions/lyrics";
+import { CoverPickerDialog } from "@/components/player/CoverPickerDialog";
 
 interface Props {
   track: QueueTrack;
   /** Called after the track is successfully deleted, so pages can drop it
       from their local list. */
   onDeleted?: (trackId: string) => void;
+  /** Called after the user picks a new cover, so the row showing this track
+      can repaint without a refetch. */
+  onCoverChanged?: (trackId: string, coverArtHash: string | null) => void;
 }
 
 type View = "main" | "playlists";
@@ -27,18 +34,22 @@ interface PlaylistLite {
   name: string;
 }
 
-export function TrackMenu({ track, onDeleted }: Props) {
+export function TrackMenu({ track, onDeleted, onCoverChanged }: Props) {
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<View>("main");
   const [busy, setBusy] = useState(false);
   const [playlists, setPlaylists] = useState<PlaylistLite[] | null>(null);
   const [addedTo, setAddedTo] = useState<string | null>(null); // last playlist we added to
+  const [coverOpen, setCoverOpen] = useState(false);
+  const [transcribing, setTranscribing] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) {
       setView("main");
       setAddedTo(null);
+      setNote(null);
       return;
     }
     function onDoc(e: MouseEvent) {
@@ -108,6 +119,30 @@ export function TrackMenu({ track, onDeleted }: Props) {
     }
   }
 
+  function openCoverPicker(e: React.MouseEvent) {
+    stop(e);
+    setOpen(false);
+    setCoverOpen(true);
+  }
+
+  async function handleReTranscribe(e: React.MouseEvent) {
+    stop(e);
+    setTranscribing(true);
+    setNote(null);
+    try {
+      await transcribeTrack(track.id);
+      setNote("Lyrics re-transcribed");
+      setTimeout(() => setOpen(false), 900);
+    } catch (err) {
+      // Most common cause is a track with no local audio file (still
+      // downloading, or a pure-streaming row). Surface the reason rather than
+      // failing silently.
+      setNote(err instanceof Error ? err.message : "Re-transcribe failed");
+    } finally {
+      setTranscribing(false);
+    }
+  }
+
   async function handleDelete(e: React.MouseEvent) {
     stop(e);
     const ok = window.confirm(
@@ -167,6 +202,21 @@ export function TrackMenu({ track, onDeleted }: Props) {
           />
           <div className="my-1 border-t border-zinc-800" />
           <MenuItem
+            icon={<AlbumIcon size={14} />}
+            label="Change cover…"
+            onClick={openCoverPicker}
+          />
+          <MenuItem
+            icon={<NoteIcon size={14} />}
+            label={transcribing ? "Transcribing…" : "Re-transcribe"}
+            onClick={handleReTranscribe}
+            disabled={transcribing}
+          />
+          {note && (
+            <p className="px-3 py-1 text-[11px] text-zinc-500">{note}</p>
+          )}
+          <div className="my-1 border-t border-zinc-800" />
+          <MenuItem
             icon={<DeleteIcon size={14} />}
             label={busy ? "Deleting…" : "Delete"}
             onClick={handleDelete}
@@ -219,6 +269,18 @@ export function TrackMenu({ track, onDeleted }: Props) {
           </div>
         </div>
       )}
+      <CoverPickerDialog
+        open={coverOpen}
+        trackId={track.id}
+        trackTitle={track.title}
+        onClose={() => setCoverOpen(false)}
+        onChanged={(hash) => {
+          // Repaint the queue (player bar, queue panel, now-playing) and let
+          // the list row showing this track update itself.
+          usePlayerStore.getState().setTrackCoverArt(track.id, hash);
+          onCoverChanged?.(track.id, hash);
+        }}
+      />
     </div>
   );
 }

@@ -33,6 +33,7 @@ export async function getFavoriteTracks() {
           id: true,
           title: true,
           duration: true,
+          coverArtHash: true,
           primaryArtist: { select: { name: true } },
           album: { select: { title: true, coverArtPath: true } },
         },

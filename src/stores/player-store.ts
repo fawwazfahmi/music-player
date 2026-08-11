@@ -68,6 +68,10 @@ interface PlayerState {
   /** Remove every occurrence of `trackId` from the queue. Used after the row
       is deleted from the database so it can't be played. */
   purgeTrack: (trackId: string) => void;
+  /** Repaint a track's art everywhere it appears in the queue after the user
+      picks a new cover. Keeps the player bar, queue panel and now-playing in
+      sync without interrupting playback. */
+  setTrackCoverArt: (trackId: string, coverArtHash: string | null) => void;
   next: () => void;
   prev: () => void;
   togglePlay: () => void;
@@ -222,6 +226,15 @@ export const usePlayerStore = create<PlayerState>()(
           }
           // Removing something after the current track leaves the index alone.
           return { queue };
+        }),
+      setTrackCoverArt: (trackId, coverArtHash) =>
+        set((s) => {
+          if (!s.queue.some((t) => t.id === trackId)) return s;
+          return {
+            queue: s.queue.map((t) =>
+              t.id === trackId ? { ...t, coverArtHash } : t,
+            ),
+          };
         }),
       purgeTrack: (trackId) => {
         // Walk the queue once, dropping any matches and tracking how it shifts

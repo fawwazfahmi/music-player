@@ -46,6 +46,7 @@ export function AlbumDetailPage({ albumId }: Props) {
       primaryArtist: t.primaryArtist,
       albumTitle: title,
       coverArtHash,
+      trackCoverArtHash: t.coverArtHash,
       ytVideoId: t.ytVideoId,
     }),
   );

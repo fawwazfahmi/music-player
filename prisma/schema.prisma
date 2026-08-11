@@ -84,6 +84,12 @@ model Track {
   metadataFetched DateTime?
   discoveredAt    DateTime?
 
+  // Per-track cover override, chosen by hand in the cover picker. Takes
+  // precedence over the album's art. Needed because every YouTube download by
+  // one artist shares a single "YouTube" album, so album-level art can't
+  // express "this one song's cover is wrong".
+  coverArtHash String?
+
   // Lyrics (LRCLIB or Whisper-transcribed)
   lyricsSynced  String?
   lyricsPlain   String?

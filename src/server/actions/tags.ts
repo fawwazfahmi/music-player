@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/server/db";
+import { resolveTrackCoverHash } from "@/lib/cover-url";
 
 function normalize(name: string): string {
   return name.trim().toLowerCase();
@@ -115,6 +116,7 @@ export async function getTracksByTag(tagId: string): Promise<{
           id: true,
           title: true,
           duration: true,
+          coverArtHash: true,
           ytVideoId: true,
           playable: true,
           primaryArtist: { select: { name: true } },
@@ -131,7 +133,11 @@ export async function getTracksByTag(tagId: string): Promise<{
       duration: r.track.duration,
       artist: r.track.primaryArtist.name,
       album: r.track.album?.title ?? "",
-      coverArtHash: r.track.album?.coverArtHash ?? null,
+      // Flattened for the client, so resolve the per-track override here.
+      coverArtHash: resolveTrackCoverHash({
+        trackCoverArtHash: r.track.coverArtHash,
+        albumCoverArtHash: r.track.album?.coverArtHash,
+      }),
       ytVideoId: r.track.ytVideoId ?? null,
     }));
   tracks.sort((a, b) => a.title.localeCompare(b.title));

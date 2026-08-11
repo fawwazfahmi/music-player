@@ -6,14 +6,24 @@ const BASE = "https://musicbrainz.org/ws/2";
 // 1 req/sec per MB etiquette policy. interval=1100ms for a tiny safety margin.
 const queue = new PQueue({ concurrency: 1, interval: 1100, intervalCap: 1 });
 
+export interface ReleaseRef {
+  mbid: string;
+  title: string;
+}
+
 export interface RecordingResult {
   mbid: string;
   score: number;
   title: string;
   artistName: string;
   artistMbid?: string;
+  /** First release, kept for the metadata worker's "best guess" path. */
   releaseMbid?: string;
   releaseTitle?: string;
+  /** Every release this recording appears on. The cover picker needs these:
+      one recording often has a dozen releases with visibly different covers,
+      and the right one is frequently not the first. */
+  releases: ReleaseRef[];
 }
 
 export interface ArtistInfo {
@@ -53,15 +63,19 @@ export async function searchRecording(artist: string, title: string): Promise<Re
     const data = (await res.json()) as { recordings?: MBRecording[] };
     return (data.recordings ?? []).map((r) => {
       const credit = r["artist-credit"]?.[0]?.artist;
-      const release = r.releases?.[0];
+      const releases = (r.releases ?? [])
+        .filter((rel) => !!rel?.id)
+        .map((rel) => ({ mbid: rel.id, title: rel.title ?? "" }));
+      const release = releases[0];
       return {
         mbid: r.id,
         score: r.score ?? 0,
         title: r.title,
         artistName: credit?.name ?? "Unknown",
         artistMbid: credit?.id,
-        releaseMbid: release?.id,
+        releaseMbid: release?.mbid,
         releaseTitle: release?.title,
+        releases,
       };
     });
   }) as Promise<RecordingResult[]>;

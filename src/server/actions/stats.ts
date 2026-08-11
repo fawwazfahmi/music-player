@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/server/db";
+import { resolveTrackCoverHash } from "@/lib/cover-url";
 
 export type StatsRange = "7d" | "30d" | "365d" | "all";
 
@@ -55,6 +56,7 @@ export async function getTopTracks(range: StatsRange, limit = 50): Promise<TopTr
       title: true,
       duration: true,
       ytVideoId: true,
+      coverArtHash: true,
       primaryArtist: { select: { name: true } },
       album: { select: { title: true, coverArtHash: true } },
     },
@@ -70,7 +72,10 @@ export async function getTopTracks(range: StatsRange, limit = 50): Promise<TopTr
         title: t.title,
         artist: t.primaryArtist.name,
         album: t.album?.title ?? "",
-        coverArtHash: t.album?.coverArtHash ?? null,
+        coverArtHash: resolveTrackCoverHash({
+          trackCoverArtHash: t.coverArtHash,
+          albumCoverArtHash: t.album?.coverArtHash,
+        }),
         duration: t.duration,
         ytVideoId: t.ytVideoId ?? null,
         playCount: r._count._all,
@@ -224,6 +229,7 @@ export async function getRecentlyPlayed(limit = 30): Promise<RecentPlay[]> {
           title: true,
           duration: true,
           ytVideoId: true,
+          coverArtHash: true,
           primaryArtist: { select: { name: true } },
           album: { select: { title: true, coverArtHash: true } },
         },
@@ -241,7 +247,10 @@ export async function getRecentlyPlayed(limit = 30): Promise<RecentPlay[]> {
       title: r.track.title,
       artist: r.track.primaryArtist.name,
       album: r.track.album?.title ?? "",
-      coverArtHash: r.track.album?.coverArtHash ?? null,
+      coverArtHash: resolveTrackCoverHash({
+        trackCoverArtHash: r.track.coverArtHash,
+        albumCoverArtHash: r.track.album?.coverArtHash,
+      }),
       duration: r.track.duration,
       ytVideoId: r.track.ytVideoId ?? null,
       playedAt: r.playedAt.toISOString(),

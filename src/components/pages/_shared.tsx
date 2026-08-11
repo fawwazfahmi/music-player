@@ -1,8 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import { usePlayerStore, type QueueTrack } from "@/stores/player-store";
 import { formatDuration } from "@/lib/format-duration";
-import { coverUrl } from "@/lib/cover-url";
+import { coverUrl, resolveTrackCoverHash } from "@/lib/cover-url";
 import { PlayIcon } from "@/components/icons";
 import { TrackMenu } from "@/components/player/TrackMenu";
 
@@ -20,6 +21,10 @@ export function SongRow({ track, index, onPlay, onDeleted, showAlbum = true }: S
   const currentTrackId = usePlayerStore((s) => s.queue[s.currentIndex]?.id);
   const isPlaying = usePlayerStore((s) => s.isPlaying);
   const active = currentTrackId === track.id;
+  // Set when the user picks a new cover from this row's menu, so the art
+  // updates immediately without the parent page refetching its list.
+  // `undefined` means "no local change"; `null` means "reset to default".
+  const [coverOverride, setCoverOverride] = useState<string | null | undefined>(undefined);
 
   return (
     <div
@@ -44,7 +49,8 @@ export function SongRow({ track, index, onPlay, onDeleted, showAlbum = true }: S
         </span>
       </div>
       {(() => {
-        const url = coverUrl(track.coverArtHash, track.ytVideoId);
+        const hash = coverOverride !== undefined ? coverOverride : track.coverArtHash;
+        const url = coverUrl(hash, track.ytVideoId);
         return url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={url} alt="" className="h-9 w-9 rounded object-cover" />
@@ -69,7 +75,11 @@ export function SongRow({ track, index, onPlay, onDeleted, showAlbum = true }: S
       {/* Kebab menu — invisible until row hover or menu open. The menu component
           handles its own click-stopPropagation so it doesn't trigger playback. */}
       <div className="opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
-        <TrackMenu track={track} onDeleted={onDeleted} />
+        <TrackMenu
+          track={track}
+          onDeleted={onDeleted}
+          onCoverChanged={(_id, hash) => setCoverOverride(hash)}
+        />
       </div>
     </div>
   );
@@ -132,7 +142,11 @@ export function buildQueueTrack(t: {
   artistName?: string;
   album?: { title?: string; coverArtHash?: string | null } | null;
   albumTitle?: string;
+  /** Album-level art. Historic field name — several callers pass it meaning
+      the album's cover, so it must not be mistaken for a per-track override. */
   coverArtHash?: string | null;
+  /** Per-track override chosen in the cover picker. Wins over album art. */
+  trackCoverArtHash?: string | null;
   ytVideoId?: string | null;
 }): QueueTrack {
   return {
@@ -141,7 +155,11 @@ export function buildQueueTrack(t: {
     duration: t.duration,
     artist: t.primaryArtist?.name ?? t.artistName ?? "Unknown",
     album: t.album?.title ?? t.albumTitle ?? "",
-    coverArtHash: t.album?.coverArtHash ?? t.coverArtHash ?? null,
+    coverArtHash: resolveTrackCoverHash({
+      trackCoverArtHash: t.trackCoverArtHash,
+      albumCoverArtHash: t.album?.coverArtHash,
+      legacyCoverArtHash: t.coverArtHash,
+    }),
     ytVideoId: t.ytVideoId ?? null,
   };
 }

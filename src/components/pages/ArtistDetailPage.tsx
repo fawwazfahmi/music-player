@@ -43,6 +43,7 @@ export function ArtistDetailPage({ artistId }: Props) {
       duration: t.duration,
       artistName: name,
       album: t.album ? { title: t.album.title, coverArtHash: t.album.coverArtHash } : null,
+      trackCoverArtHash: t.coverArtHash,
       ytVideoId: t.ytVideoId,
     }),
   );

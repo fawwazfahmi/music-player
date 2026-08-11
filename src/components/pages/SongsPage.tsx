@@ -58,6 +58,7 @@ export function SongsPage() {
         duration: s.duration,
         primaryArtist: s.primaryArtist,
         album: s.album,
+        trackCoverArtHash: s.coverArtHash,
         ytVideoId: s.ytVideoId,
       }),
     ) ?? [];

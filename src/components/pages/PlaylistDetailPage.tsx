@@ -41,6 +41,7 @@ export function PlaylistDetailPage({ playlistId }: Props) {
       duration: t.duration,
       primaryArtist: t.primaryArtist,
       album: t.album,
+      trackCoverArtHash: t.coverArtHash,
     }),
   );
 
