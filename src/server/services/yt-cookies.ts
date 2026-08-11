@@ -51,6 +51,12 @@ const STALE_PATTERNS = [
   /account cookies are invalid/i,
 ];
 
+// NOTE: the path.resolve/path.relative below make Turbopack emit an
+// "unexpected file in NFT list" build warning — its file tracer can't prove
+// which paths get read. Harmless here: this app runs via `next start`, not
+// `output: 'standalone'`, so the trace list is never consumed. Keeping the
+// assertion is worth the warning; it is the thing stopping a cookie jar from
+// landing somewhere backup.sh mirrors offsite.
 function resolveCookiesDir(): string {
   const dir =
     env.YT_COOKIES_DIR ??
