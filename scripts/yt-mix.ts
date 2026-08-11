@@ -71,7 +71,7 @@ async function main() {
 
   if (isPlaylistish(URL)) {
     console.log("→ Fetching playlist via yt-dlp --flat-playlist…");
-    const all = await fetchPlaylist(URL);
+    const { entries: all } = await fetchPlaylist(URL);
     if (all.length === 0) exitUsage("playlist returned 0 entries — check the URL");
     videos = all.slice(0, Number.isFinite(LIMIT) ? LIMIT : all.length);
     console.log(

@@ -347,7 +347,7 @@ export interface PlaylistEnqueueResult {
 const PLAYLIST_MAX_TRACKS = 30;
 
 export async function enqueuePlaylist(url: string): Promise<PlaylistEnqueueResult> {
-  const all = await fetchPlaylist(url);
+  const { entries: all } = await fetchPlaylist(url);
   if (all.length === 0) return { total: 0, available: 0, tracks: [] };
   const videos = all.slice(0, PLAYLIST_MAX_TRACKS);
   const skipped = all.length - videos.length;

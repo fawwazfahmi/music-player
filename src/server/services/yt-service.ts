@@ -45,12 +45,19 @@ function parseProgress(line: string): YtDlpProgress | null {
   };
 }
 
-function runYtDlp(
-  args: string[],
-  opts: { onProgress?: (p: YtDlpProgress) => void } = {},
-): Promise<string> {
+export interface RunYtDlpOptions {
+  onProgress?: (p: YtDlpProgress) => void;
+  /** Path to a Netscape-format cookie jar. When set, yt-dlp resolves the
+      request as that logged-in YouTube account — which is what makes a Mix
+      come back personalized rather than cold-start generic. Null/undefined
+      means run anonymously (the historical behaviour). */
+  cookiePath?: string | null;
+}
+
+function runYtDlp(args: string[], opts: RunYtDlpOptions = {}): Promise<string> {
+  const finalArgs = opts.cookiePath ? [...args, "--cookies", opts.cookiePath] : args;
   return new Promise((resolve, reject) => {
-    const proc = spawn(env.YT_DLP_PATH, args, { stdio: ["ignore", "pipe", "pipe"] });
+    const proc = spawn(env.YT_DLP_PATH, finalArgs, { stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
     let buf = "";
@@ -167,34 +174,55 @@ export function isPlaylistUrl(raw: string): boolean {
   }
 }
 
+export interface FetchPlaylistOptions {
+  /** Stop yt-dlp after N entries. Essential for mixes: a mix is an infinite
+      algorithmic radio, so an unbounded fetch walks continuation pages
+      forever — observed returning 1769 entries that were only 372 unique
+      videos. Omit for curated playlists, which are finite and must not be
+      truncated. */
+  playlistEnd?: number;
+  cookiePath?: string | null;
+}
+
+export interface FetchPlaylistResult {
+  /** yt-dlp's playlist title, e.g. "Mix - Rick Astley - Never Gonna…". */
+  title: string;
+  entries: YtSearchResult[];
+}
+
 /**
  * Fetch a YouTube playlist (or "mix" / radio) by URL. Uses yt-dlp's
  * --flat-playlist mode, which returns just the video IDs / titles / durations
- * without resolving each video's stream URL — fast and cheap (<2s for most
- * mixes), suitable for showing the list before deciding to download anything.
+ * without resolving each video's stream URL — fast and cheap, suitable for
+ * showing the list before deciding to download anything.
  *
- * Returns an empty array if yt-dlp can't recognize the URL as a playlist.
+ * Returns empty entries if yt-dlp can't recognize the URL as a playlist.
  */
-export async function fetchPlaylist(url: string): Promise<YtSearchResult[]> {
-  const raw = await runYtDlp([
-    url,
-    "--flat-playlist",
-    "--dump-single-json",
-    "--no-warnings",
-  ]);
+export async function fetchPlaylist(
+  url: string,
+  opts: FetchPlaylistOptions = {},
+): Promise<FetchPlaylistResult> {
+  const args = [url, "--flat-playlist", "--dump-single-json", "--no-warnings"];
+  if (opts.playlistEnd !== undefined) {
+    args.push("--playlist-end", String(opts.playlistEnd));
+  }
+  const raw = await runYtDlp(args, { cookiePath: opts.cookiePath });
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
-    return [];
+    return { title: "", entries: [] };
   }
-  const entries =
-    (parsed as { entries?: YtDlpEntry[] } | YtDlpEntry[])?.constructor === Array
-      ? (parsed as YtDlpEntry[])
-      : (parsed as { entries?: YtDlpEntry[] }).entries ?? [];
-  return entries
-    .map(mapYtDlpEntry)
-    .filter((x): x is YtSearchResult => x !== null);
+  const entries = Array.isArray(parsed)
+    ? (parsed as YtDlpEntry[])
+    : (parsed as { entries?: YtDlpEntry[] }).entries ?? [];
+  const title = Array.isArray(parsed)
+    ? ""
+    : (parsed as { title?: string }).title ?? "";
+  return {
+    title,
+    entries: entries.map(mapYtDlpEntry).filter((x): x is YtSearchResult => x !== null),
+  };
 }
 
 export async function searchYt(query: string, limit = 5): Promise<YtSearchResult[]> {
