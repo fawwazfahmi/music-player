@@ -44,3 +44,9 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# YouTube cookie jars — live Google credentials, never commit.
+# Root-anchored so it can't swallow source dirs like src/app/api/yt-cookies.
+/yt-cookies/
+*.cookies.txt
+/cookies.txt

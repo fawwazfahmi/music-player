@@ -168,15 +168,24 @@ export async function readCookiePath(name: AppUserName): Promise<string | null> 
   return status === "connected" ? cookiePathFor(name) : null;
 }
 
-/** Resolve the caller's jar from the mu_name identity cookie. */
-export async function cookiePathForRequest(req: {
+export interface CookieBearingRequest {
   cookies: { get(name: string): { value: string } | undefined };
-}): Promise<string | null> {
+}
+
+/** Which of the two identities is calling, per the mu_name cookie. */
+export function identityFromRequest(req: CookieBearingRequest): AppUserName | null {
   const raw = req.cookies.get(NAME_COOKIE_NAME)?.value;
   if (!raw) return null;
   const decoded = decodeURIComponent(raw);
-  if (!isValidName(decoded)) return null;
-  return readCookiePath(decoded);
+  return isValidName(decoded) ? decoded : null;
+}
+
+/** Resolve the caller's jar from the mu_name identity cookie. */
+export async function cookiePathForRequest(
+  req: CookieBearingRequest,
+): Promise<string | null> {
+  const name = identityFromRequest(req);
+  return name ? readCookiePath(name) : null;
 }
 
 export function isStaleError(message: string): boolean {

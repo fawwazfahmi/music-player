@@ -23,6 +23,7 @@ import { db } from "@/server/db";
 import { env } from "@/lib/env";
 import { downloadAudio, type YtSearchResult } from "@/server/services/yt-service";
 import { parseYtTitle } from "@/server/services/yt-title-parser";
+import { scrubCookiePaths } from "@/server/services/yt-cookies";
 
 const CACHE_DIR = path.join(env.MUSIC_LIBRARY_PATH, ".cache", "yt");
 
@@ -255,7 +256,10 @@ export async function runDownloadJob(
     });
     log("end:ok", { totalMs: Date.now() - t0 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    // Scrub before logging or persisting: yt-dlp stderr can echo the
+    // --cookies path, which points straight at a file of live Google
+    // credentials. No reason for that to land in logs or the database.
+    const message = scrubCookiePaths(err instanceof Error ? err.message : String(err));
     log("end:fail", { totalMs: Date.now() - t0, message: message.slice(0, 200) });
     await db.ytCacheEntry
       .update({

@@ -1,6 +1,12 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { previewList } from "@/server/services/yt-list";
-import { cookiePathForRequest } from "@/server/services/yt-cookies";
+import {
+  identityFromRequest,
+  isStaleError,
+  markStale,
+  readCookiePath,
+  scrubCookiePaths,
+} from "@/server/services/yt-cookies";
 
 // POST /api/yt-playlist/preview { url }
 //
@@ -23,15 +29,35 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invalid_url" }, { status: 400 });
   }
 
+  const name = identityFromRequest(req);
+  const cookiePath = name ? await readCookiePath(name) : null;
+
   try {
-    const cookiePath = await cookiePathForRequest(req);
-    const preview = await previewList(url, { cookiePath });
+    let preview;
+    try {
+      preview = await previewList(url, { cookiePath });
+    } catch (err) {
+      const raw = err instanceof Error ? err.message : String(err);
+      // Expired jar: flag it so Settings can prompt a reconnect, then fall
+      // back to an anonymous fetch. A generic list beats a hard failure.
+      if (cookiePath && name && isStaleError(raw)) {
+        await markStale(name);
+        console.warn(`[mu] YouTube cookies for ${name} look expired — falling back to anonymous`);
+        preview = await previewList(url, { cookiePath: null });
+      } else {
+        throw err;
+      }
+    }
+
     if (preview.tracks.length === 0) {
       return NextResponse.json({ error: "empty_list" }, { status: 422 });
     }
-    return NextResponse.json(preview, { headers: { "cache-control": "no-store" } });
+    return NextResponse.json(
+      { ...preview, usedCookies: cookiePath !== null },
+      { headers: { "cache-control": "no-store" } },
+    );
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
+    const message = scrubCookiePaths(err instanceof Error ? err.message : String(err));
     if (/not a youtube/i.test(message)) {
       return NextResponse.json({ error: "not_a_playlist", message }, { status: 400 });
     }
