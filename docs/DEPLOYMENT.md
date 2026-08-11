@@ -10,8 +10,8 @@ they survive reboots.
 
 | Thing         | Value                                                        |
 | ------------- | ------------------------------------------------------------ |
-| Public URL    | `https://kyote.fawwaz.fun`                                   |
-| Local origin  | `http://localhost:3000` (`next start`)                       |
+| Public URL    | `https://kyote.wazfahmi.site`                                |
+| Local origin  | `http://127.0.0.1:3100` (`next start`, PORT set in the plist)|
 | Tunnel name   | `music-universe`                                             |
 | Tunnel UUID   | `29284152-420d-4bb1-93dc-7e0f49bc3344`                       |
 | Password      | `Kyowo` (gates the whole app; bcrypt hash in `.env`)         |
@@ -69,7 +69,7 @@ launchctl list | grep musicuniverse
 ```
 
 ```bash
-curl -sI -o /dev/null -w "HTTP %{http_code} via %{remote_ip}\n" https://kyote.fawwaz.fun/login
+curl -sI -o /dev/null -w "HTTP %{http_code} via %{remote_ip}\n" https://kyote.wazfahmi.site/login
 # Expected: HTTP 200 via 104.x.x.x
 ```
 
@@ -136,7 +136,7 @@ If `~/.cloudflared/<UUID>.json` is ever compromised:
 ```bash
 cloudflared tunnel delete music-universe
 cloudflared tunnel create music-universe   # writes a new UUID + JSON
-cloudflared tunnel route dns music-universe kyote.fawwaz.fun
+cloudflared tunnel route dns music-universe kyote.wazfahmi.site
 # update tunnel + credentials-file in ~/.cloudflared/config.yml with the new UUID
 launchctl kickstart -k gui/$(id -u)/com.musicuniverse.tunnel
 ```
@@ -168,27 +168,38 @@ The app crashed. Check `~/Library/Logs/MusicUniverse/app.err.log`. launchd
 will retry after `ThrottleInterval` (10s) — if it's crash-looping, fix the
 crash and re-kickstart.
 
-### Port 3000 is already in use after a code change
+### Port 3100 is already in use / the app job silently never runs
 
-A leftover `pnpm dev` or a previous launchd app job didn't die cleanly.
+The failure mode to watch for: `launchctl list | grep musicuniverse` shows
+`-` in the PID column for `com.musicuniverse.app` with exit status `1`, yet
+the site still loads. That means an **orphaned `pnpm start`** (PPID 1, from a
+manual run) is holding 3100, and the managed job has been crash-looping on
+`EADDRINUSE` behind it — possibly for days. The site serves whatever build
+that orphan started with, so deploys appear to do nothing.
+
+Seen in the wild 12 Aug 2026: an orphan from 8 Aug had been serving prod for
+3 days while every `kickstart` failed.
 
 ```bash
-lsof -i :3000 -P -sTCP:LISTEN
-# kill the rogue node by PID, then kickstart the app job
+lsof -nP -iTCP:3100 -sTCP:LISTEN     # find the listener
+ps -o pid,ppid,lstart,command -p <PID>   # PPID 1 => orphan, not launchd
+kill <listener-pid> <its-parent-pid>
+# KeepAlive restarts the managed job within ~10s; confirm it took the port:
+launchctl list | grep musicuniverse   # app should now show a real PID
 ```
 
-### `kyote.fawwaz.fun` resolves but never connects
+### `kyote.wazfahmi.site` resolves but never connects
 
 Either the tunnel job isn't running (`launchctl list | grep tunnel`) or
 the DNS CNAME got removed from your Cloudflare zone. Re-route:
 
 ```bash
-cloudflared tunnel route dns music-universe kyote.fawwaz.fun
+cloudflared tunnel route dns music-universe kyote.wazfahmi.site
 ```
 
 ### "Successfully installed" but the app says wrong password
 
-The session cookie cache is per-host. Clear cookies for `kyote.fawwaz.fun`
+The session cookie cache is per-host. Clear cookies for `kyote.wazfahmi.site`
 and try again.
 
 ### Whisper transcriptions hang
