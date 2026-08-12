@@ -16,6 +16,7 @@ import { VideoStage } from "@/components/player/VideoStage";
 import { loadIframeAPI } from "@/components/player/YtVideoPanel";
 import { DownloadIndicator } from "@/components/player/DownloadIndicator";
 import { PartyControls } from "@/components/party/PartyControls";
+import { OverlayPresence } from "@/components/overlay/OverlayPresence";
 import { PartyBanner } from "@/components/party/PartyBanner";
 import { KeyboardHelpDialog } from "@/components/player/KeyboardHelpDialog";
 import { PatchNotesDialog } from "@/components/player/PatchNotesDialog";
@@ -320,6 +321,7 @@ export function AppShell() {
       <DownloadIndicator />
       {/* Polls + broadcasts party state. Invisible — just side-effects. */}
       <PartyControls />
+      <OverlayPresence />
       <KeyboardHelpDialog open={helpOpen} onClose={closeHelp} />
       <PatchNotesDialog
         open={!!patchNotes && patchNotes.length > 0}
