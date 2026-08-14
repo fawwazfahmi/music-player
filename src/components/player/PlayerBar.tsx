@@ -254,7 +254,10 @@ export function PlayerBar() {
             value={Math.min(Math.floor(pos), Math.floor(dur))}
             onChange={(e) => seekTo(Number(e.target.value))}
             disabled={!hasTrack || partyLocked}
-            className="flex-1 accent-zinc-300 disabled:opacity-40"
+            // Sky, matching the phone's scrubber and the mini player's
+            // progress hairline. Volume below stays neutral on purpose — one
+            // coloured slider means "this is where you are in the song".
+            className="flex-1 accent-sky-400 disabled:opacity-40"
             aria-label="seek"
           />
           <span className="w-8 tabular-nums">{formatTime(dur)}</span>
