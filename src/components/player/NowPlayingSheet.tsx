@@ -168,11 +168,29 @@ export function NowPlayingSheet({
   const art = track ? coverUrl(track.coverArtHash, track.ytVideoId) : null;
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Now playing"
-      aria-hidden={!open}
+    <>
+      {/*
+        Backdrop for the video's transparent hole.
+
+        The media slot has no background so the iframe — which lives in a fixed
+        container on document.body at z-40 — can show through the sheet. The
+        cost is that whenever the iframe isn't painted there (opening, art mode,
+        a track with no video, the moment before it's placed) the hole showed
+        the library page behind it, which is what "janky" looked like.
+
+        This sits at z-35: above the app, BELOW the iframe, below the sheet. So
+        the hole is black when there's no video and the video when there is.
+        It cannot live inside the sheet — anything in there paints above z-40
+        and would hide the video again, which was the original black-slot bug.
+      */}
+      {open && (
+        <div className="fixed inset-0 z-[35] bg-zinc-950 md:hidden" aria-hidden />
+      )}
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="Now playing"
+        aria-hidden={!open}
       // No background on the root, on purpose. The shared YouTube iframe lives
       // in a fixed container on document.body at z-40, and this sheet is z-70
       // with a transform — so it forms a stacking context above the iframe and
@@ -370,7 +388,8 @@ export function NowPlayingSheet({
           </button>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 }
 
