@@ -64,7 +64,9 @@ export function RightPanel() {
         <TabButton label="Queue" active={tab === "queue"} onClick={() => setTab("queue")} badge={<QueueBadge />} />
       </div>
       <div className="min-h-0 flex-1 overflow-hidden">
-        {tab === "lyrics" && <LyricsPanel />}
+        {/* Keyed by track: a change remounts, which resets fetch state and any
+            open lyric editor without an effect doing it by hand. */}
+        {tab === "lyrics" && <LyricsPanel key={track?.id ?? "none"} />}
         {tab === "queue" && <QueuePanel />}
       </div>
     </aside>

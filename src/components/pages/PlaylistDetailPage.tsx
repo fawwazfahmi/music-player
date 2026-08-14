@@ -13,7 +13,6 @@ interface Props {
 
 export function PlaylistDetailPage({ playlistId }: Props) {
   const [pl, setPl] = useState<Awaited<ReturnType<typeof getPlaylistWithTracks>>>(null);
-  const pop = useIpodStore((s) => s.pop);
   const toRoot = useIpodStore((s) => s.toRoot);
 
   useEffect(() => {

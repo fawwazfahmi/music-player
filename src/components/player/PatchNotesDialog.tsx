@@ -17,18 +17,18 @@ import {
  * ordered set of items shipped together. The numbering is real information —
  * rows are ordered by significance, lead single first — rather than decoration.
  *
- * Visual identity is deliberately NOT the Performance Mode dialog's. Emerald
- * means playback in this app and the bolt means Performance Mode; wearing
- * either made this dialog read as a mode switch. It gets violet, used nowhere
- * else, and a waveform strip keyed to the version — the app is called Kyowave.
+ * It carries the brand accent, but not the Performance Mode dialog's shape:
+ * no glow, no bolt. What separates them is structure — a waveform strip keyed
+ * to the version, and a numbered tracklist — rather than hue. The app is
+ * called Kyowave, so the wave is the thing worth making literal.
  *
  * Portalled to document.body: PlayerBar's backdrop-blur creates a containing
  * block, so a fixed overlay rendered beneath it centres on the player bar.
  */
 
 const KIND_LABEL: Record<Change["kind"], { text: string; cls: string }> = {
-  added: { text: "new", cls: "text-violet-300" },
-  fixed: { text: "fixed", cls: "text-sky-300/80" },
+  added: { text: "new", cls: "text-sky-300" },
+  fixed: { text: "fixed", cls: "text-sky-400/70" },
   changed: { text: "changed", cls: "text-zinc-400" },
 };
 
@@ -89,7 +89,7 @@ export function PatchNotesDialog({
             type="button"
             onClick={dismiss}
             autoFocus
-            className="rounded-lg bg-violet-500 px-4 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-violet-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-400"
+            className="rounded-lg bg-sky-500 px-4 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-sky-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-400"
           >
             Got it
           </button>
@@ -114,7 +114,7 @@ function Waveform({ seed }: { seed: string }) {
       {bars.map((v, i) => (
         <span
           key={i}
-          className="flex-1 rounded-[1px] bg-gradient-to-t from-violet-500/30 to-violet-300/80"
+          className="flex-1 rounded-[1px] bg-gradient-to-t from-sky-500/30 to-sky-300/80"
           style={{ height: `${Math.round(v * 100)}%` }}
         />
       ))}
@@ -126,7 +126,7 @@ function ReleaseBlock({ release }: { release: Release }) {
   return (
     <section className="border-b border-zinc-800/60 px-6 py-5 last:border-b-0">
       <div className="flex items-baseline justify-between gap-3">
-        <span className="font-mono text-[10px] uppercase tracking-widest text-violet-300/70">
+        <span className="font-mono text-[10px] uppercase tracking-widest text-sky-300/70">
           Release {release.version}
         </span>
         <span className="font-mono text-[10px] text-zinc-600">{release.date}</span>

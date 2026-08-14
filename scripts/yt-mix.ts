@@ -1,5 +1,5 @@
 // Manual batch import of a YouTube playlist / mix / single video — same
-// pipeline as the web /api/yt-playlist flow (Track + YtCacheEntry rows,
+// pipeline as the web playlist picker (Track + YtCacheEntry rows,
 // source = YT_CACHED, ytVideoId set so the iframe + lyrics work),
 // without the web's safety cap. Run as many in parallel as you want.
 //

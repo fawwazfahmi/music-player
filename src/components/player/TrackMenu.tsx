@@ -46,12 +46,7 @@ export function TrackMenu({ track, onDeleted, onCoverChanged }: Props) {
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!open) {
-      setView("main");
-      setAddedTo(null);
-      setNote(null);
-      return;
-    }
+    if (!open) return;
     function onDoc(e: MouseEvent) {
       if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
     }
@@ -172,7 +167,17 @@ export function TrackMenu({ track, onDeleted, onCoverChanged }: Props) {
         type="button"
         onClick={(e) => {
           stop(e);
-          setOpen((o) => !o);
+          if (open) {
+            setOpen(false);
+            return;
+          }
+          // Reset here rather than in an effect on close: an event handler is
+          // the right place for it, and it keeps the menu's state correct for
+          // every path that closes it (backdrop click, Escape, selection).
+          setView("main");
+          setAddedTo(null);
+          setNote(null);
+          setOpen(true);
         }}
         aria-label="Track options"
         title="More"

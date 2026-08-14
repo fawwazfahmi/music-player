@@ -36,7 +36,7 @@
     <dict>
         <key>PATH</key>
         <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
-        <!-- Mirror today's db.dump (and Sunday's music.tar.gz) to iCloud
+        <!-- Mirror today's db.dump to iCloud
              Drive so the only copy isn't on the same SSD as the source.
              A dead disk would otherwise take both at once. -->
         <key>OFFSITE_DIR</key>
