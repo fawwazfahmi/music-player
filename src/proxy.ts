@@ -3,15 +3,31 @@ import { SESSION_COOKIE_NAME, verifyCookie, SESSION_COOKIE_VALUE } from "@/serve
 
 // /overlay + /api/overlay: public OBS overlay (browser source has no login
 // cookie). /api/art: album covers the overlay needs — public, non-sensitive.
-// NOTE: /api/presence is intentionally NOT public — only the logged-in kyote
+// NOTE: /api/presence is intentionally NOT public — only the logged-in Kyowave
 // tab may push now-playing.
 const PUBLIC_PATHS = ["/login", "/api/login", "/api/health", "/overlay", "/api/overlay", "/api/art"];
+
+// Branding assets, which are fetched without a session cookie by definition:
+// a link preview crawler pulling og.png, the browser reading the manifest
+// before anyone logs in, iOS grabbing a touch icon off a bookmark. Gating
+// these doesn't protect anything — it just makes previews and installs fail
+// silently. `/favicon*` is already handled by the prefix check below.
+const PUBLIC_FILES = new Set([
+  "/icon.svg",
+  "/icon-light.svg",
+  "/manifest.webmanifest",
+  "/apple-touch-icon.png",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/og.png",
+]);
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
+    PUBLIC_FILES.has(pathname) ||
     PUBLIC_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))
   ) {
     return NextResponse.next();
