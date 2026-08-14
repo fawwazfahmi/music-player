@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useIsMobile } from "@/hooks/use-media-query";
 import {
   MoreIcon,
   PlayIcon,
@@ -25,6 +27,16 @@ interface Props {
   /** Called after the user picks a new cover, so the row showing this track
       can repaint without a refetch. */
   onCoverChanged?: (trackId: string, coverArtHash: string | null) => void;
+  /** Controlled open state. Supplied by rows that open the menu on long-press;
+      omit for the plain click-the-button behaviour. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** Hide the ⋮ trigger. Used once the long-press gesture has been learned. */
+  hideButton?: boolean;
+  /** Show the "hold a song to open this" footer. The button is a teacher while
+      it exists — without this line she would simply keep tapping it and never
+      discover the gesture it is standing in for. */
+  showLongPressTip?: boolean;
 }
 
 type View = "main" | "playlists";
@@ -34,8 +46,18 @@ interface PlaylistLite {
   name: string;
 }
 
-export function TrackMenu({ track, onDeleted, onCoverChanged }: Props) {
-  const [open, setOpen] = useState(false);
+export function TrackMenu({
+  track,
+  onDeleted,
+  onCoverChanged,
+  open: controlledOpen,
+  onOpenChange,
+  hideButton = false,
+  showLongPressTip = false,
+}: Props) {
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const open = controlledOpen ?? uncontrolledOpen;
+  const isMobile = useIsMobile();
   const [view, setView] = useState<View>("main");
   const [busy, setBusy] = useState(false);
   const [playlists, setPlaylists] = useState<PlaylistLite[] | null>(null);
@@ -45,6 +67,27 @@ export function TrackMenu({ track, onDeleted, onCoverChanged }: Props) {
   const [note, setNote] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
+  /**
+   * Single way in and out, so controlled and uncontrolled behave identically.
+   *
+   * The sub-view reset happens on *close* rather than on open. It used to live
+   * in the button's click handler, which no longer sees every open now that a
+   * long-press can also trigger one — resetting on the way out covers both,
+   * and needs no effect to watch the transition.
+   */
+  const setOpen = useCallback(
+    (v: boolean) => {
+      if (!v) {
+        setView("main");
+        setAddedTo(null);
+        setNote(null);
+      }
+      if (onOpenChange) onOpenChange(v);
+      else setUncontrolledOpen(v);
+    },
+    [onOpenChange],
+  );
+
   useEffect(() => {
     if (!open) return;
     function onDoc(e: MouseEvent) {
@@ -53,13 +96,16 @@ export function TrackMenu({ track, onDeleted, onCoverChanged }: Props) {
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") setOpen(false);
     }
-    document.addEventListener("mousedown", onDoc);
+    // The mobile sheet lives in a portal, so its DOM is not inside rootRef and
+    // an outside-click check would close the menu the instant she touched it.
+    // Its own backdrop does that job instead.
+    if (!isMobile) document.addEventListener("mousedown", onDoc);
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("mousedown", onDoc);
       document.removeEventListener("keydown", onKey);
     };
-  }, [open]);
+  }, [open, isMobile, setOpen]);
 
   // Lazy-load playlists the first time the picker view is opened.
   useEffect(() => {
@@ -161,38 +207,75 @@ export function TrackMenu({ track, onDeleted, onCoverChanged }: Props) {
     }
   }
 
-  return (
-    <div ref={rootRef} className="relative" onClick={stop} onKeyDown={stop}>
-      <button
-        type="button"
-        onClick={(e) => {
-          stop(e);
-          if (open) {
-            setOpen(false);
-            return;
-          }
-          // Reset here rather than in an effect on close: an event handler is
-          // the right place for it, and it keeps the menu's state correct for
-          // every path that closes it (backdrop click, Escape, selection).
-          setView("main");
-          setAddedTo(null);
-          setNote(null);
-          setOpen(true);
-        }}
-        aria-label="Track options"
-        title="More"
-        className={
-          "rounded-full p-1.5 text-zinc-400 transition hover:bg-zinc-700/60 hover:text-zinc-100 " +
-          (open ? "bg-zinc-700/60 text-zinc-100" : "")
-        }
-      >
-        <MoreIcon size={16} />
-      </button>
-      {open && view === "main" && (
+  // On a phone the menu is a bottom sheet in a portal, not a dropdown anchored
+  // to the row. Two reasons: a 48px row has nowhere to put a 200px dropdown,
+  // and the player bar's `backdrop-blur` creates a containing block for fixed
+  // positioning, which would trap an absolutely-positioned menu inside it.
+  //
+  // The portal stays inside rootRef in the *React* tree, so the stopPropagation
+  // on the wrapper still catches clicks and the row underneath never plays.
+  function panel(body: React.ReactNode, width: string) {
+    if (!isMobile) {
+      return (
         <div
           role="menu"
-          className="absolute right-0 top-full z-50 mt-1 w-48 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900 py-1 text-sm shadow-2xl"
+          className={`absolute right-0 top-full z-50 mt-1 ${width} overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900 py-1 text-sm shadow-2xl`}
         >
+          {body}
+        </div>
+      );
+    }
+    if (typeof document === "undefined") return null;
+    return createPortal(
+      <div className="fixed inset-0 z-[85] flex flex-col justify-end">
+        <button
+          type="button"
+          aria-label="Close menu"
+          className="absolute inset-0 bg-black/60"
+          onClick={() => setOpen(false)}
+        />
+        <div
+          role="menu"
+          className="kw-safe-bottom kw-contain-scroll relative max-h-[75dvh] overflow-y-auto rounded-t-2xl border-t border-zinc-700 bg-zinc-900 pb-4 pt-2 text-base shadow-2xl"
+        >
+          <div className="mx-auto mb-1 h-1 w-9 rounded-full bg-zinc-700" />
+          <p className="truncate px-4 pb-2 text-xs font-semibold text-zinc-500">
+            {track.title}
+          </p>
+          {body}
+          {showLongPressTip && (
+            <p className="mx-3 mt-2 rounded-lg border border-sky-500/30 bg-sky-500/10 px-3 py-2 text-xs text-sky-300">
+              Faster next time — <span className="font-bold">hold a song</span> to open this.
+            </p>
+          )}
+        </div>
+      </div>,
+      document.body,
+    );
+  }
+
+  return (
+    <div ref={rootRef} className="relative" onClick={stop} onKeyDown={stop}>
+      {!hideButton && (
+        <button
+          type="button"
+          onClick={(e) => {
+            stop(e);
+            setOpen(!open);
+          }}
+          aria-label="Track options"
+          aria-expanded={open}
+          title="More"
+          className={
+            "rounded-full p-1.5 text-zinc-400 transition hover:bg-zinc-700/60 hover:text-zinc-100 " +
+            (open ? "bg-zinc-700/60 text-zinc-100" : "")
+          }
+        >
+          <MoreIcon size={16} />
+        </button>
+      )}
+      {open && view === "main" && panel(
+        <>
           <MenuItem icon={<PlayIcon size={14} />} label="Play next" onClick={handlePlayNext} />
           <MenuItem
             icon={<QueueIcon size={14} />}
@@ -228,20 +311,18 @@ export function TrackMenu({ track, onDeleted, onCoverChanged }: Props) {
             danger
             disabled={busy}
           />
-        </div>
+        </>,
+        "w-48",
       )}
-      {open && view === "playlists" && (
-        <div
-          role="menu"
-          className="absolute right-0 top-full z-50 mt-1 w-56 overflow-hidden rounded-lg border border-zinc-800 bg-zinc-900 py-1 text-sm shadow-2xl"
-        >
+      {open && view === "playlists" && panel(
+        <>
           <button
             type="button"
             onClick={(e) => {
               stop(e);
               setView("main");
             }}
-            className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-200"
+            className="flex w-full items-center gap-2 px-4 py-3 text-left text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-200 md:px-3 md:py-1.5"
           >
             <ChevronLeftIcon size={14} />
             <span className="text-[11px] uppercase tracking-wider">Add to playlist</span>
@@ -262,7 +343,7 @@ export function TrackMenu({ track, onDeleted, onCoverChanged }: Props) {
                   role="menuitem"
                   disabled={busy}
                   onClick={(e) => handleAddToPlaylist(e, pl)}
-                  className="flex w-full items-center justify-between gap-2 px-3 py-1.5 text-left text-zinc-200 transition hover:bg-zinc-800 disabled:opacity-50"
+                  className="flex w-full items-center justify-between gap-2 px-4 py-3 text-left text-zinc-200 transition hover:bg-zinc-800 disabled:opacity-50 md:px-3 md:py-1.5"
                 >
                   <span className="truncate">{pl.name}</span>
                   {addedTo === pl.id && (
@@ -272,7 +353,8 @@ export function TrackMenu({ track, onDeleted, onCoverChanged }: Props) {
               ))
             )}
           </div>
-        </div>
+        </>,
+        "w-56",
       )}
       <CoverPickerDialog
         open={coverOpen}
@@ -312,7 +394,10 @@ function MenuItem({
       onClick={onClick}
       disabled={disabled}
       className={
-        "flex w-full items-center gap-2 px-3 py-1.5 text-left transition disabled:opacity-50 " +
+        // Roomier on touch: 1.5 units of vertical padding is a ~26px target,
+        // well under the 44px Apple asks for and a reliable way to mis-tap
+        // Delete when you meant Re-transcribe.
+        "flex w-full items-center gap-3 px-4 py-3 text-left transition disabled:opacity-50 md:gap-2 md:px-3 md:py-1.5 " +
         (danger
           ? "text-red-400 hover:bg-red-500/10 hover:text-red-300"
           : "text-zinc-200 hover:bg-zinc-800")

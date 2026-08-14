@@ -6,6 +6,10 @@ import { formatDuration } from "@/lib/format-duration";
 import { coverUrl, resolveTrackCoverHash } from "@/lib/cover-url";
 import { PlayIcon } from "@/components/icons";
 import { TrackMenu } from "@/components/player/TrackMenu";
+import { useIsTouch } from "@/hooks/use-media-query";
+import { useLongPress } from "@/hooks/use-long-press";
+import { useMenuPrefs } from "@/hooks/use-menu-prefs";
+import { LongPressCoach } from "@/components/mobile/LongPressCoach";
 
 interface SongRowProps {
   track: QueueTrack;
@@ -25,24 +29,59 @@ export function SongRow({ track, index, onPlay, onDeleted, showAlbum = true }: S
   // updates immediately without the parent page refetching its list.
   // `undefined` means "no local change"; `null` means "reset to default".
   const [coverOverride, setCoverOverride] = useState<string | null | undefined>(undefined);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const isTouch = useIsTouch();
+  const { showButton, showTip, recordLongPress } = useMenuPrefs(isTouch);
+
+  // Press and hold opens the menu. Enabled only where hover doesn't exist —
+  // on a mouse the ⋮ appears on hover and always has, and hijacking a
+  // right-click there would be worse than what it replaces.
+  const { handlers, pressing, consumedRef } = useLongPress(
+    () => {
+      setMenuOpen(true);
+      recordLongPress();
+    },
+    { enabled: isTouch },
+  );
+
+  function activate() {
+    // A touch that opened the menu still emits a click on release. Without
+    // this the track would start playing underneath the menu she just opened.
+    if (consumedRef.current) {
+      consumedRef.current = false;
+      return;
+    }
+    onPlay(index);
+  }
 
   return (
     <div
       role="button"
       tabIndex={0}
-      onClick={() => onPlay(index)}
+      onClick={activate}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           onPlay(index);
         }
       }}
+      {...handlers}
       className={
-        "group grid cursor-pointer grid-cols-[36px_36px_minmax(0,1fr)_minmax(0,1fr)_48px_32px] items-center gap-3 rounded-md px-3 py-2 transition hover:bg-zinc-800/50 " +
-        (active ? "bg-zinc-800/40 text-sky-400" : "")
+        // Mobile is a plain flex row: track number, album and duration columns
+        // are dropped, and album/duration reappear on the artist line so no
+        // information is actually lost. Above `md` the original six-column
+        // grid is restored untouched.
+        "group kw-pressable flex cursor-pointer items-center gap-3 rounded-md px-3 py-2 transition " +
+        "md:grid md:grid-cols-[36px_36px_minmax(0,1fr)_minmax(0,1fr)_48px_32px] " +
+        "hover:bg-zinc-800/50 " +
+        (active ? "bg-zinc-800/40 text-sky-400 " : "") +
+        // Hold feedback. iOS Safari has no vibration API, so the confirmation
+        // that a press registered has to be something she can see.
+        (pressing ? "scale-[0.97] bg-sky-500/10" : "")
       }
     >
-      <div className="text-right text-xs text-zinc-500 tabular-nums">
+      <div className="hidden text-right text-xs text-zinc-500 tabular-nums md:block">
         <span className="group-hover:hidden">{active && isPlaying ? "♪" : index + 1}</span>
         <span className="hidden group-hover:inline">
           <PlayIcon size={14} />
@@ -53,34 +92,50 @@ export function SongRow({ track, index, onPlay, onDeleted, showAlbum = true }: S
         const url = coverUrl(hash, track.ytVideoId);
         return url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={url} alt="" className="h-9 w-9 rounded object-cover" />
+          <img src={url} alt="" className="h-11 w-11 shrink-0 rounded object-cover md:h-9 md:w-9" />
         ) : (
-          <div className="h-9 w-9 rounded bg-gradient-to-br from-zinc-700 to-zinc-900" />
+          <div className="h-11 w-11 shrink-0 rounded bg-gradient-to-br from-zinc-700 to-zinc-900 md:h-9 md:w-9" />
         );
       })()}
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <div className={"truncate text-sm font-medium " + (active ? "" : "text-zinc-100")}>
           {track.title}
         </div>
-        <div className="truncate text-xs text-zinc-400">{track.artist}</div>
+        <div className="truncate text-xs text-zinc-400">
+          {track.artist}
+          <span className="md:hidden">
+            {showAlbum && track.album ? ` · ${track.album}` : ""}
+            {` · ${formatDuration(track.duration)}`}
+          </span>
+        </div>
       </div>
       {showAlbum ? (
-        <div className="truncate text-xs text-zinc-500">{track.album}</div>
+        <div className="hidden truncate text-xs text-zinc-500 md:block">{track.album}</div>
       ) : (
-        <div />
+        <div className="hidden md:block" />
       )}
-      <div className="text-right text-xs text-zinc-500 tabular-nums">
+      <div className="hidden text-right text-xs text-zinc-500 tabular-nums md:block">
         {formatDuration(track.duration)}
       </div>
-      {/* Kebab menu — invisible until row hover or menu open. The menu component
-          handles its own click-stopPropagation so it doesn't trigger playback. */}
-      <div className="opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+      {/* Kebab — on a mouse it fades in on hover, as always. On touch it is a
+          teacher that retires: visible until the long-press has been used a few
+          times, then gone. The menu stops its own click bubbling so opening it
+          never starts the track. */}
+      <div className="shrink-0 transition md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
         <TrackMenu
           track={track}
           onDeleted={onDeleted}
           onCoverChanged={(_id, hash) => setCoverOverride(hash)}
+          open={menuOpen}
+          onOpenChange={setMenuOpen}
+          hideButton={!showButton}
+          showLongPressTip={showTip}
         />
       </div>
+      {/* Rendered by the first row only, so exactly one coach mark appears
+          whenever a song list is on screen — no page has to remember to mount
+          it, and no two pages can double it up. */}
+      {index === 0 && <LongPressCoach />}
     </div>
   );
 }

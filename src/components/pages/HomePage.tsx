@@ -104,7 +104,10 @@ export function HomePage() {
                         {s.primaryArtist.name}
                       </div>
                     </div>
-                    <div className="mr-3 rounded-full bg-sky-500 p-2 text-zinc-950 opacity-0 transition group-hover:opacity-100">
+                    {/* Visible by default, hover-revealed only where hover
+                        exists. A touch device has no hover state, so an
+                        opacity-0 control there is simply invisible. */}
+                    <div className="mr-3 rounded-full bg-sky-500 p-2 text-zinc-950 transition md:opacity-0 md:group-hover:opacity-100">
                       <PlayIcon size={16} />
                     </div>
                   </button>

@@ -1,9 +1,12 @@
 {
+  "id": "/",
   "name": "Kyowave",
   "short_name": "Kyowave",
   "description": "Everyone has their own wavelength. This one is yours.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#09090b",
   "theme_color": "#09090b",
   "icons": [

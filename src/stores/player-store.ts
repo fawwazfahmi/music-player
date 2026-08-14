@@ -24,10 +24,10 @@ function getPersistName(): string {
  */
 function migrateLegacyKey(key: string): void {
   try {
-    if (typeof localStorage === "undefined" || !localStorage?.getItem) return;
-    if (localStorage.getItem(key)) return;
-    const legacy = localStorage.getItem(key.replace(KEY_PREFIX, LEGACY_KEY_PREFIX));
-    if (legacy) localStorage.setItem(key, legacy);
+    if (typeof window === "undefined" || !window.localStorage?.getItem) return;
+    if (window.localStorage.getItem(key)) return;
+    const legacy = window.localStorage.getItem(key.replace(KEY_PREFIX, LEGACY_KEY_PREFIX));
+    if (legacy) window.localStorage.setItem(key, legacy);
   } catch {
     /* storage disabled or full — starting fresh is acceptable here */
   }
@@ -70,6 +70,13 @@ interface PlayerState {
       animations, and other GPU/CPU expensive eye candy. Designed for users
       who want music in a second tab while gaming. Persisted per-device. */
   performanceMode: boolean;
+  /** Whether audio is allowed to wait for the video at all.
+      Set false on touch devices — see `videoGateOpen`. Not persisted: it
+      describes the device, and is decided fresh on every mount. */
+  videoGateEnabled: boolean;
+  /** Mobile sheet — show album art in place of the video. Hers to toggle;
+      performance mode forces it on. Persisted per-device. */
+  mobileArtMode: boolean;
   currentTrack: () => QueueTrack | null;
   setQueue: (queue: QueueTrack[], startIndex?: number) => void;
   /** Append a track to the end of the queue. If the queue is empty, starts
@@ -106,6 +113,72 @@ interface PlayerState {
   setVideoLoading: (v: boolean) => void;
   setPerformanceMode: (v: boolean) => void;
   togglePerformanceMode: () => void;
+  setVideoGateEnabled: (v: boolean) => void;
+  setMobileArtMode: (v: boolean) => void;
+  toggleMobileArtMode: () => void;
+}
+
+/**
+ * May audio wait for the YouTube iframe before starting?
+ *
+ * Two things can close the gate permanently, and both have caused silent
+ * playback before:
+ *
+ *   - Performance mode unmounts the video stage, so nothing is left to clear
+ *     `videoLoading` and the gate opens for nobody.
+ *   - On a phone the iframe is torn down whenever the sheet closes or the
+ *     screen locks. A gate set just before a teardown would strand her music
+ *     paused until she found the sheet again.
+ *
+ * Rather than remember to check both at eleven call sites, every site asks
+ * this one question.
+ */
+export function videoGateOpen(s: {
+  performanceMode: boolean;
+  videoGateEnabled: boolean;
+}): boolean {
+  return !s.performanceMode && s.videoGateEnabled;
+}
+
+/**
+ * A storage object that is safe to call, whatever the environment hands us.
+ *
+ * Three cases have to work:
+ *   - the server, where there is no window at all;
+ *   - a browser with storage switched off, which is Safari private mode and any
+ *     locked-down profile — persist writes on nearly every action, so an
+ *     unguarded `setItem` there takes the whole app down on the first play;
+ *   - Node, where the bare `localStorage` identifier can resolve to Node's own
+ *     experimental global, which is an inert object with no methods unless
+ *     --localstorage-file points somewhere real.
+ *
+ * In all three the app runs; it just forgets preferences between visits, which
+ * is the correct thing to degrade to.
+ */
+function usableStorage(): Storage {
+  const memory = new Map<string, string>();
+  const fallback = {
+    getItem: (k: string) => memory.get(k) ?? null,
+    setItem: (k: string, v: string) => void memory.set(k, v),
+    removeItem: (k: string) => void memory.delete(k),
+    clear: () => memory.clear(),
+    key: (i: number) => Array.from(memory.keys())[i] ?? null,
+    get length() {
+      return memory.size;
+    },
+  } as Storage;
+
+  if (typeof window === "undefined") return fallback;
+  try {
+    const ls = window.localStorage;
+    if (typeof ls?.getItem !== "function" || typeof ls?.setItem !== "function") {
+      return fallback;
+    }
+    return ls;
+  } catch {
+    // Merely reading window.localStorage throws when cookies are blocked.
+    return fallback;
+  }
 }
 
 const PERSIST_KEY = getPersistName();
@@ -124,6 +197,8 @@ export const usePlayerStore = create<PlayerState>()(
       videoLoading: false,
       playbackKey: 0,
       performanceMode: false,
+      videoGateEnabled: true,
+      mobileArtMode: false,
       currentTrack: () => {
         const s = get();
         return s.queue[s.currentIndex] ?? null;
@@ -137,7 +212,7 @@ export const usePlayerStore = create<PlayerState>()(
           queue,
           currentIndex: queue.length ? Math.min(startIndex, queue.length - 1) : -1,
           isPlaying: queue.length > 0,
-          videoLoading: hasVideo && !get().performanceMode,
+          videoLoading: hasVideo && videoGateOpen(get()),
           playbackKey: get().playbackKey + 1,
           position: 0,
         });
@@ -150,7 +225,7 @@ export const usePlayerStore = create<PlayerState>()(
               queue: [track],
               currentIndex: 0,
               isPlaying: true,
-              videoLoading: !!track.ytVideoId && !get().performanceMode,
+              videoLoading: !!track.ytVideoId && videoGateOpen(get()),
               playbackKey: s.playbackKey + 1,
               position: 0,
             };
@@ -166,7 +241,7 @@ export const usePlayerStore = create<PlayerState>()(
               queue: tracks,
               currentIndex: 0,
               isPlaying: true,
-              videoLoading: !!first.ytVideoId && !get().performanceMode,
+              videoLoading: !!first.ytVideoId && videoGateOpen(get()),
               playbackKey: s.playbackKey + 1,
               position: 0,
             };
@@ -180,7 +255,7 @@ export const usePlayerStore = create<PlayerState>()(
               queue: [track],
               currentIndex: 0,
               isPlaying: true,
-              videoLoading: !!track.ytVideoId && !get().performanceMode,
+              videoLoading: !!track.ytVideoId && videoGateOpen(get()),
               playbackKey: s.playbackKey + 1,
               position: 0,
             };
@@ -223,7 +298,7 @@ export const usePlayerStore = create<PlayerState>()(
             currentIndex: index,
             position: 0,
             isPlaying: true,
-            videoLoading: !!next?.ytVideoId && !get().performanceMode,
+            videoLoading: !!next?.ytVideoId && videoGateOpen(get()),
             playbackKey: s.playbackKey + 1,
           };
         }),
@@ -243,7 +318,7 @@ export const usePlayerStore = create<PlayerState>()(
               queue,
               currentIndex: newIdx,
               position: 0,
-              videoLoading: !!next?.ytVideoId && !get().performanceMode,
+              videoLoading: !!next?.ytVideoId && videoGateOpen(get()),
               playbackKey: s.playbackKey + 1,
             };
           }
@@ -289,7 +364,7 @@ export const usePlayerStore = create<PlayerState>()(
             queue,
             currentIndex: newCurrent,
             position: 0,
-            videoLoading: !!next?.ytVideoId && !get().performanceMode,
+            videoLoading: !!next?.ytVideoId && videoGateOpen(get()),
             playbackKey: s.playbackKey + 1,
           });
         } else {
@@ -320,7 +395,7 @@ export const usePlayerStore = create<PlayerState>()(
           return {
             currentIndex: nextIdx,
             position: 0,
-            videoLoading: !!next?.ytVideoId && !get().performanceMode,
+            videoLoading: !!next?.ytVideoId && videoGateOpen(get()),
             playbackKey: s.playbackKey + 1,
           };
         }),
@@ -333,7 +408,7 @@ export const usePlayerStore = create<PlayerState>()(
             return {
               currentIndex: s.currentIndex - 1,
               position: 0,
-              videoLoading: !!next?.ytVideoId && !get().performanceMode,
+              videoLoading: !!next?.ytVideoId && videoGateOpen(get()),
               playbackKey: s.playbackKey + 1,
             };
           }
@@ -342,7 +417,7 @@ export const usePlayerStore = create<PlayerState>()(
             return {
               currentIndex: s.queue.length - 1,
               position: 0,
-              videoLoading: !!next?.ytVideoId && !get().performanceMode,
+              videoLoading: !!next?.ytVideoId && videoGateOpen(get()),
               playbackKey: s.playbackKey + 1,
             };
           }
@@ -367,25 +442,25 @@ export const usePlayerStore = create<PlayerState>()(
             ? { performanceMode: false }
             : { performanceMode: true, videoLoading: false },
         ),
+      // Disabling clears any gate already in flight, for the same reason
+      // setPerformanceMode does: the thing that would have opened it is about
+      // to stop existing.
+      setVideoGateEnabled: (v) =>
+        set(v ? { videoGateEnabled: true } : { videoGateEnabled: false, videoLoading: false }),
+      setMobileArtMode: (v) => set({ mobileArtMode: v }),
+      toggleMobileArtMode: () => set((s) => ({ mobileArtMode: !s.mobileArtMode })),
     }),
     {
       // Per-device persistence: localStorage on the user's own machine.
       // Only saves preferences (volume, shuffle, repeat) — never queue/playback state.
       name: PERSIST_KEY,
-      storage: createJSONStorage(() =>
-        typeof window === "undefined"
-          ? {
-              getItem: () => null,
-              setItem: () => undefined,
-              removeItem: () => undefined,
-            }
-          : localStorage,
-      ),
+      storage: createJSONStorage(usableStorage),
       partialize: (state) => ({
         volume: state.volume,
         shuffle: state.shuffle,
         repeat: state.repeat,
         performanceMode: state.performanceMode,
+        mobileArtMode: state.mobileArtMode,
         // Survive a refresh. Without these the queue, which song was playing
         // and how far in all vanished on reload.
         queue: state.queue,

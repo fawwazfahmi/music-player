@@ -6,6 +6,9 @@ import { LogoutIcon } from "@/components/icons";
 import { PageHeader } from "./_shared";
 import { PatchNotesDialog } from "@/components/player/PatchNotesDialog";
 import { PATCH_NOTES } from "@/lib/patch-notes";
+import { useIsTouch } from "@/hooks/use-media-query";
+import { useMenuPrefs } from "@/hooks/use-menu-prefs";
+import { LEARNED_AFTER, type MenuButtonPref } from "@/lib/mobile";
 
 type CookieStatus = "none" | "connected" | "stale";
 
@@ -146,6 +149,60 @@ function YouTubeCookiesSection() {
   );
 }
 
+/**
+ * Escape hatch for the long-press gesture.
+ *
+ * The ⋮ retires itself once the gesture has been used a few times, which is
+ * right the day it happens and wrong three months later if she's forgotten.
+ * This is a switch, not a tutorial — and it can be flipped for her without a
+ * deploy.
+ */
+function TrackMenuButtonSection() {
+  const isTouch = useIsTouch();
+  const { pref, longPressCount, setPref } = useMenuPrefs(isTouch);
+
+  const options: { value: MenuButtonPref; label: string; hint: string }[] = [
+    { value: "always", label: "Always", hint: "Every row shows ⋮" },
+    {
+      value: "until-learned",
+      label: "Until learned",
+      hint: `Retires after ${LEARNED_AFTER} holds (${Math.min(longPressCount, LEARNED_AFTER)}/${LEARNED_AFTER})`,
+    },
+    { value: "never", label: "Never", hint: "Hold a song instead" },
+  ];
+
+  return (
+    <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+      <h3 className="text-sm font-semibold text-zinc-100">Track menu button</h3>
+      <p className="mt-1 text-xs text-zinc-500">
+        On a phone, hold a song to open its menu. The ⋮ button is there while you get used to it.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {options.map((o) => (
+          <button
+            key={o.value}
+            type="button"
+            onClick={() => setPref(o.value)}
+            aria-pressed={pref === o.value}
+            title={o.hint}
+            className={
+              "rounded-lg border px-4 py-2 text-sm transition " +
+              (pref === o.value
+                ? "border-sky-500 bg-sky-500/15 text-sky-200"
+                : "border-zinc-700 text-zinc-300 hover:bg-zinc-800")
+            }
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+      <p className="mt-2 text-[11px] text-zinc-600">
+        {options.find((o) => o.value === pref)?.hint}
+      </p>
+    </section>
+  );
+}
+
 export function SettingsPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [notesOpen, setNotesOpen] = useState(false);
@@ -205,6 +262,7 @@ export function SettingsPage() {
             releases={PATCH_NOTES}
             onClose={() => setNotesOpen(false)}
           />
+          <TrackMenuButtonSection />
           <YouTubeCookiesSection />
           <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
             <h3 className="text-sm font-semibold text-zinc-100">Library</h3>
