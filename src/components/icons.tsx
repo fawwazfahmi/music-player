@@ -324,3 +324,32 @@ export function BoltIcon(props: IconProps) {
     </Icon>
   );
 }
+
+export function ChevronUpIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 8.6l6 6-1.4 1.4L12 11.4l-4.6 4.6L6 14.6z" />
+    </Icon>
+  );
+}
+
+export function ChevronDownIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 15.4l-6-6L7.4 8l4.6 4.6L16.6 8 18 9.4z" />
+    </Icon>
+  );
+}
+
+// iOS Share glyph — the box-with-an-arrow the install hint points at. Drawn to
+// match Apple's, because the hint is telling her to find this exact shape in
+// Safari's toolbar; a generic "share" icon would send her looking for the
+// wrong thing.
+export function ShareIosIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M12 2.5l4 4-1.4 1.4L13 6.3V15h-2V6.3L9.4 7.9 8 6.5z" />
+      <path d="M5 10h3v2H6.5v8h11v-8H16v-2h3v12H5z" />
+    </Icon>
+  );
+}

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { useIpodStore } from "@/stores/ipod-store";
+import { usePlayerStore } from "@/stores/player-store";
 import { YtVideoPanel } from "./YtVideoPanel";
 
 // VideoStage keeps a SINGLE YtVideoPanel instance alive for the whole session,
@@ -16,7 +17,15 @@ import { YtVideoPanel } from "./YtVideoPanel";
 // when their parent element changes — which would reset YT to its original src
 // videoId, defeating the whole point of keeping the player alive.
 
+//   data-video-slot="sheet" → mobile now-playing sheet (wins when present)
+//
+// The mobile sheet is checked first because it only exists in the DOM while
+// the sheet is open, and while it is open it is the only thing on screen.
+// Checking it after "big" would hand the iframe to a nowPlayingFull slot
+// sitting behind the sheet, where nobody can see it.
 function findActiveSlot(): HTMLElement | null {
+  const sheet = document.querySelector<HTMLElement>('[data-video-slot="sheet"]');
+  if (sheet) return sheet;
   const big = document.querySelector<HTMLElement>('[data-video-slot="big"]');
   if (big) return big;
   return document.querySelector<HTMLElement>('[data-video-slot="small"]');
@@ -94,6 +103,14 @@ function getOrCreateContainer(): HTMLDivElement {
  * another root is mid-render, and this is called from an effect cleanup.
  */
 export function teardownVideoStage(): void {
+  // Open the audio gate before anything else. YtVideoPanel is the only thing
+  // that clears `videoLoading`, and it is about to stop existing — a track
+  // that was mid-gate when this ran would otherwise stay silent forever.
+  // On mobile this fires every time the sheet closes or the screen locks, so
+  // it is the difference between music that survives a pocket and music that
+  // doesn't.
+  usePlayerStore.getState().setVideoLoading(false);
+
   const root = _root;
   const container = _container;
   _root = null;

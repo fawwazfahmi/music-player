@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { Geist } from "next/font/google";
 import { cn } from "@/lib/utils";
@@ -11,6 +11,15 @@ export const metadata: Metadata = {
   description: "Everyone has their own wavelength. This one is yours.",
   applicationName: "Kyowave",
   manifest: "/manifest.webmanifest",
+  // Home-screen launch on iOS: no Safari chrome, and a translucent status bar
+  // so the app's own background runs under it. `title` is what appears under
+  // the icon on the home screen — without it iOS uses the <title>, which is
+  // the same here but would drift the moment the tab title changes.
+  appleWebApp: {
+    capable: true,
+    title: "Kyowave",
+    statusBarStyle: "black-translucent",
+  },
   icons: {
     // Two SVG variants, picked by the browser's colour scheme. Each is drawn
     // to read against that scheme's chrome: icon.svg is bright blue on near
@@ -48,7 +57,17 @@ export const metadata: Metadata = {
   },
 };
 
-export const viewport = { themeColor: "#09090b" };
+// viewportFit:"cover" lets the app paint under the notch and the home
+// indicator; everything that would otherwise sit beneath them pads with
+// env(safe-area-inset-*) instead. Zoom is deliberately NOT disabled —
+// maximum-scale=1 is an accessibility regression. iOS's auto-zoom-on-focus is
+// prevented the correct way, by keeping every text input at 16px or larger.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#09090b",
+};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

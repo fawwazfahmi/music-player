@@ -11,6 +11,9 @@ import { startPlay, updatePlayProgress } from "@/server/actions/playback";
 import { Sidebar } from "./Sidebar";
 import { RightPanel } from "./RightPanel";
 import { PlayerBar } from "@/components/player/PlayerBar";
+import { MiniPlayer } from "@/components/player/MiniPlayer";
+import { NowPlayingSheet } from "@/components/player/NowPlayingSheet";
+import { InstallHint } from "@/components/mobile/InstallHint";
 import { MainContent } from "@/components/pages/MainContent";
 import { VideoStage } from "@/components/player/VideoStage";
 import { loadIframeAPI } from "@/components/player/YtVideoPanel";
@@ -22,6 +25,12 @@ import { KeyboardHelpDialog } from "@/components/player/KeyboardHelpDialog";
 import { PatchNotesDialog } from "@/components/player/PatchNotesDialog";
 import { readSeenVersion, unseenReleases, type Release } from "@/lib/patch-notes";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
+import { useIsMobile } from "@/hooks/use-media-query";
+import { useDocumentVisible } from "@/hooks/use-document-visible";
+import {
+  updateMediaPositionState,
+  setMediaPlaybackState,
+} from "@/audio/media-session";
 import { ChevronLeftIcon, MenuIcon, CloseIcon } from "@/components/icons";
 
 export function AppShell() {
@@ -30,7 +39,41 @@ export function AppShell() {
   const navStackLen = useIpodStore((s) => s.navStack.length);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [rightOpen, setRightOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  const isMobile = useIsMobile();
+  const documentVisible = useDocumentVisible();
+  const setVideoGateEnabled = usePlayerStore((s) => s.setVideoGateEnabled);
+  const mobileArtMode = usePlayerStore((s) => s.mobileArtMode);
+
+  // Which layout is showing is decided in CSS (`md:hidden` / `hidden md:…`), so
+  // there is no hydration flash. This flag only drives *behaviour* — what the
+  // iframe does and whether audio may wait for it — where being briefly wrong
+  // on the very first frame costs nothing.
+  //
+  // Audio must never wait for video on a phone: the iframe is torn down every
+  // time the sheet closes or the screen locks, and a gate set just before a
+  // teardown would leave her music silent with nothing left to start it.
+  useEffect(() => {
+    setVideoGateEnabled(!isMobile);
+  }, [isMobile, setVideoGateEnabled]);
+
+  // Derived, not synced: a sheet left open across a resize to desktop would
+  // otherwise sit invisible (it is `md:hidden`) while still owning the video
+  // slot. Deriving means there is no state to get out of step.
+  const sheetVisible = sheetOpen && isMobile;
+
+  // Effective art mode: performance mode always wins.
+  const artMode = player.performanceMode || mobileArtMode;
+
+  // The iframe exists only when someone can actually see it. On desktop that's
+  // whenever performance mode is off; on a phone it additionally requires the
+  // sheet open, art mode off, and the app on screen. Rebuilding costs ~500ms
+  // when she reopens the sheet, which is the right trade against decoding
+  // video in her pocket for a whole album.
+  const showVideoStage =
+    !player.performanceMode &&
+    (!isMobile || (sheetVisible && !mobileArtMode && documentVisible));
 
   // Global keyboard shortcuts — space=play/pause, arrows for seek/track,
   // ?=help, /=search. Disabled while typing in inputs.
@@ -44,6 +87,7 @@ export function AppShell() {
 
   const historyIdRef = useRef<string | null>(null);
   const lastReportedSecondRef = useRef(0);
+  const lastPositionSecondRef = useRef(-1);
 
   // Audio engine: load track when the selected playback attempt changes.
   // Deliberately does NOT depend on `player.queue` — pushing onto the queue
@@ -104,6 +148,14 @@ export function AppShell() {
     getEngine().setVolume(player.volume);
   }, [player.volume]);
 
+  // Keep the OS transport showing the right button. Without this the platform
+  // infers state from the audio element, which drifts whenever playback is
+  // gated in app code — the lock screen would offer Play while we consider
+  // ourselves playing.
+  useEffect(() => {
+    setMediaPlaybackState(player.isPlaying);
+  }, [player.isPlaying]);
+
   // Start a history row when a track starts playing
   useEffect(() => {
     const state = usePlayerStore.getState();
@@ -130,6 +182,15 @@ export function AppShell() {
       usePlayerStore.getState().setPosition(t);
       const state = usePlayerStore.getState();
       const track = state.queue[state.currentIndex];
+      // Feed the lock screen / Dynamic Island scrubber. Throttled to whole
+      // seconds because timeupdate fires ~4x that and the arc can't show more.
+      if (track) {
+        const second = Math.floor(t);
+        if (second !== lastPositionSecondRef.current) {
+          lastPositionSecondRef.current = second;
+          updateMediaPositionState(t, engine.getDuration() || track.duration);
+        }
+      }
       if (historyIdRef.current && track && track.duration > 0) {
         if (Math.floor(t) - lastReportedSecondRef.current >= 5) {
           const completed = t / track.duration >= 0.8;
@@ -240,14 +301,9 @@ export function AppShell() {
         <h1 className="text-sm font-bold tracking-tight">
           Kyowave<span className="text-sky-500">.</span>
         </h1>
-        <button
-          type="button"
-          onClick={() => setRightOpen((s) => !s)}
-          className="rounded p-2 text-zinc-300 hover:bg-zinc-800"
-          aria-label="Lyrics / Video"
-        >
-          ♪
-        </button>
+        {/* Balances the hamburger so the title stays centred. The old ♪ button
+            lived here; lyrics and video are now a swipe up from the player. */}
+        <span className="w-9" aria-hidden />
       </header>
 
       {/* Listening Party banner (fawwaz only, when a party is active) */}
@@ -291,37 +347,40 @@ export function AppShell() {
           </div>
         </main>
 
-        {/* Right panel */}
-        <div
-          className={
-            "shrink-0 border-l border-zinc-800/50 transition-transform md:block " +
-            (rightOpen
-              ? "fixed inset-y-0 right-0 z-30 w-80 translate-x-0"
-              : "fixed inset-y-0 right-0 z-30 w-80 translate-x-full md:relative md:w-[340px] md:translate-x-0")
-          }
-        >
+        {/* Right panel — desktop only. On a phone the now-playing sheet does
+            this job, and a side drawer is the wrong shape for it besides. Not
+            rendered at all rather than hidden, so its `data-video-slot="small"`
+            can't compete with the sheet's for the iframe. */}
+        <div className="hidden shrink-0 border-l border-zinc-800/50 md:relative md:block md:w-[340px]">
           <RightPanel />
         </div>
-        {rightOpen && (
-          <button
-            type="button"
-            aria-label="Close panel"
-            className="fixed inset-0 z-20 bg-black/60 md:hidden"
-            onClick={() => setRightOpen(false)}
-          />
-        )}
       </div>
 
-      <PlayerBar />
+      {/* Desktop transport. Below `md` it is replaced wholesale by the mini
+          player + sheet; the swap is CSS so neither flashes on load. */}
+      <div className="hidden md:block">
+        <PlayerBar />
+      </div>
+      <div className="md:hidden">
+        <MiniPlayer onOpen={() => setSheetOpen(true)} />
+      </div>
+      <NowPlayingSheet
+        open={sheetVisible}
+        onClose={() => setSheetOpen(false)}
+        artMode={artMode}
+      />
+
       {/* Single always-mounted YT iframe; positions itself over the active slot.
           Skipped entirely in Performance Mode — biggest GPU saving for the
-          'use the app while gaming' case. */}
-      {!player.performanceMode && <VideoStage />}
+          'use the app while gaming' case — and on mobile whenever nobody is
+          looking at it. */}
+      {showVideoStage && <VideoStage />}
       {/* Floating "downloading…" toast that persists across nav */}
       <DownloadIndicator />
       {/* Polls + broadcasts party state. Invisible — just side-effects. */}
       <PartyControls />
       <OverlayPresence />
+      <InstallHint />
       <KeyboardHelpDialog open={helpOpen} onClose={closeHelp} />
       <PatchNotesDialog
         open={!!patchNotes && patchNotes.length > 0}

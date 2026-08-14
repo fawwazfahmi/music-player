@@ -132,6 +132,37 @@
     color-scheme: dark;
   }
 }
+/* ── Mobile / installed-app plumbing ────────────────────────────────────── */
+
+/* Safe areas. viewportFit:"cover" means the app paints under the notch and the
+   home indicator, so anything anchored to an edge has to pad itself back out.
+   Written as utilities rather than inline arbitrary values so the intent is
+   greppable and there is exactly one definition to change. */
+.kw-safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.kw-safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Rows that respond to press-and-hold. iOS pops its own copy/lookup/share
+   bubble on a long press and it renders ON TOP of our menu — this is the only
+   way to suppress it. The matching preventDefault on contextmenu is in
+   use-long-press; both are required, neither is sufficient. */
+.kw-pressable {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Scroll containers inside the sheet. Without this, reaching the end of the
+   lyrics hands the scroll to the page behind and drags the whole sheet. */
+.kw-contain-scroll {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
 /* Kyowave mark — the rings breathe while something is playing. Scaling an SVG
    circle needs fill-box, or the transform pivots on the viewport origin and
    the ring slides off instead of growing from its centre. */
