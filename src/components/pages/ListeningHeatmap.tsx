@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getListeningHeatmap, type HeatmapResult, type StatsRange } from "@/server/actions/stats";
 import { PageLoading } from "./_shared";
+import { useIdentity } from "@/hooks/use-identity";
 
 // Hour-of-day × day-of-week, coloured by minutes listened.
 //
@@ -53,7 +54,13 @@ function fmtHour(h: number): string {
 
 export function ListeningHeatmap({ range }: { range: StatsRange }) {
   const [data, setData] = useState<HeatmapResult | null>(null);
-  const [listener, setListener] = useState<string>("");
+  // Defaults to whoever is signed in — your own rhythm is the interesting one;
+  // the pooled view mostly muddies two different sleep schedules together.
+  // Derived rather than seeded in an effect: `override` stays null until the
+  // reader actually picks something, and "" is a real choice meaning Everyone.
+  const identity = useIdentity();
+  const [override, setOverride] = useState<string | null>(null);
+  const listener = override ?? identity ?? "";
   const [hovered, setHovered] = useState<Hovered | null>(null);
 
   useEffect(() => {
@@ -94,7 +101,7 @@ export function ListeningHeatmap({ range }: { range: StatsRange }) {
         {data.listeners.length > 1 && (
           <select
             value={listener}
-            onChange={(e) => setListener(e.target.value)}
+            onChange={(e) => setOverride(e.target.value)}
             className="rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 focus:border-sky-500 focus:outline-none"
           >
             <option value="">Everyone</option>

@@ -360,7 +360,11 @@ export async function getListeningHeatmap(
       COALESCE(SUM("durationListened"), 0)::int AS seconds,
       COUNT(*)::int AS plays
     FROM "ListeningHistory"
-    WHERE (${listener ?? null}::text IS NULL OR "listener" = ${listener ?? null})
+    -- Same definition of "a play" as the cards above it. Without this the
+    -- heatmap counted skips and the two disagreed on screen: 929 plays here
+    -- against 855 there, for an identical range.
+    WHERE completed = true
+      AND (${listener ?? null}::text IS NULL OR "listener" = ${listener ?? null})
       AND (${since ?? null}::timestamp IS NULL OR "playedAt" >= ${since ?? null})
     GROUP BY 1, 2
   `;
