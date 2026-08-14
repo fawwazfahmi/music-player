@@ -20,6 +20,7 @@ import {
   VolumeMuteIcon,
   VolumeUpIcon,
 } from "@/components/icons";
+import { PerformanceModeDialog } from "@/components/player/PerformanceModeDialog";
 
 // Small icon toggle in the player bar. ON → no YT iframe, no smooth-scroll
 // lyrics, no decorative animations. Designed for a user who wants the app
@@ -28,11 +29,21 @@ import {
 // muted).
 function PerformanceToggle() {
   const perf = usePlayerStore((s) => s.performanceMode);
-  const toggle = usePlayerStore((s) => s.togglePerformanceMode);
+  const setPerf = usePlayerStore((s) => s.setPerformanceMode);
+  const [confirming, setConfirming] = useState(false);
+
+  // Explain the mode on the way in only. Turning it back off restores
+  // everything, which needs no confirmation — just swap.
+  function onClick() {
+    if (perf) setPerf(false);
+    else setConfirming(true);
+  }
+
   return (
+    <>
     <button
       type="button"
-      onClick={toggle}
+      onClick={onClick}
       aria-pressed={perf}
       title={
         perf
@@ -48,6 +59,15 @@ function PerformanceToggle() {
     >
       <BoltIcon size={16} />
     </button>
+    <PerformanceModeDialog
+      open={confirming}
+      onCancel={() => setConfirming(false)}
+      onConfirm={() => {
+        setPerf(true);
+        setConfirming(false);
+      }}
+    />
+    </>
   );
 }
 
