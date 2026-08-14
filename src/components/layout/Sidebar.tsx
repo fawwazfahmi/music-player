@@ -18,6 +18,7 @@ import {
   SettingsIcon,
   StatsIcon,
   TagIcon,
+  WaveIcon,
 } from "@/components/icons";
 import { PartyButton } from "@/components/party/PartyButton";
 
@@ -54,6 +55,7 @@ function NavItem({ label, icon, target, active }: NavItemProps) {
 }
 
 export function Sidebar() {
+  const isPlaying = usePlayerStore((s) => s.isPlaying);
   const current = useIpodStore((s) => s.current());
   const push = useIpodStore((s) => s.push);
   const toRoot = useIpodStore((s) => s.toRoot);
@@ -75,8 +77,11 @@ export function Sidebar() {
 
   return (
     <nav className="flex h-full w-60 flex-col gap-1 overflow-y-auto bg-zinc-950 px-3 py-4">
-      <div className="px-3 pb-3 text-lg font-bold tracking-tight text-zinc-100">
-        Kyowave<span className="text-sky-500">.</span>
+      <div className="flex items-center gap-2.5 px-3 pb-3">
+        <WaveIcon size={28} pulsing={isPlaying} />
+        <span className="text-lg font-bold tracking-tight text-zinc-100">
+          Kyowave<span className="text-sky-500">.</span>
+        </span>
       </div>
 
       <NavItem

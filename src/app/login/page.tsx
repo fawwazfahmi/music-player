@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
+import { WaveIcon } from "@/components/icons";
 
 const NAMES = ["ainul", "fawwaz"] as const;
 type Name = (typeof NAMES)[number];
@@ -49,7 +50,8 @@ export default function LoginPage() {
 
       <div className="relative w-full max-w-sm">
         <div className="mb-8 text-center">
-          <h1 className="text-4xl font-extrabold tracking-tight">
+          <WaveIcon size={96} className="mx-auto" />
+          <h1 className="mt-4 text-4xl font-extrabold tracking-tight">
             Kyowave<span className="text-sky-500">.</span>
           </h1>
           {/* The one place this line lives. Seen rarely, so it stays a moment

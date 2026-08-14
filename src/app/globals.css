@@ -128,3 +128,42 @@
     @apply font-sans;
   }
 }
+/* Kyowave mark — the rings breathe while something is playing. Scaling an SVG
+   circle needs fill-box, or the transform pivots on the viewport origin and
+   the ring slides off instead of growing from its centre. */
+.kyowave-ring {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.kyowave-ring-outer {
+  animation: kyowave-ring-outer 1.2s ease-in-out infinite;
+}
+.kyowave-ring-inner {
+  animation: kyowave-ring-inner 1.2s ease-in-out infinite;
+}
+@keyframes kyowave-ring-outer {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.75;
+  }
+  18% {
+    transform: scale(1.14);
+    opacity: 1;
+  }
+}
+@keyframes kyowave-ring-inner {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  18% {
+    transform: scale(1.08);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .kyowave-ring-outer,
+  .kyowave-ring-inner {
+    animation: none;
+  }
+}

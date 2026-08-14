@@ -262,6 +262,40 @@ export function QueueIcon(props: IconProps) {
   );
 }
 
+// The Kyowave mark: a round tile with two concentric rings and a centre dot.
+// Proportions are public/icon.svg scaled from its 512 viewBox to 24 — outer
+// ring r 31.5%, inner r 19.5%, both 8.2% wide, dot r 8.6%.
+//
+// `pulsing` animates the rings outward; the sidebar turns it on while a track
+// is playing. Ring classes are targeted from globals.css because SVG elements
+// need transform-box: fill-box for a scale to pivot on their own centre.
+export function WaveIcon({ pulsing = false, ...props }: IconProps & { pulsing?: boolean }) {
+  return (
+    <Icon {...props}>
+      <circle cx="12" cy="12" r="12" fill="#09090b" />
+      <circle
+        cx="12"
+        cy="12"
+        r="7.56"
+        fill="none"
+        stroke="rgba(14,165,233,0.35)"
+        strokeWidth="1.968"
+        className={pulsing ? "kyowave-ring kyowave-ring-outer" : undefined}
+      />
+      <circle
+        cx="12"
+        cy="12"
+        r="4.68"
+        fill="none"
+        stroke="rgba(14,165,233,0.75)"
+        strokeWidth="1.968"
+        className={pulsing ? "kyowave-ring kyowave-ring-inner" : undefined}
+      />
+      <circle cx="12" cy="12" r="2.064" fill="#38bdf8" />
+    </Icon>
+  );
+}
+
 export function DownloadIcon(props: IconProps) {
   return (
     <Icon {...props}>
