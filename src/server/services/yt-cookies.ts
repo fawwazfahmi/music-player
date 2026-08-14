@@ -60,7 +60,7 @@ const STALE_PATTERNS = [
 function resolveCookiesDir(): string {
   const dir =
     env.YT_COOKIES_DIR ??
-    path.join(os.homedir(), ".config", "music-universe", "yt-cookies");
+    path.join(os.homedir(), ".config", "kyowave", "yt-cookies");
   const resolved = path.resolve(dir);
   const library = path.resolve(env.MUSIC_LIBRARY_PATH);
   // path.relative gives a non-".."-prefixed, non-absolute result exactly when

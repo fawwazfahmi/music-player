@@ -35,7 +35,7 @@ export async function fetchLyrics(
 
   const res = await fetch(`${BASE}/get?${params.toString()}`, {
     headers: {
-      "User-Agent": "MusicUniverse/1.0 (personal music player)",
+      "User-Agent": "Kyowave/1.0 (personal music player)",
     },
   });
   if (res.status === 404) {
@@ -54,7 +54,7 @@ export async function fetchLyrics(
 async function searchLyrics(artist: string, title: string): Promise<LrcLibResult | null> {
   const params = new URLSearchParams({ track_name: title, artist_name: artist });
   const res = await fetch(`${BASE}/search?${params.toString()}`, {
-    headers: { "User-Agent": "MusicUniverse/1.0 (personal music player)" },
+    headers: { "User-Agent": "Kyowave/1.0 (personal music player)" },
   });
   if (!res.ok) return null;
   const data = (await res.json()) as LrcLibResponse[];

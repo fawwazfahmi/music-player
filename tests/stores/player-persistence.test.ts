@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const KEY = "music-universe-player:default";
+const KEY = "kyowave-player:default";
+const LEGACY_KEY = "music-universe-player:default";
 
 const TRACKS = [
   { id: "t1", title: "One", duration: 200, artist: "A", album: "X" },
@@ -92,6 +93,33 @@ describe("player persistence across a refresh", () => {
     expect(s.shuffle).toBe(true);
     expect(s.repeat).not.toBe("off");
     expect(s.performanceMode).toBe(true);
+  });
+
+  it("carries state across the Music Universe -> Kyowave key rename", async () => {
+    // The rename would otherwise silently wipe everyone's volume, shuffle,
+    // repeat and — now that they persist — their queue and playhead.
+    store.setItem(
+      LEGACY_KEY,
+      JSON.stringify({
+        state: { volume: 0.25, shuffle: true, repeat: "all", performanceMode: false,
+                 queue: TRACKS, currentIndex: 1, position: 99 },
+        version: 0,
+      }),
+    );
+
+    const reloaded = await reload();
+    const s = reloaded.getState();
+    expect(s.volume).toBeCloseTo(0.25);
+    expect(s.queue.map((t) => t.id)).toEqual(["t1", "t2"]);
+    expect(s.currentIndex).toBe(1);
+    expect(s.position).toBe(99);
+  });
+
+  it("does not clobber existing Kyowave state with the legacy key", async () => {
+    store.setItem(KEY, JSON.stringify({ state: { volume: 0.9 }, version: 0 }));
+    store.setItem(LEGACY_KEY, JSON.stringify({ state: { volume: 0.1 }, version: 0 }));
+    const reloaded = await reload();
+    expect(reloaded.getState().volume).toBeCloseTo(0.9);
   });
 
   it("starts clean when there is nothing saved", async () => {

@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 export const metadata: Metadata = {
-  title: "Music Universe",
+  title: "Kyowave",
   description: "Personal music streaming.",
 };
 

@@ -18,6 +18,8 @@ import { DownloadIndicator } from "@/components/player/DownloadIndicator";
 import { PartyControls } from "@/components/party/PartyControls";
 import { PartyBanner } from "@/components/party/PartyBanner";
 import { KeyboardHelpDialog } from "@/components/player/KeyboardHelpDialog";
+import { PatchNotesDialog } from "@/components/player/PatchNotesDialog";
+import { readSeenVersion, unseenReleases, type Release } from "@/lib/patch-notes";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { ChevronLeftIcon, MenuIcon, CloseIcon } from "@/components/icons";
 
@@ -52,6 +54,13 @@ export function AppShell() {
   // import time, and the audio element's first `timeupdate` fires with 0,
   // which would otherwise wipe the saved value before we could use it.
   // Consumed exactly once, so a later track change starts from the top.
+  // What's new, shown once per release. Computed on first render from
+  // localStorage, so a fresh browser or cleared storage sees it again —
+  // Settings has a permanent way in for exactly that case.
+  const [patchNotes, setPatchNotes] = useState<Release[] | null>(() =>
+    typeof window === "undefined" ? null : (unseenReleases(readSeenVersion()) || null),
+  );
+
   const resumeAtRef = useRef<number | null>(
     usePlayerStore.getState().position || null,
   );
@@ -312,6 +321,11 @@ export function AppShell() {
       {/* Polls + broadcasts party state. Invisible — just side-effects. */}
       <PartyControls />
       <KeyboardHelpDialog open={helpOpen} onClose={closeHelp} />
+      <PatchNotesDialog
+        open={!!patchNotes && patchNotes.length > 0}
+        releases={patchNotes ?? []}
+        onClose={() => setPatchNotes(null)}
+      />
     </div>
   );
 }

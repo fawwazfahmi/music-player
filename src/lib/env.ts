@@ -15,12 +15,12 @@ const Schema = z.object({
   // Public URL used when generating WhatsApp join links — set to the
   // Cloudflare Tunnel hostname in production, or http://localhost:3000 in
   // dev.
-  PUBLIC_APP_URL: z.string().url().default("https://kyote.fawwaz.fun"),
+  PUBLIC_APP_URL: z.string().url().default("https://kyowave.wazfahmi.site"),
   // Where per-user YouTube cookie jars live. MUST be outside
   // MUSIC_LIBRARY_PATH and outside Postgres — scripts/backup.sh tars the
   // library and pg_dumps the DB, and both are mirrored offsite; a jar in
   // either would ship live Google session credentials to the backup target.
-  // Defaults (in yt-cookies.ts) to ~/.config/music-universe/yt-cookies.
+  // Defaults (in yt-cookies.ts) to ~/.config/kyowave/yt-cookies.
   YT_COOKIES_DIR: z.string().min(1).optional(),
   // playedAt is stored as UTC in a `timestamp without time zone` column, so
   // any hour-of-day analysis has to convert or it lands 8 hours out — UTC

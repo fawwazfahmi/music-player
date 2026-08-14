@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { backfillMetadata, rescanLibrary } from "@/server/actions/library";
 import { LogoutIcon } from "@/components/icons";
 import { PageHeader } from "./_shared";
+import { PatchNotesDialog } from "@/components/player/PatchNotesDialog";
+import { PATCH_NOTES } from "@/lib/patch-notes";
 
 type CookieStatus = "none" | "connected" | "stale";
 
@@ -144,6 +146,7 @@ function YouTubeCookiesSection() {
 
 export function SettingsPage() {
   const [busy, setBusy] = useState<string | null>(null);
+  const [notesOpen, setNotesOpen] = useState(false);
   const [report, setReport] = useState<string | null>(null);
 
   async function rescan() {
@@ -182,6 +185,25 @@ export function SettingsPage() {
       <PageHeader title="Settings" subtitle="Account & Library" />
       <div className="min-h-0 flex-1 overflow-y-auto p-6">
         <div className="mx-auto max-w-xl space-y-4">
+          <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+            <h3 className="text-sm font-semibold text-zinc-100">What&apos;s new</h3>
+            <p className="mt-1 text-xs text-zinc-500">
+              Release notes for Kyowave. These pop up once when there&apos;s an update;
+              open them here any time, or if you cleared your browser storage.
+            </p>
+            <button
+              type="button"
+              onClick={() => setNotesOpen(true)}
+              className="mt-3 rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-200 transition hover:bg-zinc-800"
+            >
+              View patch notes
+            </button>
+          </section>
+          <PatchNotesDialog
+            open={notesOpen}
+            releases={PATCH_NOTES}
+            onClose={() => setNotesOpen(false)}
+          />
           <YouTubeCookiesSection />
           <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
             <h3 className="text-sm font-semibold text-zinc-100">Library</h3>
