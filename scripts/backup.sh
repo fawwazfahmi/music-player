@@ -103,15 +103,34 @@ if command -v "$PG_RESTORE_BIN" >/dev/null 2>&1; then
 fi
 
 # ── Music library ─────────────────────────────────────────────────────────────
-echo "→ Archiving music library at ${MUSIC_LIBRARY_PATH}…"
-tar \
-  --exclude='.DS_Store' \
-  --exclude='.cache' \
-  -czf "$DEST/music.tar.gz" \
-  -C "$(dirname "$MUSIC_LIBRARY_PATH")" \
-  "$(basename "$MUSIC_LIBRARY_PATH")"
-MUSIC_SIZE=$(du -h "$DEST/music.tar.gz" | awk '{print $1}')
-echo "  ✓ music.tar.gz ($MUSIC_SIZE)"
+#
+# This used to `tar --exclude='.cache'`, which excluded the entire library:
+# every downloaded track lives in .cache/yt, so music.tar.gz was 360 bytes
+# containing one empty directory while 3 GB of audio went unprotected.
+#
+# It is a mirror rather than a snapshot on purpose. The files are immutable and
+# content-addressed (<videoId>.m4a), so N dated copies would be N copies of the
+# same bytes — 3 GB/day against 30-day retention is 90 GB, on a disk with 63 GB
+# free. They are also already-compressed m4a, so gzipping them daily costs CPU
+# and saves nothing. One incremental mirror gives the same protection for the
+# size of the library.
+#
+# No --delete: a track removed from the library (or lost to a bad disk) stays
+# in the mirror. This is a backup, not a sync.
+MIRROR="$BACKUP_ROOT/library-mirror"
+echo "→ Mirroring music library at ${MUSIC_LIBRARY_PATH}…"
+mkdir -p "$MIRROR"
+rsync -a --exclude='.DS_Store' \
+  "$MUSIC_LIBRARY_PATH/" "$MIRROR/" \
+  || { echo "✗ library mirror failed" >&2; exit 6; }
+MIRROR_SIZE=$(du -sh "$MIRROR" | awk '{print $1}')
+MIRROR_FILES=$(find "$MIRROR" -type f | wc -l | tr -d ' ')
+echo "  ✓ library mirror ($MIRROR_SIZE, $MIRROR_FILES files)"
+
+if [[ "$MIRROR_FILES" -lt 1 ]]; then
+  echo "✗ library mirror is empty — refusing to report success" >&2
+  exit 7
+fi
 
 # ── Retention ────────────────────────────────────────────────────────────────
 echo "→ Pruning backups older than $RETENTION_DAYS days…"
@@ -120,7 +139,7 @@ while IFS= read -r -d '' old; do
   rm -rf "$old"
   echo "  ✗ removed $(basename "$old")"
   PRUNED=$((PRUNED + 1))
-done < <(find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -mtime "+$RETENTION_DAYS" -print0)
+done < <(find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -name '2*' -mtime "+$RETENTION_DAYS" -print0)
 echo "  ✓ pruned $PRUNED old backup(s)"
 
 # ── Off-host copy (optional but recommended) ──────────────────────────────────
@@ -130,13 +149,21 @@ echo "  ✓ pruned $PRUNED old backup(s)"
 # SSD takes both at once.
 if [[ -n "${OFFSITE_DIR:-}" ]]; then
   mkdir -p "$OFFSITE_DIR"
-  cp -p "$DEST/db.dump" "$OFFSITE_DIR/db.dump.latest"
-  cp -p "$DEST/db.dump" "$OFFSITE_DIR/db.dump.$STAMP"
-  # Music tarball is large (multi-GB) — copy on Sundays only to save space.
-  if [[ "$(date +%u)" == "7" ]]; then
-    cp -p "$DEST/music.tar.gz" "$OFFSITE_DIR/music.tar.gz.weekly"
+  # Plain cp, not `cp -p`. iCloud Drive rejects the attribute-preserving copy
+  # with "Operation not permitted", which failed silently on every run — 52
+  # consecutive failures before anyone looked at the log.
+  cp "$DEST/db.dump" "$OFFSITE_DIR/db.dump.latest" \
+    || { echo "  ! offsite copy failed (db.dump.latest)" >&2; OFFSITE_OK=0; }
+  cp "$DEST/db.dump" "$OFFSITE_DIR/db.dump.$STAMP" \
+    || { echo "  ! offsite copy failed (db.dump.$STAMP)" >&2; OFFSITE_OK=0; }
+  # The audio mirror is deliberately not pushed to iCloud: 3 GB of immutable
+  # m4a would churn the sync client daily for no benefit. Point OFFSITE_DIR at
+  # an external drive if you want the audio off-host too.
+  if [[ "${OFFSITE_OK:-1}" == "1" ]]; then
+    echo "  ✓ mirrored to $OFFSITE_DIR"
+  else
+    echo "  ! offsite mirror INCOMPLETE — check permissions on $OFFSITE_DIR" >&2
   fi
-  echo "  ✓ mirrored to $OFFSITE_DIR"
 fi
 
 TOTAL=$(du -sh "$DEST" | awk '{print $1}')
