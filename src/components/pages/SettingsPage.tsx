@@ -100,20 +100,22 @@ function YouTubeCookiesSection() {
         </span>
       </div>
       <p className="mt-2 text-xs text-zinc-500">
-        A YouTube Mix is personalized by your logged-in session, not by the link — the link only
-        names the seed song. Without cookies the server fetches a generic version of the mix.
-        Export a <code className="text-zinc-400">cookies.txt</code> with a browser extension like
-        &ldquo;Get cookies.txt LOCALLY&rdquo; while signed in to YouTube, then upload it here.
+        Makes mixes match your taste instead of a generic one.
       </p>
+      <ul className="mt-2 space-y-1 text-xs text-zinc-500">
+        <li>1. Sign in to YouTube.</li>
+        <li>
+          2. Export <code className="text-zinc-400">cookies.txt</code> with the &ldquo;Get
+          cookies.txt LOCALLY&rdquo; extension.
+        </li>
+        <li>3. Upload it below.</li>
+      </ul>
       <p className="mt-2 text-xs text-amber-500/80">
-        Heads up: that file holds live Google account credentials and can&apos;t be limited to
-        YouTube alone. Consider using a throwaway Google account. Sessions expire on their own, so
-        you&apos;ll need to re-upload now and then.
+        That file is your full Google login. Use a throwaway account if you can.
       </p>
       {status === "stale" && (
         <p className="mt-2 text-xs text-amber-400">
-          The saved cookies stopped working, so mixes are falling back to anonymous. Re-export and
-          upload to fix it.
+          Your cookies expired. Upload a fresh export to fix it.
         </p>
       )}
       <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -188,8 +190,7 @@ export function SettingsPage() {
           <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
             <h3 className="text-sm font-semibold text-zinc-100">What&apos;s new</h3>
             <p className="mt-1 text-xs text-zinc-500">
-              Release notes for Kyowave. These pop up once when there&apos;s an update;
-              open them here any time, or if you cleared your browser storage.
+              What changed, and when.
             </p>
             <button
               type="button"

@@ -62,23 +62,14 @@ export function PerformanceModeDialog({
         </div>
 
         <div className="px-5 py-4">
-          <p className="text-xs text-zinc-400">
-            For running Kyowave in a background tab while you&apos;re gaming. It turns off:
-          </p>
+          <p className="text-xs text-zinc-400">Turns off, to save your GPU:</p>
           <ul className="mt-3 space-y-2">
-            <Item
-              title="The YouTube video"
-              detail="The iframe is removed entirely — album art shows instead. This is the big one: video keeps decoding on the GPU even muted."
-            />
-            <Item
-              title="Smooth lyric scrolling"
-              detail="Lyrics still work, they just jump to the active line instead of animating to it."
-            />
-            <Item title="Decorative animations" detail="Transitions and other UI eye candy." />
+            <Item title="The video" detail="Album art instead." />
+            <Item title="Smooth lyric scrolling" detail="Lyrics still work — they just jump." />
+            <Item title="Animations" detail="" />
           </ul>
           <p className="mt-3 text-[11px] text-zinc-500">
-            Audio, lyrics, and the queue are untouched. Turning it back off restores
-            everything immediately.
+            Music and lyrics keep working. Switch it off any time.
           </p>
         </div>
 
@@ -111,7 +102,7 @@ function Item({ title, detail }: { title: string; detail: string }) {
       <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500/70" />
       <div>
         <div className="text-xs font-medium text-zinc-200">{title}</div>
-        <div className="text-[11px] leading-snug text-zinc-500">{detail}</div>
+        {detail && <div className="text-[11px] leading-snug text-zinc-500">{detail}</div>}
       </div>
     </li>
   );

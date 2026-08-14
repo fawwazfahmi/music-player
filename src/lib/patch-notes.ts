@@ -30,44 +30,16 @@ export const PATCH_NOTES: Release[] = [
     date: "2026-08-14",
     title: "Kyowave",
     changes: [
-      { kind: "changed", text: "Music Universe is now Kyowave, on kyowave.wazfahmi.site." },
-      {
-        kind: "added",
-        text: "The player survives a refresh. Your queue and the song you were on come back, parked exactly where you stopped — paused, not playing.",
-      },
-      {
-        kind: "added",
-        text: "Stats has a Rhythm tab: a heatmap of when you actually listen, by hour and weekday.",
-      },
-      {
-        kind: "added",
-        text: "Change cover… in a song's ⋯ menu, for when the album art is wrong or badly cropped. Re-transcribe moved in there too.",
-      },
-      {
-        kind: "added",
-        text: "Paste a YouTube playlist or mix and you now get to review the songs first, ticking off anything you don't want before a single byte downloads.",
-      },
-      {
-        kind: "added",
-        text: "A Downloads tab with real progress that survives a reload, plus retry on failures and add-to-queue when they land.",
-      },
-      {
-        kind: "added",
-        text: "Settings → Connect YouTube. Upload a cookies.txt and mixes resolve as your account instead of a generic one.",
-      },
-      {
-        kind: "fixed",
-        text: "Performance Mode actually removes the video now — it used to leave the iframe on screen if you switched it on mid-session.",
-      },
-      {
-        kind: "fixed",
-        text: "Songs play in Performance Mode. Playback was waiting for a video that the mode had already removed, so nothing ever started.",
-      },
-      {
-        kind: "fixed",
-        text: "Mixes no longer fill the queue with unrelated songs. They're bounded and de-duplicated instead of running off into whatever YouTube felt like.",
-      },
-      { kind: "fixed", text: "The lightning bolt icon sits centred now, in the player bar and the dialog." },
+      { kind: "changed", text: "New name. Music Universe → Kyowave." },
+      { kind: "added", text: "Refresh keeps your queue. Picks up right where you paused." },
+      { kind: "added", text: "Stats now shows when you listen, by hour and day." },
+      { kind: "added", text: "Wrong cover art? Change it from a song's ⋯ menu." },
+      { kind: "added", text: "Playlist links: pick the songs you want before downloading." },
+      { kind: "added", text: "Downloads tab. Watch progress, retry, add to queue." },
+      { kind: "added", text: "Connect YouTube in Settings for better mixes." },
+      { kind: "fixed", text: "Songs play in Performance Mode again." },
+      { kind: "fixed", text: "Performance Mode really hides the video now." },
+      { kind: "fixed", text: "Mixes stop pulling in random unrelated songs." },
     ],
   },
 ];
