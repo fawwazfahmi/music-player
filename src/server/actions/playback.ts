@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { db } from "@/server/db";
+import { playbackSourceFor } from "@/lib/playback-source";
 import { NAME_COOKIE_NAME, isValidName } from "@/server/auth";
 
 /**
@@ -18,10 +19,15 @@ async function currentListener(): Promise<string | null> {
 }
 
 export async function startPlay(trackId: string): Promise<string> {
+  const track = await db.track.findUnique({
+    where: { id: trackId },
+    select: { source: true },
+  });
+
   const history = await db.listeningHistory.create({
     data: {
       trackId,
-      source: "LOCAL_FILE",
+      source: track ? playbackSourceFor(track.source) : "LOCAL_FILE",
       durationListened: 0,
       completed: false,
       listener: await currentListener(),
