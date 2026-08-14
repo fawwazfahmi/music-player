@@ -399,7 +399,7 @@ export function AppShell() {
       {/* Polls + broadcasts party state. Invisible — just side-effects. */}
       <PartyControls />
       <OverlayPresence />
-      <InstallHint />
+      <InstallHint suppressed={!notesDismissed && patchNotes.length > 0} />
       <KeyboardHelpDialog open={helpOpen} onClose={closeHelp} />
       <PatchNotesDialog
         open={!notesDismissed && patchNotes.length > 0}

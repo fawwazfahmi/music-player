@@ -307,6 +307,34 @@ fixed`, which would otherwise trap it.
 
 ---
 
+## Found on a real device, not in a browser at 390px
+
+Verified on an **iPhone 13 simulator, iOS 26.5**. Four things only a real
+WebKit build surfaced:
+
+1. **Swiping the sheet closed reloaded the whole app.** A downward drag near
+   the top of the page triggers Safari's pull-to-refresh; the store rehydrates
+   paused by design, so it presented as "closing the sheet stops the music."
+   Two wrong theories died first (a synthetic click on the transport, then the
+   YouTube iframe stealing the audio channel) — the dev-server log settled it:
+   six page loads where only two were navigations. Fixed with a non-passive
+   `touchmove` preventDefault on the drag regions, plus `overscroll-behavior-y:
+   contain` app-wide. **React's root touch listeners are passive**, so
+   `preventDefault` inside `onTouchMove` is silently ignored — the listener has
+   to be attached by hand.
+2. **iOS 26 moved Share into the `···` overflow menu.** The install hint said
+   "tap Share", pointing at a button that is no longer in the toolbar. Now
+   branches on `shareMenuLocation()` and renders three steps on 26+, two below.
+3. **The install hint stacked on top of the patch-notes dialog** on a first
+   visit. It now waits its turn.
+4. **iPhone 13 has a notch, not a Dynamic Island** — that starts at iPhone 14
+   Pro. The MediaSession work still pays off, on the lock screen and in
+   Control Center rather than in an Island pill.
+
+**Not verifiable in the simulator:** the YouTube iframe renders black, because
+the simulator has no video decode path for it. Album art via the bolt is the
+escape hatch either way.
+
 ## Testing
 
 **Automated (vitest):**

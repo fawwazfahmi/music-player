@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { usePlayerStore } from "@/stores/player-store";
 import { usePartyStore } from "@/stores/party-store";
 import { useFavorite } from "@/hooks/use-favorite";
@@ -40,6 +40,22 @@ export function MiniPlayer({ onOpen }: { onOpen: () => void }) {
 
   const startY = useRef<number | null>(null);
   const swiped = useRef(false);
+  const barRef = useRef<HTMLDivElement>(null);
+
+  // Swiping here must not also scroll the library behind the sheet. React's
+  // root touch listeners are passive, so preventDefault only works from a
+  // hand-attached, explicitly non-passive listener. Same reason as the sheet's
+  // drag region — see the comment there for the bug this class of gesture
+  // caused.
+  useEffect(() => {
+    const el = barRef.current;
+    if (!el) return;
+    const onMove = (e: TouchEvent) => {
+      if (startY.current !== null && e.cancelable) e.preventDefault();
+    };
+    el.addEventListener("touchmove", onMove, { passive: false });
+    return () => el.removeEventListener("touchmove", onMove);
+  }, []);
 
   const dur = track?.duration ?? 0;
   const pct = dur > 0 ? Math.min(100, (position / dur) * 100) : 0;
@@ -69,6 +85,7 @@ export function MiniPlayer({ onOpen }: { onOpen: () => void }) {
 
   return (
     <div
+      ref={barRef}
       className="kw-pressable relative shrink-0 border-t border-zinc-800/70 bg-zinc-900"
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}

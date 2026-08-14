@@ -2,8 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { ShareIosIcon, WaveIcon } from "@/components/icons";
-import { detectShouldShowInstallHint, markInstallHintDismissed } from "@/lib/mobile";
+import { MoreHorizontalIcon, ShareIosIcon, WaveIcon } from "@/components/icons";
+import {
+  detectShouldShowInstallHint,
+  markInstallHintDismissed,
+  shareMenuLocation,
+} from "@/lib/mobile";
+import { useIsHydrated } from "@/hooks/use-hydrated";
 
 /** Let the first paint settle before interrupting it. */
 const APPEAR_DELAY_MS = 2000;
@@ -24,8 +29,18 @@ const APPEAR_DELAY_MS = 2000;
  * Safari's compass to the Kyowave mark. That is the real payoff, not the tidier
  * home screen.
  */
-export function InstallHint() {
+export function InstallHint({ suppressed = false }: { suppressed?: boolean }) {
   const [show, setShow] = useState(false);
+  const hydrated = useIsHydrated();
+
+  // Where Share lives differs by iOS version, and directions to a button that
+  // isn't on screen are worse than no directions at all. Derived rather than
+  // stored: it cannot change during a session, and reading navigator behind
+  // the hydration gate keeps it out of an effect.
+  const viaOverflow =
+    !hydrated ||
+    shareMenuLocation(navigator as unknown as { userAgent: string; maxTouchPoints: number }) ===
+      "overflow";
 
   useEffect(() => {
     if (!detectShouldShowInstallHint()) return;
@@ -38,7 +53,11 @@ export function InstallHint() {
     setShow(false);
   }
 
-  if (!show || typeof document === "undefined") return null;
+  // Never stack on top of another dialog. On a first visit the patch notes and
+  // this hint both want the screen, and two modals at once reads as a mess —
+  // the hint waits its turn rather than competing. It is not dismissed by
+  // waiting, so it appears as soon as the other one closes.
+  if (!show || suppressed || typeof document === "undefined") return null;
 
   return createPortal(
     <div
@@ -55,14 +74,36 @@ export function InstallHint() {
         </div>
 
         <ol className="space-y-2 px-4 py-3.5 text-sm text-zinc-300">
-          <Step n="1">
-            Tap
-            <span className="mx-1 inline-flex translate-y-[2px] text-sky-400">
-              <ShareIosIcon size={15} />
-            </span>
-            Share
-          </Step>
-          <Step n="2">Add to Home Screen</Step>
+          {viaOverflow ? (
+            <>
+              <Step n="1">
+                Tap
+                <span className="mx-1 inline-flex translate-y-[2px] text-sky-400">
+                  <MoreHorizontalIcon size={15} />
+                </span>
+                below
+              </Step>
+              <Step n="2">
+                Then
+                <span className="mx-1 inline-flex translate-y-[2px] text-sky-400">
+                  <ShareIosIcon size={15} />
+                </span>
+                Share
+              </Step>
+              <Step n="3">Add to Home Screen</Step>
+            </>
+          ) : (
+            <>
+              <Step n="1">
+                Tap
+                <span className="mx-1 inline-flex translate-y-[2px] text-sky-400">
+                  <ShareIosIcon size={15} />
+                </span>
+                Share
+              </Step>
+              <Step n="2">Add to Home Screen</Step>
+            </>
+          )}
         </ol>
 
         <div className="flex items-center justify-between gap-3 border-t border-zinc-800 px-4 py-3">

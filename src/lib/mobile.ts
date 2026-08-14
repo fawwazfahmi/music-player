@@ -68,6 +68,36 @@ export function isStandaloneDisplay(
   }
 }
 
+/**
+ * Safari's major version from the UA, or null if it isn't there.
+ *
+ * Read from the `Version/NN` token rather than `OS NN_N`, because an iPad
+ * reporting itself as a Mac carries the former but not the latter.
+ */
+export function safariMajorVersion(nav: NavigatorLike): number | null {
+  const m = /Version\/(\d+)/.exec(nav.userAgent);
+  if (!m?.[1]) return null;
+  const n = Number(m[1]);
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Where Share lives in the Safari toolbar — which decides what the install
+ * hint tells her to tap.
+ *
+ * iOS 26 moved Share into the `···` overflow menu; before that it was its own
+ * toolbar button. Verified on an iPhone 13 running iOS 26.5: the toolbar is
+ * back / URL / reload / `···`, with no share glyph anywhere. A hint that says
+ * "tap Share" sends her looking for a button that is not on screen.
+ *
+ * Unknown versions get the newer path, since that is where things are heading.
+ */
+export function shareMenuLocation(nav: NavigatorLike): "toolbar" | "overflow" {
+  const major = safariMajorVersion(nav);
+  if (major === null) return "overflow";
+  return major >= 26 ? "overflow" : "toolbar";
+}
+
 /** iOS, not already installed, not previously dismissed. All three, or nothing. */
 export function shouldShowInstallHint(args: {
   nav: NavigatorLike;

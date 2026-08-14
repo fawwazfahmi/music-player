@@ -353,3 +353,14 @@ export function ShareIosIcon(props: IconProps) {
     </Icon>
   );
 }
+
+// Horizontal ellipsis — matches Safari's `···` overflow button. Distinct from
+// MoreIcon, which is the app's own vertical ⋮ kebab. The install hint points
+// at a real button in the OS chrome, so it has to be the right shape.
+export function MoreHorizontalIcon(props: IconProps) {
+  return (
+    <Icon {...props}>
+      <path d="M6 10a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm6 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4zm6 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4z" />
+    </Icon>
+  );
+}

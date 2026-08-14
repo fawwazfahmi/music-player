@@ -124,6 +124,15 @@
   body {
     @apply bg-background text-foreground;
   }
+  html,
+  body {
+    /* Disable pull-to-refresh. A downward swipe anywhere near the top of the
+       page reloads the app in Safari, and a reload restarts playback paused —
+       so dragging the now-playing sheet closed silently stopped the music on
+       an iPhone. The sheet also cancels the gesture itself; this is the
+       app-wide belt so no future gesture can reintroduce it. */
+    overscroll-behavior-y: contain;
+  }
   html {
     @apply font-sans;
     /* The app is dark-only, but without this the browser still paints its own

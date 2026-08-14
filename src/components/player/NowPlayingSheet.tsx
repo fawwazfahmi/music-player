@@ -58,6 +58,7 @@ export function NowPlayingSheet({
   const [dragY, setDragY] = useState(0);
   const [dragging, setDragging] = useState(false);
   const dragStartY = useRef<number | null>(null);
+  const dragRef = useRef<HTMLDivElement>(null);
 
   const track = usePlayerStore((s) => s.queue[s.currentIndex] ?? null);
   const isPlaying = usePlayerStore((s) => s.isPlaying);
@@ -86,6 +87,30 @@ export function NowPlayingSheet({
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  /**
+   * Stop the drag from also being a page gesture.
+   *
+   * This is the fix for the worst bug found on a real iPhone: swiping the
+   * sheet down to dismiss it triggered Safari's pull-to-refresh, which
+   * RELOADED THE WHOLE APP. Playback stopped every time, because the store
+   * deliberately rehydrates paused — so it looked like "closing the sheet
+   * pauses the music" when the app had in fact restarted underneath. The dev
+   * server log settled it: six page loads where only two were navigations.
+   *
+   * React attaches touch listeners at the root as passive, so
+   * `e.preventDefault()` inside onTouchMove is silently ignored. The listener
+   * has to be attached by hand with `passive: false`.
+   */
+  useEffect(() => {
+    const el = dragRef.current;
+    if (!el) return;
+    const onMove = (e: TouchEvent) => {
+      if (dragStartY.current !== null && e.cancelable) e.preventDefault();
+    };
+    el.addEventListener("touchmove", onMove, { passive: false });
+    return () => el.removeEventListener("touchmove", onMove);
+  }, []);
+
   function onDragStart(e: React.TouchEvent) {
     dragStartY.current = e.touches[0]?.clientY ?? null;
     setDragging(true);
@@ -105,7 +130,9 @@ export function NowPlayingSheet({
   function onDragEnd() {
     dragStartY.current = null;
     setDragging(false);
-    if (dragY > CLOSE_THRESHOLD_PX) onClose();
+    if (dragY > CLOSE_THRESHOLD_PX) {
+      onClose();
+    }
     setDragY(0);
   }
 
@@ -135,6 +162,7 @@ export function NowPlayingSheet({
           Only this area drags. If the whole sheet did, scrolling the lyrics
           would fight the dismiss gesture on every flick. */}
       <div
+        ref={dragRef}
         className="kw-safe-top kw-pressable shrink-0"
         onTouchStart={onDragStart}
         onTouchMove={onDragMove}
