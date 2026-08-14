@@ -47,12 +47,34 @@ export function AppShell() {
   // (addToQueue / playNext) creates a new array reference but doesn't change
   // which track is current, and we don't want that to yank el.src back to
   // the beginning of the currently-playing song.
+  // Where playback was when the page was last closed. Captured on the very
+  // first render — the store rehydrates from localStorage synchronously at
+  // import time, and the audio element's first `timeupdate` fires with 0,
+  // which would otherwise wipe the saved value before we could use it.
+  // Consumed exactly once, so a later track change starts from the top.
+  const resumeAtRef = useRef<number | null>(
+    usePlayerStore.getState().position || null,
+  );
+
   useEffect(() => {
     const engine = getEngine();
     const track = usePlayerStore.getState().queue[player.currentIndex];
     if (!track) return;
     engine.loadTrack(track.id);
     updateMediaMetadata(track);
+
+    const resumeAt = resumeAtRef.current;
+    resumeAtRef.current = null;
+    if (resumeAt !== null && resumeAt > 0.5) {
+      // Seek once the element actually has the media; seeking straight after
+      // setting src is ignored because there is no duration yet.
+      const off = engine.on("loaded", () => {
+        engine.seek(resumeAt);
+        usePlayerStore.setState({ position: resumeAt });
+        off();
+      });
+      return off;
+    }
   }, [player.currentIndex, player.playbackKey]);
 
   // Play/pause sync — soft gate. Includes playbackKey so that when the

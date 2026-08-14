@@ -351,7 +351,21 @@ export const usePlayerStore = create<PlayerState>()(
         shuffle: state.shuffle,
         repeat: state.repeat,
         performanceMode: state.performanceMode,
+        // Survive a refresh. Without these the queue, which song was playing
+        // and how far in all vanished on reload.
+        queue: state.queue,
+        currentIndex: state.currentIndex,
+        position: state.position,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        // Come back paused, parked at the saved position — never auto-play.
+        // That is what was asked for, and browsers block autoplay without a
+        // user gesture anyway, so restoring isPlaying:true would just leave
+        // the UI claiming to play while silent.
+        state.isPlaying = false;
+        state.videoLoading = false;
+      },
     },
   ),
 );
