@@ -5,7 +5,7 @@ import { NAME_COOKIE_NAME, isValidName } from "@/server/auth";
 
 // Write current now-playing. NOT in PUBLIC_PATHS, so the proxy middleware has
 // already rejected anyone without a valid session before we run — only the
-// logged-in kyote tab can push. Keyed by the listener's name cookie.
+// logged-in Kyowave tab can push. Keyed by the listener's name cookie.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 

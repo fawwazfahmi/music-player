@@ -1,5 +1,5 @@
 // In-memory "what's playing right now" presence for the public OBS overlay.
-// The logged-in kyote tab POSTs here (via /api/presence); the public overlay
+// The logged-in Kyowave tab POSTs here (via /api/presence); the public overlay
 // reads it (via /api/overlay/now-playing). Lives in this single Node worker —
 // same assumption as party-service. Cleared on restart; repopulates within
 // one heartbeat of the player tab.

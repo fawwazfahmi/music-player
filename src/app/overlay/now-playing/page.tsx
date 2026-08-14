@@ -1,10 +1,9 @@
-// @ts-nocheck  -- self-contained OBS overlay (vendored canvas colour code)
 "use client";
 
 import { useEffect, useRef } from "react";
 
 // Kyote -> OBS now-playing overlay. Transparent browser source that mirrors
-// whatever the kyote player tab is playing (via /api/overlay/now-playing).
+// whatever the Kyowave player tab is playing (via /api/overlay/now-playing).
 // Same look as the standalone OBS widget: album-art colour gradient, animated
 // eq bars, progress bar.
 //
@@ -93,7 +92,9 @@ export default function OverlayNowPlaying() {
     const dist = (a: { r: number; g: number; b: number }, b: { r: number; g: number; b: number }) => Math.hypot(a.r - b.r, a.g - b.g, a.b - b.b);
     const darken = (c: { r: number; g: number; b: number }, f: number) => ({ r: Math.round(c.r * f), g: Math.round(c.g * f), b: Math.round(c.b * f) });
     const rgb = (c: { r: number; g: number; b: number }) => `rgb(${c.r},${c.g},${c.b})`;
-    function extractColors(img: HTMLImageElement): string[] | null {
+    // Always three colours or nothing — the tuple says so, which is what lets
+    // the caller index it without assertions.
+    function extractColors(img: HTMLImageElement): [string, string, string] | null {
       const n = 40; const cv = document.createElement("canvas"); cv.width = n; cv.height = n;
       const ctx = cv.getContext("2d", { willReadFrequently: true }); if (!ctx) return null;
       ctx.drawImage(img, 0, 0, n, n);
@@ -101,15 +102,15 @@ export default function OverlayNowPlaying() {
       try { data = ctx.getImageData(0, 0, n, n).data; } catch { return null; }
       const buckets: Record<string, { r: number; g: number; b: number; w: number }> = {};
       for (let i = 0; i < data.length; i += 4) {
-        const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3]; if (a < 128) continue;
+        const r = data[i]!, g = data[i + 1]!, b = data[i + 2]!, a = data[i + 3]!; if (a < 128) continue;
         const mx = Math.max(r, g, b), mn = Math.min(r, g, b); const sat = mx === 0 ? 0 : (mx - mn) / mx; const val = mx / 255;
         const kk = (r >> 5) + "," + (g >> 5) + "," + (b >> 5); const w = sat * val + 0.05;
         const bk = buckets[kk] || (buckets[kk] = { r: 0, g: 0, b: 0, w: 0 }); bk.r += r * w; bk.g += g * w; bk.b += b * w; bk.w += w;
       }
       const arr = Object.values(buckets).map((bk) => ({ r: Math.round(bk.r / bk.w), g: Math.round(bk.g / bk.w), b: Math.round(bk.b / bk.w), score: bk.w })).sort((x, y) => y.score - x.score);
       if (!arr.length) return null;
-      const first = arr[0]; const second = arr.find((c) => dist(c, first) > 55) || arr[1] || first;
-      const third = arr.find((c) => dist(c, first) > 55 && dist(c, second) > 45) || second;
+      const first = arr[0]!; const second = arr.find((c) => dist(c, first) > 55) ?? arr[1] ?? first;
+      const third = arr.find((c) => dist(c, first) > 55 && dist(c, second) > 45) ?? second;
       return [rgb(darken(first, 0.85)), rgb(darken(second, 0.8)), rgb(darken(third, 0.75))];
     }
     function loadArt(url: string | null) {
