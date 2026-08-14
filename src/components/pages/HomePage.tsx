@@ -7,6 +7,7 @@ import { usePlayerStore } from "@/stores/player-store";
 import { AlbumIcon, ArtistIcon, MusicNoteIcon, PlayIcon } from "@/components/icons";
 import { coverUrl } from "@/lib/cover-url";
 import { buildQueueTrack } from "./_shared";
+import { emptyLineFor } from "@/lib/empty-lines";
 
 export function HomePage() {
   const [songs, setSongs] = useState<Awaited<ReturnType<typeof getAllSongs>>>([]);
@@ -57,13 +58,16 @@ export function HomePage() {
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/30 p-8 text-center">
             <MusicNoteIcon size={48} />
             <h2 className="mt-3 text-lg font-semibold text-zinc-100">Library is empty</h2>
-            <p className="mt-1 text-sm text-zinc-500">
-              Add audio files to your music folder, or use Search → YouTube to grab a song.
+            {/* Flavour first, then what to actually do. An empty screen is an
+                invitation to act, so the instruction stays. */}
+            <p className="mt-1 text-sm text-zinc-500">{emptyLineFor("home")}</p>
+            <p className="mt-1 text-xs text-zinc-600">
+              Search YouTube, or drop files in your music folder.
             </p>
             <button
               type="button"
               onClick={() => push({ name: "search" })}
-              className="mt-4 rounded-full bg-emerald-500 px-5 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400"
+              className="mt-4 rounded-full bg-sky-500 px-5 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-sky-400"
             >
               Search
             </button>
@@ -100,7 +104,7 @@ export function HomePage() {
                         {s.primaryArtist.name}
                       </div>
                     </div>
-                    <div className="mr-3 rounded-full bg-emerald-500 p-2 text-zinc-950 opacity-0 transition group-hover:opacity-100">
+                    <div className="mr-3 rounded-full bg-sky-500 p-2 text-zinc-950 opacity-0 transition group-hover:opacity-100">
                       <PlayIcon size={16} />
                     </div>
                   </button>

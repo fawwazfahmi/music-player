@@ -51,11 +51,11 @@ export function PerformanceModeDialog({
       aria-label="Turn on Performance Mode"
     >
       <div
-        className="w-full max-w-sm overflow-hidden rounded-2xl border border-emerald-500/40 bg-zinc-900 shadow-[0_0_0_1px_rgba(16,185,129,0.15),0_0_60px_-10px_rgba(16,185,129,0.55),0_24px_60px_-20px_rgba(0,0,0,0.9)]"
+        className="w-full max-w-sm overflow-hidden rounded-2xl border border-sky-500/40 bg-zinc-900 shadow-[0_0_0_1px_rgba(14,165,233,0.15),0_0_60px_-10px_rgba(14,165,233,0.55),0_24px_60px_-20px_rgba(0,0,0,0.9)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2.5 border-b border-zinc-800 px-5 py-3.5">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-300">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-sky-500/15 text-sky-300">
             <BoltIcon size={15} />
           </span>
           <h2 className="text-sm font-bold text-zinc-100">Turn on Performance Mode</h2>
@@ -85,7 +85,7 @@ export function PerformanceModeDialog({
             type="button"
             onClick={onConfirm}
             autoFocus
-            className="rounded-lg bg-emerald-500 px-3.5 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-emerald-400"
+            className="rounded-lg bg-sky-500 px-3.5 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-sky-400"
           >
             Turn on
           </button>
@@ -99,7 +99,7 @@ export function PerformanceModeDialog({
 function Item({ title, detail }: { title: string; detail: string }) {
   return (
     <li className="flex gap-2.5">
-      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500/70" />
+      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-sky-500/70" />
       <div>
         <div className="text-xs font-medium text-zinc-200">{title}</div>
         {detail && <div className="text-[11px] leading-snug text-zinc-500">{detail}</div>}

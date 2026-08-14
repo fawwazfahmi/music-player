@@ -254,7 +254,7 @@ export function LyricsPanel() {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-zinc-400">
         <div className="h-1.5 w-32 overflow-hidden rounded-full bg-zinc-800">
-          <div className="h-full w-1/2 animate-pulse rounded-full bg-emerald-500" />
+          <div className="h-full w-1/2 animate-pulse rounded-full bg-sky-500" />
         </div>
         <span>
           {data?.autoTranscribing ? "Auto-transcribing with Whisper…" : "Transcribing with Whisper…"}
@@ -288,7 +288,7 @@ export function LyricsPanel() {
         <button
           type="button"
           onClick={handleTranscribe}
-          className="rounded-full bg-emerald-600 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-emerald-500"
+          className="rounded-full bg-sky-600 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-sky-500"
         >
           Transcribe with AI
         </button>
@@ -334,7 +334,7 @@ export function LyricsPanel() {
                       }
                     }}
                     onBlur={() => void saveEdit()}
-                    className="w-full rounded border border-emerald-500/60 bg-zinc-900/80 px-2 py-1.5 text-base text-zinc-100 outline-none focus:border-emerald-500"
+                    className="w-full rounded border border-sky-500/60 bg-zinc-900/80 px-2 py-1.5 text-base text-zinc-100 outline-none focus:border-sky-500"
                   />
                   <div className="mt-1 flex items-center gap-3 text-[10px] text-zinc-500">
                     <span>Enter to save · Esc to cancel</span>
@@ -355,7 +355,7 @@ export function LyricsPanel() {
                 className={
                   "block w-full cursor-pointer rounded px-2 py-2 text-left text-base transition-all duration-200 " +
                   (i === activeIndex
-                    ? `scale-105 font-bold ${isWhisper ? "text-emerald-200" : "text-zinc-100"}`
+                    ? `scale-105 font-bold ${isWhisper ? "text-sky-200" : "text-zinc-100"}`
                     : i < activeIndex
                       ? "text-zinc-600 hover:text-zinc-400"
                       : "text-zinc-500 hover:text-zinc-300")
@@ -405,7 +405,7 @@ function LyricsHeader({
       <span
         className={
           isWhisper
-            ? "rounded-full bg-emerald-500/15 px-2 py-0.5 font-semibold text-emerald-300"
+            ? "rounded-full bg-sky-500/15 px-2 py-0.5 font-semibold text-sky-300"
             : "text-zinc-500"
         }
       >

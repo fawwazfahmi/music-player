@@ -7,12 +7,12 @@ import { PageLoading } from "./_shared";
 // Hour-of-day × day-of-week, coloured by minutes listened.
 //
 // Sequential encoding (magnitude), so: one hue, light→dark, no rainbow. The
-// hue is the app's emerald accent. The ramp starts at emerald-700 rather than
-// emerald-950 because the darker steps fall below 3:1 against the zinc surface
+// hue is the app's emerald accent. The ramp starts at sky-700 rather than
+// sky-950 because the darker steps fall below 3:1 against the zinc surface
 // — a barely-listened hour would have been indistinguishable from an hour with
 // no listening at all. "No data" is instead a neutral zinc, so empty reads by
 // hue rather than by brightness.
-export const RAMP = ["#047857", "#059669", "#10b981", "#34d399", "#6ee7b7"];
+export const RAMP = ["#0284c7", "#0ea5e9", "#38bdf8", "#7dd3fc", "#bae6fd"];
 const EMPTY = "rgba(63,63,70,0.4)"; // zinc-700/40
 
 // Monday-first reading order; Postgres EXTRACT(DOW) is 0=Sunday.
@@ -95,7 +95,7 @@ export function ListeningHeatmap({ range }: { range: StatsRange }) {
           <select
             value={listener}
             onChange={(e) => setListener(e.target.value)}
-            className="rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 focus:border-emerald-500 focus:outline-none"
+            className="rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 focus:border-sky-500 focus:outline-none"
           >
             <option value="">Everyone</option>
             {data.listeners.map((l) => (

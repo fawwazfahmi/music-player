@@ -261,7 +261,7 @@ export function TrackMenu({ track, onDeleted, onCoverChanged }: Props) {
                 >
                   <span className="truncate">{pl.name}</span>
                   {addedTo === pl.id && (
-                    <span className="text-xs text-emerald-400">Added ✓</span>
+                    <span className="text-xs text-sky-400">Added ✓</span>
                   )}
                 </button>
               ))

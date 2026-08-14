@@ -76,7 +76,7 @@ export function Sidebar() {
   return (
     <nav className="flex h-full w-60 flex-col gap-1 overflow-y-auto bg-zinc-950 px-3 py-4">
       <div className="px-3 pb-3 text-lg font-bold tracking-tight text-zinc-100">
-        Kyowave<span className="text-emerald-500">.</span>
+        Kyowave<span className="text-sky-500">.</span>
       </div>
 
       <NavItem
@@ -242,7 +242,7 @@ function DownloadsNavItem({ activeName }: { activeName: string }) {
       </span>
       <span>Downloads</span>
       {activeCount > 0 && (
-        <span className="ml-auto rounded-full bg-emerald-500 px-1.5 text-[10px] font-bold text-zinc-950 tabular-nums">
+        <span className="ml-auto rounded-full bg-sky-500 px-1.5 text-[10px] font-bold text-zinc-950 tabular-nums">
           {activeCount}
         </span>
       )}

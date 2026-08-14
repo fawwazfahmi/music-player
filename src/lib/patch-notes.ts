@@ -31,6 +31,7 @@ export const PATCH_NOTES: Release[] = [
     title: "Kyowave",
     changes: [
       { kind: "changed", text: "New name. Music Universe → Kyowave." },
+      { kind: "changed", text: "New colour. Green → blue." },
       { kind: "added", text: "Refresh keeps your queue. Picks up right where you paused." },
       { kind: "added", text: "Stats now shows when you listen, by hour and day." },
       { kind: "added", text: "Wrong cover art? Change it from a song's ⋯ menu." },

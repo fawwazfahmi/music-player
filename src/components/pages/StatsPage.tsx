@@ -103,7 +103,7 @@ export function StatsPage() {
               className={
                 "rounded-full px-3 py-1.5 font-semibold transition " +
                 (tab === t.value
-                  ? "bg-emerald-500/15 text-emerald-300"
+                  ? "bg-sky-500/15 text-sky-300"
                   : "text-zinc-500 hover:bg-zinc-800/60 hover:text-zinc-200")
               }
             >
@@ -114,7 +114,7 @@ export function StatsPage() {
         <select
           value={range}
           onChange={(e) => setRange(e.target.value as StatsRange)}
-          className="rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 focus:border-emerald-500 focus:outline-none"
+          className="rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 focus:border-sky-500 focus:outline-none"
         >
           {RANGES.map((r) => (
             <option key={r.value} value={r.value}>
@@ -212,7 +212,7 @@ function TopTracksList({ items }: { items: TopTrack[] | null }) {
               <div className="truncate text-xs text-zinc-500">{t.artist}</div>
             </div>
             <PlayCount n={t.playCount} />
-            <span className="hidden text-emerald-400 group-hover:inline">
+            <span className="hidden text-sky-400 group-hover:inline">
               <PlayIcon size={16} />
             </span>
             <span className="w-12 text-right text-xs text-zinc-600 tabular-nums">
@@ -240,7 +240,7 @@ function TopArtistsList({ items }: { items: TopArtist[] | null }) {
             className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition hover:bg-zinc-800/50"
           >
             <span className="w-6 text-right text-xs text-zinc-500 tabular-nums">{i + 1}</span>
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-emerald-700 to-zinc-700 text-sm font-bold text-zinc-100">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-sky-700 to-zinc-700 text-sm font-bold text-zinc-100">
               {a.name.charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0 flex-1 truncate text-sm font-medium text-zinc-100">
@@ -319,7 +319,7 @@ function RecentList({ items }: { items: RecentPlay[] | null }) {
             <span className="w-24 text-right text-xs text-zinc-600">
               {relativeTime(t.playedAt)}
             </span>
-            <span className="hidden text-emerald-400 group-hover:inline">
+            <span className="hidden text-sky-400 group-hover:inline">
               <PlayIcon size={16} />
             </span>
           </button>

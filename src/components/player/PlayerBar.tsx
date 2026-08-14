@@ -53,7 +53,7 @@ function PerformanceToggle() {
       className={
         "rounded-full p-1.5 transition " +
         (perf
-          ? "bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
+          ? "bg-sky-500/15 text-sky-300 hover:bg-sky-500/25"
           : "text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200")
       }
     >
@@ -157,7 +157,7 @@ export function PlayerBar() {
               <div className="truncate text-sm font-medium text-zinc-100">{track.title}</div>
               <div className="truncate text-xs text-zinc-400">
                 {videoLoading ? (
-                  <span className="text-emerald-400">Loading video…</span>
+                  <span className="text-sky-400">Loading video…</span>
                 ) : (
                   track.artist
                 )}

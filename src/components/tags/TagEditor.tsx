@@ -94,7 +94,7 @@ export function TagEditor({ trackId }: Props) {
           {tags.map((t) => (
             <span
               key={t.id}
-              className="group flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-1 text-xs font-medium text-emerald-300"
+              className="group flex items-center gap-1 rounded-full bg-sky-500/15 px-2.5 py-1 text-xs font-medium text-sky-300"
             >
               {t.name}
               <button
@@ -102,7 +102,7 @@ export function TagEditor({ trackId }: Props) {
                 onClick={() => remove(t.id)}
                 disabled={busy}
                 aria-label={`Remove tag ${t.name}`}
-                className="ml-1 rounded-full p-0.5 text-emerald-300/60 transition hover:bg-emerald-500/20 hover:text-emerald-200"
+                className="ml-1 rounded-full p-0.5 text-sky-300/60 transition hover:bg-sky-500/20 hover:text-sky-200"
               >
                 <CloseIcon size={10} />
               </button>
@@ -125,7 +125,7 @@ export function TagEditor({ trackId }: Props) {
           onChange={(e) => setInput(e.target.value)}
           placeholder="Add a tag…"
           disabled={busy}
-          className="w-full rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none"
+          className="w-full rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-sky-500 focus:outline-none"
         />
         {suggestions.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
@@ -135,7 +135,7 @@ export function TagEditor({ trackId }: Props) {
                 type="button"
                 onClick={() => add(s.name)}
                 disabled={busy}
-                className="rounded-full border border-zinc-700/70 px-2 py-0.5 text-[11px] text-zinc-300 transition hover:border-emerald-500/50 hover:bg-emerald-500/10 hover:text-emerald-300"
+                className="rounded-full border border-zinc-700/70 px-2 py-0.5 text-[11px] text-zinc-300 transition hover:border-sky-500/50 hover:bg-sky-500/10 hover:text-sky-300"
               >
                 {s.name}
                 <span className="ml-1 text-zinc-500">·</span>

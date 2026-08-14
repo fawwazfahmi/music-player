@@ -65,7 +65,7 @@ export function DownloadIndicator() {
                 !
               </div>
             ) : (
-              <svg viewBox="0 0 36 36" className="h-full w-full animate-spin text-emerald-500">
+              <svg viewBox="0 0 36 36" className="h-full w-full animate-spin text-sky-500">
                 <circle
                   cx="18"
                   cy="18"
@@ -83,7 +83,7 @@ export function DownloadIndicator() {
             <div
               className={
                 "truncate text-[11px] font-semibold uppercase tracking-wider " +
-                (failed ? "text-red-400" : "text-emerald-400")
+                (failed ? "text-red-400" : "text-sky-400")
               }
             >
               {failed ? "Download failed" : "Downloading"}
@@ -100,7 +100,7 @@ export function DownloadIndicator() {
         {!failed && (
           <div className="h-1 w-full bg-zinc-800">
             <div
-              className="h-full bg-emerald-500 transition-[width] duration-300 ease-out"
+              className="h-full bg-sky-500 transition-[width] duration-300 ease-out"
               style={{ width: `${pct}%` }}
             />
           </div>

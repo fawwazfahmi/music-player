@@ -84,7 +84,7 @@ function YouTubeCookiesSection() {
 
   const badge =
     status === "connected"
-      ? { text: "Connected", cls: "bg-emerald-500/15 text-emerald-300" }
+      ? { text: "Connected", cls: "bg-sky-500/15 text-sky-300" }
       : status === "stale"
         ? { text: "Expired — reconnect", cls: "bg-amber-500/15 text-amber-300" }
         : { text: "Not connected", cls: "bg-zinc-800 text-zinc-400" };

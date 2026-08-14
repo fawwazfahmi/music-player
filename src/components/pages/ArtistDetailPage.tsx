@@ -67,7 +67,7 @@ export function ArtistDetailPage({ artistId }: Props) {
               type="button"
               onClick={() => queue.length > 0 && play(0)}
               disabled={queue.length === 0}
-              className="flex items-center gap-2 rounded-full bg-emerald-500 px-5 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400 disabled:opacity-40"
+              className="flex items-center gap-2 rounded-full bg-sky-500 px-5 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-sky-400 disabled:opacity-40"
             >
               <PlayIcon size={16} /> Play
             </button>

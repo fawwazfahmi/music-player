@@ -132,7 +132,7 @@ export function YtPlaylistPickerPage({ url }: Props) {
   return (
     <div className="flex h-full flex-col">
       <div className="border-b border-zinc-800/50 px-6 py-5">
-        <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-emerald-400">
+        <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-wider text-sky-400">
           <PlaylistIcon size={14} />
           {isMix ? "YouTube Mix" : "YouTube Playlist"}
         </div>
@@ -185,7 +185,7 @@ export function YtPlaylistPickerPage({ url }: Props) {
                 type="checkbox"
                 checked={checked.has(i)}
                 onChange={() => toggle(i)}
-                className="h-4 w-4 shrink-0 accent-emerald-500"
+                className="h-4 w-4 shrink-0 accent-sky-500"
               />
               {t.thumbnail ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -212,7 +212,7 @@ export function YtPlaylistPickerPage({ url }: Props) {
             type="button"
             disabled={submitting || selected.length === 0}
             onClick={() => void onDownload()}
-            className="flex items-center gap-2 rounded-full bg-emerald-500 px-5 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex items-center gap-2 rounded-full bg-sky-500 px-5 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <DownloadIcon size={16} />
             {submitting

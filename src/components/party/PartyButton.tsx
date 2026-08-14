@@ -65,7 +65,7 @@ export function PartyButton() {
           "flex w-full items-center justify-center gap-2 rounded-full px-3 py-2 text-xs font-semibold transition disabled:opacity-50 " +
           (active
             ? "bg-red-500/15 text-red-300 hover:bg-red-500/25"
-            : "bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25")
+            : "bg-sky-500/15 text-sky-300 hover:bg-sky-500/25")
         }
       >
         <span>{active ? "End listening party" : "Start listening party"}</span>

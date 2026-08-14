@@ -153,7 +153,7 @@ export function CoverPickerDialog({
                   className={
                     "group overflow-hidden rounded-lg border text-left transition disabled:opacity-50 " +
                     (c.isCurrent
-                      ? "border-emerald-500/60"
+                      ? "border-sky-500/60"
                       : "border-zinc-800 hover:border-zinc-600")
                   }
                 >
@@ -179,7 +179,7 @@ export function CoverPickerDialog({
                       <div className="truncate text-[10px] text-amber-500/70">{c.note}</div>
                     )}
                     {c.isCurrent && (
-                      <div className="text-[10px] text-emerald-400">In use</div>
+                      <div className="text-[10px] text-sky-400">In use</div>
                     )}
                   </div>
                 </button>

@@ -237,7 +237,7 @@ export function AppShell() {
           {sidebarOpen ? <CloseIcon size={20} /> : <MenuIcon size={20} />}
         </button>
         <h1 className="text-sm font-bold tracking-tight">
-          Music<span className="text-emerald-500">.</span>
+          Music<span className="text-sky-500">.</span>
         </h1>
         <button
           type="button"

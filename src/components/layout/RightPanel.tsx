@@ -89,7 +89,7 @@ function TabButton({
       className={
         "flex flex-1 items-center justify-center gap-1.5 border-b-2 px-3 py-2 font-semibold transition " +
         (active
-          ? "border-emerald-500 text-zinc-100"
+          ? "border-sky-500 text-zinc-100"
           : "border-transparent text-zinc-500 hover:text-zinc-300")
       }
     >
@@ -113,7 +113,7 @@ function PerformanceCover({
       ) : (
         <div className="h-full w-full bg-gradient-to-br from-zinc-800 to-zinc-950" />
       )}
-      <div className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-emerald-500/90 px-2 py-0.5 text-[10px] font-semibold text-zinc-950">
+      <div className="absolute right-2 top-2 flex items-center gap-1 rounded-full bg-sky-500/90 px-2 py-0.5 text-[10px] font-semibold text-zinc-950">
         <BoltIcon size={10} />
         Perf
       </div>

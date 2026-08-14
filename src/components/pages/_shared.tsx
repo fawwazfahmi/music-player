@@ -39,7 +39,7 @@ export function SongRow({ track, index, onPlay, onDeleted, showAlbum = true }: S
       }}
       className={
         "group grid cursor-pointer grid-cols-[36px_36px_minmax(0,1fr)_minmax(0,1fr)_48px_32px] items-center gap-3 rounded-md px-3 py-2 transition hover:bg-zinc-800/50 " +
-        (active ? "bg-zinc-800/40 text-emerald-400" : "")
+        (active ? "bg-zinc-800/40 text-sky-400" : "")
       }
     >
       <div className="text-right text-xs text-zinc-500 tabular-nums">
@@ -128,7 +128,7 @@ export function PageHeader({
 export function PageLoading({ message = "Loading…" }: { message?: string } = {}) {
   return (
     <div className="flex items-center justify-center gap-2 py-16 text-sm text-zinc-500">
-      <span className="inline-block h-3 w-3 animate-pulse rounded-full bg-emerald-500/70" />
+      <span className="inline-block h-3 w-3 animate-pulse rounded-full bg-sky-500/70" />
       <span>{message}</span>
     </div>
   );

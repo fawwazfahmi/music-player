@@ -152,7 +152,7 @@ export function DownloadsPage() {
                 <div className="mt-2 h-1 overflow-hidden rounded-full bg-zinc-800">
                   <div
                     className={
-                      "h-full rounded-full bg-emerald-500 transition-all " +
+                      "h-full rounded-full bg-sky-500 transition-all " +
                       (r.progressPct === null ? "animate-pulse" : "")
                     }
                     style={{ width: `${r.progressPct ?? 8}%` }}

@@ -85,8 +85,8 @@ export function SearchPage() {
 
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
         {playlistUrl && (
-          <div className="mb-4 flex flex-col gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-4">
-            <div className="flex items-center gap-2 text-sm text-emerald-200">
+          <div className="mb-4 flex flex-col gap-2 rounded-xl border border-sky-500/40 bg-sky-500/10 p-4">
+            <div className="flex items-center gap-2 text-sm text-sky-200">
               <PlaylistIcon size={16} />
               <span>YouTube playlist / mix detected</span>
             </div>
@@ -95,7 +95,7 @@ export function SearchPage() {
               <button
                 type="button"
                 onClick={() => push({ name: "ytPlaylistPicker", url: playlistUrl })}
-                className="rounded-full bg-emerald-500 px-4 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-emerald-400"
+                className="rounded-full bg-sky-500 px-4 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-sky-400"
               >
                 Review songs
               </button>

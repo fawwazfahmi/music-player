@@ -26,10 +26,10 @@ export function PartyBanner() {
     if (!remote?.active || remote.startedBy !== "ainul") return null;
     const others = remote.followers.filter((f) => f !== "ainul");
     return (
-      <div className="flex items-center justify-between gap-3 border-b border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-sm">
+      <div className="flex items-center justify-between gap-3 border-b border-sky-500/40 bg-sky-500/10 px-4 py-2 text-sm">
         <div className="flex items-center gap-2">
           <span
-            className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400"
+            className="inline-block h-2 w-2 animate-pulse rounded-full bg-sky-400"
             aria-hidden
           />
           <span className="text-zinc-100">
@@ -57,10 +57,10 @@ export function PartyBanner() {
 
   if (!following && remote?.active) {
     return (
-      <div className="flex items-center justify-between gap-3 border-b border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-sm">
+      <div className="flex items-center justify-between gap-3 border-b border-sky-500/40 bg-sky-500/10 px-4 py-2 text-sm">
         <div className="flex items-center gap-2">
           <span
-            className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400"
+            className="inline-block h-2 w-2 animate-pulse rounded-full bg-sky-400"
             aria-hidden
           />
           <span className="text-zinc-100">
@@ -71,7 +71,7 @@ export function PartyBanner() {
         <button
           type="button"
           onClick={() => setFollowing(true)}
-          className="rounded-full bg-emerald-500 px-3 py-1 text-xs font-semibold text-zinc-950 transition hover:bg-emerald-400"
+          className="rounded-full bg-sky-500 px-3 py-1 text-xs font-semibold text-zinc-950 transition hover:bg-sky-400"
         >
           Join
         </button>
@@ -80,10 +80,10 @@ export function PartyBanner() {
   }
 
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-emerald-500/40 bg-emerald-500/10 px-4 py-2 text-sm">
+    <div className="flex items-center justify-between gap-3 border-b border-sky-500/40 bg-sky-500/10 px-4 py-2 text-sm">
       <div className="flex items-center gap-2">
         <span
-          className="inline-block h-2 w-2 animate-pulse rounded-full bg-emerald-400"
+          className="inline-block h-2 w-2 animate-pulse rounded-full bg-sky-400"
           aria-hidden
         />
         <span className="text-zinc-100">
@@ -94,7 +94,7 @@ export function PartyBanner() {
       <button
         type="button"
         onClick={() => setFollowing(false)}
-        className="rounded-full border border-emerald-500/50 px-3 py-1 text-xs font-semibold text-emerald-200 transition hover:bg-emerald-500/20"
+        className="rounded-full border border-sky-500/50 px-3 py-1 text-xs font-semibold text-sky-200 transition hover:bg-sky-500/20"
       >
         Leave party
       </button>

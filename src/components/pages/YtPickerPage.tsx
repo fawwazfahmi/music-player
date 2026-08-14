@@ -144,9 +144,9 @@ export function YtPickerPage({ query }: Props) {
                 <div className="truncate text-xs text-zinc-500">{r.uploader}</div>
               </div>
               <div className="text-xs text-zinc-500 tabular-nums">{formatDuration(r.duration)}</div>
-              <div className="text-zinc-500 group-hover:text-emerald-400">
+              <div className="text-zinc-500 group-hover:text-sky-400">
                 {isPicking ? (
-                  <span className="text-[10px] uppercase tracking-wider text-emerald-400">
+                  <span className="text-[10px] uppercase tracking-wider text-sky-400">
                     Queueing…
                   </span>
                 ) : (

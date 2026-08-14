@@ -154,7 +154,7 @@ function QueueRow(props: RowProps) {
       }}
       className={
         "group flex cursor-pointer items-center gap-2 rounded-md px-1.5 py-1.5 transition hover:bg-zinc-800/60 " +
-        (active ? "bg-zinc-800/40 text-emerald-400 " : "") +
+        (active ? "bg-zinc-800/40 text-sky-400 " : "") +
         (isDragging ? "z-10 bg-zinc-800/90 shadow-lg ring-1 ring-zinc-700" : "")
       }
     >

@@ -74,7 +74,7 @@ export function NotesPage({ trackId }: Props) {
             onChange={(e) => setDraft(e.target.value)}
             placeholder="Write a memory…"
             rows={3}
-            className="w-full resize-none rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3 text-sm text-zinc-100 outline-none focus:border-emerald-500"
+            className="w-full resize-none rounded-lg border border-zinc-800 bg-zinc-900/50 px-4 py-3 text-sm text-zinc-100 outline-none focus:border-sky-500"
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
@@ -87,7 +87,7 @@ export function NotesPage({ trackId }: Props) {
             <button
               type="submit"
               disabled={!draft.trim() || busy}
-              className="rounded-full bg-emerald-500 px-4 py-1 font-semibold text-zinc-950 transition hover:bg-emerald-400 disabled:opacity-40"
+              className="rounded-full bg-sky-500 px-4 py-1 font-semibold text-zinc-950 transition hover:bg-sky-400 disabled:opacity-40"
             >
               {busy ? "…" : "Save"}
             </button>

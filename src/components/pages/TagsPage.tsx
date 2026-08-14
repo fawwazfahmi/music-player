@@ -37,10 +37,10 @@ export function TagsPage() {
                 key={t.id}
                 type="button"
                 onClick={() => push({ name: "tagDetail", tagId: t.id })}
-                className="group flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/50 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:border-emerald-500/40 hover:bg-emerald-500/10 hover:text-emerald-300"
+                className="group flex items-center gap-2 rounded-full border border-zinc-800 bg-zinc-900/50 px-4 py-2 text-sm font-medium text-zinc-200 transition hover:border-sky-500/40 hover:bg-sky-500/10 hover:text-sky-300"
               >
                 <span>{t.name}</span>
-                <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] tabular-nums text-zinc-400 group-hover:bg-emerald-500/20 group-hover:text-emerald-300">
+                <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] tabular-nums text-zinc-400 group-hover:bg-sky-500/20 group-hover:text-sky-300">
                   {t.trackCount}
                 </span>
               </button>

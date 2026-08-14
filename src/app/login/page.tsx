@@ -39,20 +39,26 @@ export default function LoginPage() {
         className="pointer-events-none absolute inset-0 opacity-60"
         style={{
           background:
-            "radial-gradient(800px circle at 20% 20%, rgba(16,185,129,0.18), transparent 60%), radial-gradient(700px circle at 85% 80%, rgba(99,102,241,0.14), transparent 55%)",
+            "radial-gradient(800px circle at 20% 20%, rgba(14,165,233,0.18), transparent 60%), radial-gradient(700px circle at 85% 80%, rgba(99,102,241,0.14), transparent 55%)",
         }}
       />
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-emerald-500/30 to-transparent"
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-px bg-gradient-to-r from-transparent via-sky-500/30 to-transparent"
       />
 
       <div className="relative w-full max-w-sm">
         <div className="mb-8 text-center">
           <h1 className="text-4xl font-extrabold tracking-tight">
-            Music<span className="text-emerald-500">.</span>
+            Kyowave<span className="text-sky-500">.</span>
           </h1>
-          <p className="mt-2 text-sm text-zinc-500">A private universe of your favourite songs</p>
+          {/* The one place this line lives. Seen rarely, so it stays a moment
+              rather than wallpaper. */}
+          <p className="mt-3 text-sm leading-relaxed text-zinc-500">
+            Everyone has their own wavelength.
+            <br />
+            <span className="text-zinc-400">This one is yours.</span>
+          </p>
         </div>
 
         <form
@@ -71,7 +77,7 @@ export default function LoginPage() {
                 className={
                   "rounded-lg border px-4 py-2 text-sm font-semibold capitalize transition " +
                   (name === n
-                    ? "border-emerald-500 bg-emerald-500/15 text-emerald-200"
+                    ? "border-sky-500 bg-sky-500/15 text-sky-200"
                     : "border-zinc-800 bg-zinc-950/60 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200")
                 }
               >
@@ -91,7 +97,7 @@ export default function LoginPage() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
-            className="mt-2 w-full rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+            className="mt-2 w-full rounded-lg border border-zinc-800 bg-zinc-950/60 px-3 py-2.5 text-sm text-zinc-100 placeholder:text-zinc-600 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20"
           />
 
           {error && (
@@ -103,7 +109,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={pending || !password}
-            className="mt-5 w-full rounded-full bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
+            className="mt-5 w-full rounded-full bg-sky-500 px-4 py-2.5 text-sm font-semibold text-zinc-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {pending ? "Signing in…" : "Enter"}
           </button>
