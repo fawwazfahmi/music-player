@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  launchd job: nightly Music Universe backup.
+  launchd job: nightly Kyowave backup.
 
   Runs scripts/backup.sh once per day at 03:00 local time. The script
   dumps the database (custom-format) and tars the music library into
-  ~/Backups/MusicUniverse/<timestamp>/, pruning anything older than 30
+  ~/Backups/Kyowave/<timestamp>/, pruning anything older than 30
   days.
 
   Install:
-    cp deploy/launchd/com.musicuniverse.backup.plist ~/Library/LaunchAgents/
-    launchctl load -w ~/Library/LaunchAgents/com.musicuniverse.backup.plist
+    cp deploy/launchd/com.kyowave.backup.plist ~/Library/LaunchAgents/
+    launchctl load -w ~/Library/LaunchAgents/com.kyowave.backup.plist
 
   Run on demand (without waiting for 03:00):
-    launchctl start com.musicuniverse.backup
-    tail -f ~/Library/Logs/MusicUniverse/backup.out.log
+    launchctl start com.kyowave.backup
+    tail -f ~/Library/Logs/Kyowave/backup.out.log
 
   RunAtLoad is false on purpose — we only want the scheduled run, not a
   backup every time the Mac boots.
@@ -22,7 +22,7 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.musicuniverse.backup</string>
+    <string>com.kyowave.backup</string>
 
     <key>ProgramArguments</key>
     <array>
@@ -40,7 +40,7 @@
              Drive so the only copy isn't on the same SSD as the source.
              A dead disk would otherwise take both at once. -->
         <key>OFFSITE_DIR</key>
-        <string>/Users/fwzfhmy/Library/Mobile Documents/com~apple~CloudDocs/MusicUniverse-Backups</string>
+        <string>/Users/fwzfhmy/Library/Mobile Documents/com~apple~CloudDocs/Kyowave-Backups</string>
     </dict>
 
     <key>RunAtLoad</key>
@@ -55,9 +55,9 @@
     </dict>
 
     <key>StandardOutPath</key>
-    <string>/Users/fwzfhmy/Library/Logs/MusicUniverse/backup.out.log</string>
+    <string>/Users/fwzfhmy/Library/Logs/Kyowave/backup.out.log</string>
 
     <key>StandardErrorPath</key>
-    <string>/Users/fwzfhmy/Library/Logs/MusicUniverse/backup.err.log</string>
+    <string>/Users/fwzfhmy/Library/Logs/Kyowave/backup.err.log</string>
 </dict>
 </plist>

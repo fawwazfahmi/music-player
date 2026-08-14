@@ -61,6 +61,10 @@ export const PATCH_NOTES: Release[] = [
       },
       {
         kind: "fixed",
+        text: "Songs play in Performance Mode. Playback was waiting for a video that the mode had already removed, so nothing ever started.",
+      },
+      {
+        kind: "fixed",
         text: "Mixes no longer fill the queue with unrelated songs. They're bounded and de-duplicated instead of running off into whatever YouTube felt like.",
       },
       { kind: "fixed", text: "The lightning bolt icon sits centred now, in the player bar and the dialog." },
@@ -99,4 +103,29 @@ export function markSeen(version: string = CURRENT_VERSION): void {
   } catch {
     /* storage disabled — they'll just be shown the notes again */
   }
+}
+
+/**
+ * Bar heights (0..1) for a release's waveform strip.
+ *
+ * Deterministic from the version string, so each release gets its own wave and
+ * it never changes between renders. Not random: a wave that reshuffled on every
+ * open would read as noise rather than as a property of the release.
+ */
+export function waveformBars(seed: string, count = 48): number[] {
+  let h = 2166136261;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  const bars: number[] = [];
+  for (let i = 0; i < count; i++) {
+    h ^= h << 13;
+    h ^= h >>> 17;
+    h ^= h << 5;
+    // Keep it in a readable band — bars at 0 look like gaps, bars at 1 look
+    // like a solid block.
+    bars.push(0.25 + (Math.abs(h) % 1000) / 1000 * 0.75);
+  }
+  return bars;
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CURRENT_VERSION, PATCH_NOTES, unseenReleases } from "@/lib/patch-notes";
+import { CURRENT_VERSION, PATCH_NOTES, unseenReleases, waveformBars } from "@/lib/patch-notes";
 
 describe("patch notes", () => {
   it("keeps releases newest-first, so CURRENT_VERSION is the newest", () => {
@@ -34,5 +34,21 @@ describe("patch notes", () => {
       expect(r.title.trim()).not.toBe("");
       expect(r.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     }
+  });
+
+  it("gives each release a stable waveform", () => {
+    // Same release, same wave — a strip that reshuffled on every open would
+    // read as noise instead of as a property of the release.
+    expect(waveformBars("2026.08.14")).toEqual(waveformBars("2026.08.14"));
+    expect(waveformBars("2026.08.14")).not.toEqual(waveformBars("2026.09.01"));
+  });
+
+  it("keeps bars inside a readable band", () => {
+    // 0 looks like a gap, 1 looks like a solid block; neither reads as a wave.
+    for (const v of waveformBars("2026.08.14")) {
+      expect(v).toBeGreaterThanOrEqual(0.25);
+      expect(v).toBeLessThanOrEqual(1);
+    }
+    expect(waveformBars("x", 12)).toHaveLength(12);
   });
 });

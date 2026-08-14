@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  launchd job: Cloudflare Tunnel for Music Universe.
+  launchd job: Cloudflare Tunnel for Kyowave.
 
   Prerequisites:
     1. cloudflared installed (brew install cloudflared)
@@ -10,12 +10,12 @@
     5. ~/.cloudflared/config.yml populated from deploy/cloudflared/config.example.yml
 
   Install:
-    cp deploy/launchd/com.musicuniverse.tunnel.plist ~/Library/LaunchAgents/
-    launchctl load -w ~/Library/LaunchAgents/com.musicuniverse.tunnel.plist
+    cp deploy/launchd/com.kyowave.tunnel.plist ~/Library/LaunchAgents/
+    launchctl load -w ~/Library/LaunchAgents/com.kyowave.tunnel.plist
 
   Logs:
-    tail -f ~/Library/Logs/MusicUniverse/tunnel.out.log
-    tail -f ~/Library/Logs/MusicUniverse/tunnel.err.log
+    tail -f ~/Library/Logs/Kyowave/tunnel.out.log
+    tail -f ~/Library/Logs/Kyowave/tunnel.err.log
 
   Note: cloudflared reads its config from ~/.cloudflared/config.yml by default,
   which already names the tunnel — so `cloudflared tunnel run` with no extra
@@ -25,7 +25,7 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.musicuniverse.tunnel</string>
+    <string>com.kyowave.tunnel</string>
 
     <key>ProgramArguments</key>
     <array>
@@ -54,9 +54,9 @@
     <integer>10</integer>
 
     <key>StandardOutPath</key>
-    <string>/Users/fwzfhmy/Library/Logs/MusicUniverse/tunnel.out.log</string>
+    <string>/Users/fwzfhmy/Library/Logs/Kyowave/tunnel.out.log</string>
 
     <key>StandardErrorPath</key>
-    <string>/Users/fwzfhmy/Library/Logs/MusicUniverse/tunnel.err.log</string>
+    <string>/Users/fwzfhmy/Library/Logs/Kyowave/tunnel.err.log</string>
 </dict>
 </plist>

@@ -2,26 +2,36 @@
 
 import { useEffect } from "react";
 import { createPortal } from "react-dom";
-import { BoltIcon } from "@/components/icons";
-import { PATCH_NOTES, markSeen, type Change, type Release } from "@/lib/patch-notes";
-
-const KIND_STYLE: Record<Change["kind"], { label: string; cls: string }> = {
-  added: { label: "New", cls: "bg-emerald-500/15 text-emerald-300" },
-  fixed: { label: "Fixed", cls: "bg-sky-500/15 text-sky-300" },
-  changed: { label: "Changed", cls: "bg-amber-500/15 text-amber-300" },
-};
+import {
+  PATCH_NOTES,
+  markSeen,
+  waveformBars,
+  type Change,
+  type Release,
+} from "@/lib/patch-notes";
 
 /**
  * What's new.
  *
- * `releases` is what to show: the unseen ones on an automatic open, or the
- * full history when opened from Settings. Dismissing marks the current
- * version seen either way, so it won't reappear on the next load.
+ * Presented as a release with a tracklist, because that is what it is: an
+ * ordered set of items shipped together. The numbering is real information —
+ * rows are ordered by significance, lead single first — rather than decoration.
  *
- * Portalled to document.body for the same reason as the Performance Mode
- * dialog — PlayerBar's backdrop-blur creates a containing block, and a fixed
- * overlay rendered under it centres on the player bar instead of the page.
+ * Visual identity is deliberately NOT the Performance Mode dialog's. Emerald
+ * means playback in this app and the bolt means Performance Mode; wearing
+ * either made this dialog read as a mode switch. It gets violet, used nowhere
+ * else, and a waveform strip keyed to the version — the app is called Kyowave.
+ *
+ * Portalled to document.body: PlayerBar's backdrop-blur creates a containing
+ * block, so a fixed overlay rendered beneath it centres on the player bar.
  */
+
+const KIND_LABEL: Record<Change["kind"], { text: string; cls: string }> = {
+  added: { text: "new", cls: "text-violet-300" },
+  fixed: { text: "fixed", cls: "text-sky-300/80" },
+  changed: { text: "changed", cls: "text-zinc-400" },
+};
+
 export function PatchNotesDialog({
   open,
   releases = PATCH_NOTES,
@@ -49,61 +59,37 @@ export function PatchNotesDialog({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[85] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[85] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
       onClick={dismiss}
       role="dialog"
       aria-modal="true"
-      aria-label="What's new"
+      aria-label="What's new in Kyowave"
     >
       <div
-        className="flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border border-emerald-500/40 bg-zinc-900 shadow-[0_0_0_1px_rgba(16,185,129,0.15),0_0_60px_-10px_rgba(16,185,129,0.55),0_24px_60px_-20px_rgba(0,0,0,0.9)]"
+        className="flex max-h-[82vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-[0_24px_70px_-20px_rgba(0,0,0,0.95)]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-2.5 border-b border-zinc-800 px-5 py-3.5">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-300">
-            <BoltIcon size={15} />
-          </span>
-          <h2 className="text-sm font-bold text-zinc-100">What&apos;s new</h2>
-        </div>
+        {releases.length > 0 && <Waveform seed={releases[0]!.version} />}
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+        <div className="min-h-0 flex-1 overflow-y-auto">
           {releases.length === 0 ? (
-            <p className="py-6 text-center text-sm text-zinc-500">
+            <p className="px-6 py-12 text-center text-sm text-zinc-500">
               You&apos;re up to date.
             </p>
           ) : (
-            releases.map((r) => (
-              <section key={r.version} className="mb-5 last:mb-0">
-                <div className="mb-2 flex items-baseline gap-2">
-                  <h3 className="text-sm font-semibold text-zinc-100">{r.title}</h3>
-                  <span className="text-[11px] text-zinc-600">{r.date}</span>
-                </div>
-                <ul className="space-y-2">
-                  {r.changes.map((c, i) => {
-                    const style = KIND_STYLE[c.kind];
-                    return (
-                      <li key={i} className="flex gap-2.5">
-                        <span
-                          className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold ${style.cls}`}
-                        >
-                          {style.label}
-                        </span>
-                        <span className="text-xs leading-snug text-zinc-300">{c.text}</span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </section>
-            ))
+            releases.map((r) => <ReleaseBlock key={r.version} release={r} />)
           )}
         </div>
 
-        <div className="flex justify-end border-t border-zinc-800 px-5 py-3">
+        <div className="flex items-center justify-between border-t border-zinc-800 px-6 py-3.5">
+          <span className="font-mono text-[10px] uppercase tracking-widest text-zinc-600">
+            Kyowave
+          </span>
           <button
             type="button"
             onClick={dismiss}
             autoFocus
-            className="rounded-lg bg-emerald-500 px-3.5 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-emerald-400"
+            className="rounded-lg bg-violet-500 px-4 py-1.5 text-xs font-semibold text-zinc-950 transition hover:bg-violet-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-400"
           >
             Got it
           </button>
@@ -111,5 +97,64 @@ export function PatchNotesDialog({
       </div>
     </div>,
     document.body,
+  );
+}
+
+/**
+ * The signature element: a strip of bars whose heights come from the version
+ * string, so a release always looks like itself.
+ */
+function Waveform({ seed }: { seed: string }) {
+  const bars = waveformBars(seed);
+  return (
+    <div
+      aria-hidden
+      className="flex h-10 shrink-0 items-end gap-[3px] border-b border-zinc-800 bg-zinc-950/60 px-6 pb-2 pt-3"
+    >
+      {bars.map((v, i) => (
+        <span
+          key={i}
+          className="flex-1 rounded-[1px] bg-gradient-to-t from-violet-500/30 to-violet-300/80"
+          style={{ height: `${Math.round(v * 100)}%` }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function ReleaseBlock({ release }: { release: Release }) {
+  return (
+    <section className="border-b border-zinc-800/60 px-6 py-5 last:border-b-0">
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="font-mono text-[10px] uppercase tracking-widest text-violet-300/70">
+          Release {release.version}
+        </span>
+        <span className="font-mono text-[10px] text-zinc-600">{release.date}</span>
+      </div>
+      <h3 className="mt-1 text-lg font-semibold tracking-tight text-zinc-100">
+        {release.title}
+      </h3>
+
+      <ol className="mt-4 space-y-2.5">
+        {release.changes.map((c, i) => {
+          const kind = KIND_LABEL[c.kind];
+          return (
+            <li
+              key={i}
+              style={{ animationDelay: `${Math.min(i * 40, 400)}ms` }}
+              className="grid grid-cols-[1.5rem_4rem_minmax(0,1fr)] items-baseline gap-3 animate-in fade-in slide-in-from-bottom-1 fill-mode-backwards duration-300 motion-reduce:animate-none"
+            >
+              <span className="font-mono text-[11px] tabular-nums text-zinc-600">
+                {String(i + 1).padStart(2, "0")}
+              </span>
+              <span className={`font-mono text-[10px] uppercase tracking-wider ${kind.cls}`}>
+                {kind.text}
+              </span>
+              <span className="text-[13px] leading-snug text-zinc-300">{c.text}</span>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
   );
 }

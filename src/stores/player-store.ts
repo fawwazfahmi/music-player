@@ -53,8 +53,15 @@ interface PlayerState {
   repeat: RepeatMode;
   volume: number;
   position: number;
-  // True while we're waiting for the YT iframe to load before starting playback.
-  // Transient; not persisted.
+  // True while we're waiting for the YT iframe to load before starting
+  // playback. Transient; not persisted.
+  //
+  // INVARIANT: only ever true when a video stage exists to clear it.
+  // YtVideoPanel is the sole thing that sets it false, and Performance Mode
+  // unmounts the stage entirely — so setting this while Performance Mode is
+  // on deadlocks playback permanently: the gate opens for nobody and no audio
+  // ever starts. Every assignment below is gated on !performanceMode, and
+  // switching the mode on clears any gate already in flight.
   videoLoading: boolean;
   // Increments whenever playback is intentionally restarted or moved to a new
   // queue item, even if the YouTube video id is the same.
@@ -130,7 +137,7 @@ export const usePlayerStore = create<PlayerState>()(
           queue,
           currentIndex: queue.length ? Math.min(startIndex, queue.length - 1) : -1,
           isPlaying: queue.length > 0,
-          videoLoading: hasVideo,
+          videoLoading: hasVideo && !get().performanceMode,
           playbackKey: get().playbackKey + 1,
           position: 0,
         });
@@ -143,7 +150,7 @@ export const usePlayerStore = create<PlayerState>()(
               queue: [track],
               currentIndex: 0,
               isPlaying: true,
-              videoLoading: !!track.ytVideoId,
+              videoLoading: !!track.ytVideoId && !get().performanceMode,
               playbackKey: s.playbackKey + 1,
               position: 0,
             };
@@ -159,7 +166,7 @@ export const usePlayerStore = create<PlayerState>()(
               queue: tracks,
               currentIndex: 0,
               isPlaying: true,
-              videoLoading: !!first.ytVideoId,
+              videoLoading: !!first.ytVideoId && !get().performanceMode,
               playbackKey: s.playbackKey + 1,
               position: 0,
             };
@@ -173,7 +180,7 @@ export const usePlayerStore = create<PlayerState>()(
               queue: [track],
               currentIndex: 0,
               isPlaying: true,
-              videoLoading: !!track.ytVideoId,
+              videoLoading: !!track.ytVideoId && !get().performanceMode,
               playbackKey: s.playbackKey + 1,
               position: 0,
             };
@@ -216,7 +223,7 @@ export const usePlayerStore = create<PlayerState>()(
             currentIndex: index,
             position: 0,
             isPlaying: true,
-            videoLoading: !!next?.ytVideoId,
+            videoLoading: !!next?.ytVideoId && !get().performanceMode,
             playbackKey: s.playbackKey + 1,
           };
         }),
@@ -236,7 +243,7 @@ export const usePlayerStore = create<PlayerState>()(
               queue,
               currentIndex: newIdx,
               position: 0,
-              videoLoading: !!next?.ytVideoId,
+              videoLoading: !!next?.ytVideoId && !get().performanceMode,
               playbackKey: s.playbackKey + 1,
             };
           }
@@ -282,7 +289,7 @@ export const usePlayerStore = create<PlayerState>()(
             queue,
             currentIndex: newCurrent,
             position: 0,
-            videoLoading: !!next?.ytVideoId,
+            videoLoading: !!next?.ytVideoId && !get().performanceMode,
             playbackKey: s.playbackKey + 1,
           });
         } else {
@@ -313,7 +320,7 @@ export const usePlayerStore = create<PlayerState>()(
           return {
             currentIndex: nextIdx,
             position: 0,
-            videoLoading: !!next?.ytVideoId,
+            videoLoading: !!next?.ytVideoId && !get().performanceMode,
             playbackKey: s.playbackKey + 1,
           };
         }),
@@ -326,7 +333,7 @@ export const usePlayerStore = create<PlayerState>()(
             return {
               currentIndex: s.currentIndex - 1,
               position: 0,
-              videoLoading: !!next?.ytVideoId,
+              videoLoading: !!next?.ytVideoId && !get().performanceMode,
               playbackKey: s.playbackKey + 1,
             };
           }
@@ -335,7 +342,7 @@ export const usePlayerStore = create<PlayerState>()(
             return {
               currentIndex: s.queue.length - 1,
               position: 0,
-              videoLoading: !!next?.ytVideoId,
+              videoLoading: !!next?.ytVideoId && !get().performanceMode,
               playbackKey: s.playbackKey + 1,
             };
           }
@@ -350,8 +357,16 @@ export const usePlayerStore = create<PlayerState>()(
       setVolume: (v) => set({ volume: Math.max(0, Math.min(1, v)) }),
       setPosition: (p) => set({ position: Math.max(0, p) }),
       setVideoLoading: (v) => set({ videoLoading: v }),
-      setPerformanceMode: (v) => set({ performanceMode: v }),
-      togglePerformanceMode: () => set((s) => ({ performanceMode: !s.performanceMode })),
+      setPerformanceMode: (v) =>
+        // Clearing videoLoading matters: if a track was mid-gate when the mode
+        // flipped, the stage unmounts and nothing would ever open it again.
+        set(v ? { performanceMode: true, videoLoading: false } : { performanceMode: v }),
+      togglePerformanceMode: () =>
+        set((s) =>
+          s.performanceMode
+            ? { performanceMode: false }
+            : { performanceMode: true, videoLoading: false },
+        ),
     }),
     {
       // Per-device persistence: localStorage on the user's own machine.

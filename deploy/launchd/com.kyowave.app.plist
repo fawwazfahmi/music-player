@@ -1,19 +1,19 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  launchd job: Music Universe Next.js app (production).
+  launchd job: Kyowave Next.js app (production).
 
   Install:
-    cp deploy/launchd/com.musicuniverse.app.plist ~/Library/LaunchAgents/
-    launchctl load -w ~/Library/LaunchAgents/com.musicuniverse.app.plist
+    cp deploy/launchd/com.kyowave.app.plist ~/Library/LaunchAgents/
+    launchctl load -w ~/Library/LaunchAgents/com.kyowave.app.plist
 
   Start / stop / inspect:
-    launchctl start  com.musicuniverse.app
-    launchctl stop   com.musicuniverse.app
-    launchctl list | grep musicuniverse
+    launchctl start  com.kyowave.app
+    launchctl stop   com.kyowave.app
+    launchctl list | grep kyowave
 
   Logs:
-    tail -f ~/Library/Logs/MusicUniverse/app.out.log
-    tail -f ~/Library/Logs/MusicUniverse/app.err.log
+    tail -f ~/Library/Logs/Kyowave/app.out.log
+    tail -f ~/Library/Logs/Kyowave/app.err.log
 
   Run `pnpm build` once before loading (and after every code change). The
   job runs `next start` which expects a prebuilt .next directory.
@@ -22,7 +22,7 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.musicuniverse.app</string>
+    <string>com.kyowave.app</string>
 
     <key>ProgramArguments</key>
     <array>
@@ -39,6 +39,11 @@
         <string>production</string>
         <key>PATH</key>
         <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <!-- Run on 3100 (not the default 3000) so it never collides with the
+             youmi-schedule dev server that uses port 3000. next start honors
+             the PORT env var. The cloudflared tunnel points at 127.0.0.1:3100. -->
+        <key>PORT</key>
+        <string>3100</string>
     </dict>
 
     <key>RunAtLoad</key>
@@ -57,9 +62,9 @@
     <integer>10</integer>
 
     <key>StandardOutPath</key>
-    <string>/Users/fwzfhmy/Library/Logs/MusicUniverse/app.out.log</string>
+    <string>/Users/fwzfhmy/Library/Logs/Kyowave/app.out.log</string>
 
     <key>StandardErrorPath</key>
-    <string>/Users/fwzfhmy/Library/Logs/MusicUniverse/app.err.log</string>
+    <string>/Users/fwzfhmy/Library/Logs/Kyowave/app.err.log</string>
 </dict>
 </plist>
