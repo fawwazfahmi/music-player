@@ -11,33 +11,36 @@ const FAKE_PROGRESS_DURATION_MS = 60_000; // typical 30-150s download — slower
 
 export function DownloadIndicator() {
   const active = useDownloadStore((s) => s.active);
-  const [pct, setPct] = useState(0);
+  // Only the animated fallback lives in state. A real reading from the poller
+  // is derived at render time, so nothing has to be assigned synchronously in
+  // an effect — and there is no window where a stale animated value paints
+  // over a real one.
+  const [fakePct, setFakePct] = useState(0);
+
+  const animating = !!active && !active.error && typeof active.progressPct !== "number";
 
   useEffect(() => {
-    if (!active) {
-      setPct(0);
-      return;
-    }
-    if (active.error) return; // freeze progress when failed
-    // If the poller has handed us a real progress reading, just show that —
-    // skip the fake animation entirely. Otherwise (the first beat before
-    // yt-dlp emits, or any stale fallback), animate up toward 95%.
-    if (typeof active.progressPct === "number") {
-      setPct(active.progressPct);
-      return;
-    }
+    if (!animating || !active) return;
+    // The first frame lands via rAF, not synchronously, so a new job's
+    // leftover value is replaced within one frame rather than persisting.
     let raf = 0;
     const t0 = active.startedAt;
     const tick = () => {
       const elapsed = Date.now() - t0;
       const linear = Math.min(1, elapsed / FAKE_PROGRESS_DURATION_MS);
       const eased = 1 - Math.pow(1 - linear, 2);
-      setPct(Math.min(95, Math.round(eased * 95)));
+      setFakePct(Math.min(95, Math.round(eased * 95)));
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [active]);
+  }, [animating, active]);
+
+  const pct = active
+    ? typeof active.progressPct === "number"
+      ? active.progressPct
+      : fakePct
+    : 0;
 
   // Auto-dismiss the error toast after a moment so the UI doesn't lock.
   useEffect(() => {

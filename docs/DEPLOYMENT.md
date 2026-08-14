@@ -121,9 +121,12 @@ Run on demand:
 Output lands in `~/Backups/Kyowave/<timestamp>/`:
 
 - `db.dump` — pg_dump custom format (restore via `pg_restore`)
-- `music.tar.gz` — gzipped tar of the music library (excludes `.cache` and `.DS_Store`)
+- `library-mirror/` — incremental rsync mirror of the music library, one copy
+  shared by every snapshot (the audio is immutable, so dated copies would be
+  the same 3 GB over and over)
 
-Backups older than 30 days auto-prune. Tweak with `RETENTION_DAYS=N`.
+Dated snapshots older than 30 days auto-prune. Tweak with `RETENTION_DAYS=N`.
+The library mirror is never pruned.
 
 ### Restore the database from a dump
 
@@ -136,10 +139,14 @@ pg_restore --clean --if-exists --no-owner \
 ### Restore the music library
 
 ```bash
-tar -xzf ~/Backups/Kyowave/<timestamp>/music.tar.gz -C ~/Music/
+rsync -a ~/Backups/Kyowave/library-mirror/ ~/Music/MusicUniverse/
 # then trigger a rescan from the Settings page, or:
 # the chokidar watcher picks up new files automatically
 ```
+
+The mirror is not per-timestamp — it is a single always-current copy at
+`~/Backups/Kyowave/library-mirror/`, outside the dated snapshot directories so
+retention cannot prune it.
 
 ---
 

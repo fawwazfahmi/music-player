@@ -22,6 +22,8 @@ function detectYtPlaylistUrl(text: string): string | null {
   }
 }
 
+const EMPTY_RESULTS: SearchResults = { tracks: [], artists: [], albums: [] };
+
 export function SearchPage() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResults>({ tracks: [], artists: [], albums: [] });
@@ -36,12 +38,11 @@ export function SearchPage() {
   }, []);
 
   useEffect(() => {
-    if (query.trim().length === 0) {
-      setResults({ tracks: [], artists: [], albums: [] });
-      return;
-    }
-    setSearching(true);
+    // No reset here — an empty box shows EMPTY_RESULTS by derivation below,
+    // so there is nothing to clear.
+    if (query.trim().length === 0) return;
     const t = setTimeout(() => {
+      setSearching(true);
       void searchLibrary(query)
         .then(setResults)
         .finally(() => setSearching(false));
@@ -64,7 +65,9 @@ export function SearchPage() {
     );
   }
 
-  const totalLocal = results.tracks.length + results.artists.length + results.albums.length;
+  // Derived rather than stored: an empty query has no results by definition.
+  const shown = query.trim().length === 0 ? EMPTY_RESULTS : results;
+  const totalLocal = shown.tracks.length + shown.artists.length + shown.albums.length;
 
   return (
     <div className="flex h-full flex-col">
@@ -125,13 +128,13 @@ export function SearchPage() {
           </div>
         ) : (
           <div className="space-y-6">
-            {results.tracks.length > 0 && (
+            {shown.tracks.length > 0 && (
               <section>
                 <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-zinc-300">
                   <MusicNoteIcon size={16} /> Songs
                 </h3>
                 <div className="space-y-1">
-                  {results.tracks.map((t) => (
+                  {shown.tracks.map((t) => (
                     <button
                       key={t.id}
                       type="button"
@@ -150,13 +153,13 @@ export function SearchPage() {
               </section>
             )}
 
-            {results.artists.length > 0 && (
+            {shown.artists.length > 0 && (
               <section>
                 <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-zinc-300">
                   <ArtistIcon size={16} /> Artists
                 </h3>
                 <div className="space-y-1">
-                  {results.artists.map((a) => (
+                  {shown.artists.map((a) => (
                     <button
                       key={a.id}
                       type="button"
@@ -173,13 +176,13 @@ export function SearchPage() {
               </section>
             )}
 
-            {results.albums.length > 0 && (
+            {shown.albums.length > 0 && (
               <section>
                 <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold text-zinc-300">
                   <AlbumIcon size={16} /> Albums
                 </h3>
                 <div className="space-y-1">
-                  {results.albums.map((a) => (
+                  {shown.albums.map((a) => (
                     <button
                       key={a.id}
                       type="button"

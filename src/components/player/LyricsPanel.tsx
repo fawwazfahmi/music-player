@@ -28,7 +28,6 @@ export function LyricsPanel() {
   const track = queue[currentIndex] ?? null;
 
   const [data, setData] = useState<GetLyricsResult | null>(null);
-  const [loading, setLoading] = useState(false);
   const [transcribing, setTranscribing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -45,12 +44,11 @@ export function LyricsPanel() {
   // auto-transcription, re-poll every 4s until it lands so the user doesn't
   // need to navigate away and back.
   useEffect(() => {
-    if (!track) {
-      setData(null);
-      return;
-    }
-    setLoading(true);
-    setError(null);
+    // No reset needed: RightPanel keys this component by track id, so a
+    // different track arrives as a fresh mount with fresh state.
+    // No error reset: the component is keyed by track, so a fresh mount
+    // already starts with a clear error.
+    if (!track) return;
     let cancelled = false;
     let pollHandle: ReturnType<typeof setTimeout> | null = null;
     const trackId = track.id;
@@ -72,7 +70,7 @@ export function LyricsPanel() {
           if (!cancelled) console.error("[mu] getLyrics failed", e);
         })
         .finally(() => {
-          if (!cancelled) setLoading(false);
+          /* loading is derived from data/error below */
         });
     }
     fetchOnce();
@@ -81,13 +79,6 @@ export function LyricsPanel() {
       cancelled = true;
       if (pollHandle !== null) clearTimeout(pollHandle);
     };
-  }, [track?.id]);
-
-  // Reset edit state on track change so we don't bleed an open editor across
-  // tracks.
-  useEffect(() => {
-    setEditingIdx(null);
-    setContextMenu(null);
   }, [track?.id]);
 
   // Context-menu dismissal — outside click + Escape.
@@ -241,6 +232,10 @@ export function LyricsPanel() {
       </div>
     );
   }
+
+  // Derived, not stored: we are loading exactly while this track has no
+  // lyrics yet and nothing has failed.
+  const loading = !!track && !error && data?.trackId !== track.id;
 
   if (loading) {
     return (

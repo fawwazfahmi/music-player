@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 
 const NAMES = ["ainul", "fawwaz"] as const;
 export type AppUserName = (typeof NAMES)[number];
@@ -13,12 +13,12 @@ function readNameCookie(): AppUserName | null {
   return (NAMES as readonly string[]).includes(v) ? (v as AppUserName) : null;
 }
 
-/** Reads the mu_name cookie set at login. Returns null until hydration so
-    server and client agree on the first paint. */
+/** Never resubscribes: the cookie is set at login and cannot change without a
+    page load. */
+const subscribe = () => () => {};
+
+/** Reads the mu_name cookie set at login. Returns null on the server so the
+    first client paint matches the markup, then the real value. */
 export function useIdentity(): AppUserName | null {
-  const [name, setName] = useState<AppUserName | null>(null);
-  useEffect(() => {
-    setName(readNameCookie());
-  }, []);
-  return name;
+  return useSyncExternalStore(subscribe, readNameCookie, () => null);
 }

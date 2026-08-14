@@ -43,10 +43,10 @@ export function StatsPage() {
   const [range, setRange] = useState<StatsRange>("30d");
 
   const [overview, setOverview] = useState<StatsOverview | null>(null);
-  const [tracks, setTracks] = useState<TopTrack[] | null>(null);
-  const [artists, setArtists] = useState<TopArtist[] | null>(null);
-  const [albums, setAlbums] = useState<TopAlbum[] | null>(null);
-  const [recent, setRecent] = useState<RecentPlay[] | null>(null);
+  const [tracks, setTracks] = useState<{ key: string; items: TopTrack[] } | null>(null);
+  const [artists, setArtists] = useState<{ key: string; items: TopArtist[] } | null>(null);
+  const [albums, setAlbums] = useState<{ key: string; items: TopAlbum[] } | null>(null);
+  const [recent, setRecent] = useState<{ key: string; items: RecentPlay[] } | null>(null);
 
   // Refetch overview + active tab data when range or tab changes
   useEffect(() => {
@@ -59,20 +59,22 @@ export function StatsPage() {
     };
   }, [range]);
 
+  const dataKey = `${tab}:${range}`;
+
   useEffect(() => {
     let cancelled = false;
+    const key = `${tab}:${range}`;
+    // No synchronous null-reset: staleness is expressed by the stored key not
+    // matching the current one, so the lists below read as loading until the
+    // fetch for *this* key lands.
     if (tab === "tracks") {
-      setTracks(null);
-      void getTopTracks(range).then((r) => !cancelled && setTracks(r));
+      void getTopTracks(range).then((r) => !cancelled && setTracks({ key, items: r }));
     } else if (tab === "artists") {
-      setArtists(null);
-      void getTopArtists(range).then((r) => !cancelled && setArtists(r));
+      void getTopArtists(range).then((r) => !cancelled && setArtists({ key, items: r }));
     } else if (tab === "albums") {
-      setAlbums(null);
-      void getTopAlbums(range).then((r) => !cancelled && setAlbums(r));
+      void getTopAlbums(range).then((r) => !cancelled && setAlbums({ key, items: r }));
     } else if (tab === "recent") {
-      setRecent(null);
-      void getRecentlyPlayed().then((r) => !cancelled && setRecent(r));
+      void getRecentlyPlayed().then((r) => !cancelled && setRecent({ key, items: r }));
     }
     return () => {
       cancelled = true;
@@ -125,10 +127,10 @@ export function StatsPage() {
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
-        {tab === "tracks" && <TopTracksList items={tracks} />}
-        {tab === "artists" && <TopArtistsList items={artists} />}
-        {tab === "albums" && <TopAlbumsList items={albums} />}
-        {tab === "recent" && <RecentList items={recent} />}
+        {tab === "tracks" && <TopTracksList items={tracks?.key === dataKey ? tracks.items : null} />}
+        {tab === "artists" && <TopArtistsList items={artists?.key === dataKey ? artists.items : null} />}
+        {tab === "albums" && <TopAlbumsList items={albums?.key === dataKey ? albums.items : null} />}
+        {tab === "recent" && <RecentList items={recent?.key === dataKey ? recent.items : null} />}
       </div>
     </div>
   );

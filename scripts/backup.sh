@@ -8,7 +8,7 @@
 # Output:
 #   ~/Backups/Kyowave/YYYY-MM-DD_HHMMSS/
 #     ├── db.dump
-#     └── music.tar.gz
+#     └── library-mirror/   (shared, not per-timestamp)
 #
 # Retention: anything older than $RETENTION_DAYS is pruned at the end.
 #
