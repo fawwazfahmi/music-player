@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { createRoot } from "react-dom/client";
+import { createRoot, type Root } from "react-dom/client";
 import { useIpodStore } from "@/stores/ipod-store";
 import { YtVideoPanel } from "./YtVideoPanel";
 
@@ -34,8 +34,13 @@ function debugLog(...args: unknown[]) {
 
 // Module-level singleton so we create exactly one container + React root for
 // the entire browser session. The YT iframe survives page transitions.
+//
+// The root is kept here, not as a local, so teardownVideoStage() can actually
+// unmount it. Without that handle the iframe outlived the component: turning
+// Performance Mode on unmounted <VideoStage /> but left the container sitting
+// on document.body at z-index 40, still covering the cover art beneath it.
 let _container: HTMLDivElement | null = null;
-let _initialized = false;
+let _root: Root | null = null;
 
 function emitSlotMoved() {
   window.dispatchEvent(new CustomEvent("music-video-slot-moved"));
@@ -68,12 +73,36 @@ function getOrCreateContainer(): HTMLDivElement {
   document.body.appendChild(div);
   _container = div;
 
-  // Render YtVideoPanel into this stable container — never reparented, never
-  // unmounted. The iframe inside is born here and dies here.
+  // Render YtVideoPanel into this stable container. Never reparented — the
+  // iframe reloads if its parent changes. It is torn down only when the stage
+  // itself unmounts (Performance Mode), via teardownVideoStage().
   const root = createRoot(div);
   root.render(<YtVideoPanel />);
-  _initialized = true;
+  _root = root;
   return div;
+}
+
+/**
+ * Destroy the stage: unmount the panel and remove the container from the DOM.
+ *
+ * Called when <VideoStage /> unmounts, which happens when Performance Mode is
+ * switched on. Because the container is created imperatively on document.body
+ * rather than through React's tree, unmounting the component alone leaves the
+ * live YouTube iframe on screen.
+ *
+ * The unmount is deferred by a tick: React throws if a root is unmounted while
+ * another root is mid-render, and this is called from an effect cleanup.
+ */
+export function teardownVideoStage(): void {
+  const root = _root;
+  const container = _container;
+  _root = null;
+  _container = null;
+  if (!root && !container) return;
+  setTimeout(() => {
+    root?.unmount();
+    container?.remove();
+  }, 0);
 }
 
 export function VideoStage() {
@@ -157,6 +186,12 @@ export function VideoStage() {
       }
     };
   }, [currentName]);
+
+  // Teardown lives in its own effect with no dependencies, so it runs only on
+  // a real unmount. The positioning effect above re-runs on every screen
+  // change; tearing down there would destroy and recreate the iframe on each
+  // navigation, which is the exact thing the single-stage design prevents.
+  useEffect(() => teardownVideoStage, []);
 
   // Container stays pointer-events:none always so app controls (player bar,
   // Expand button, sidebar nav) remain clickable through it. No periodic
