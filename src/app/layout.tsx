@@ -12,8 +12,22 @@ export const metadata: Metadata = {
   applicationName: "Kyowave",
   manifest: "/manifest.webmanifest",
   icons: {
+    // Two SVG variants, picked by the browser's colour scheme. Each is drawn
+    // to read against that scheme's chrome: icon.svg is bright blue on near
+    // black, icon-light.svg is deeper blue on near white, so in both cases the
+    // tile recedes and the rings carry the mark. favicon.ico last, for
+    // anything that ignores media queries or SVG favicons.
     icon: [
-      { url: "/icon.svg", type: "image/svg+xml" },
+      {
+        url: "/icon.svg",
+        type: "image/svg+xml",
+        media: "(prefers-color-scheme: dark)",
+      },
+      {
+        url: "/icon-light.svg",
+        type: "image/svg+xml",
+        media: "(prefers-color-scheme: light)",
+      },
       { url: "/favicon.ico", sizes: "48x48" },
     ],
     apple: "/apple-touch-icon.png",
