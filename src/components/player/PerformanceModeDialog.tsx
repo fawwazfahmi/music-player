@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { BoltIcon } from "@/components/icons";
 
 /**
@@ -13,6 +14,11 @@ import { BoltIcon } from "@/components/icons";
  * lyrics panel — Performance Mode only drops the smooth-scroll animation on
  * the active lyric line. Saying otherwise here would be the fastest way to
  * make this dialog a lie.
+ *
+ * Rendered through a portal to document.body. PlayerBar's root carries
+ * `backdrop-blur`, and backdrop-filter creates a containing block for fixed
+ * descendants — so without the portal this overlay is positioned against the
+ * 80px player bar instead of the viewport, and lands nowhere near centre.
  */
 export function PerformanceModeDialog({
   open,
@@ -32,9 +38,11 @@ export function PerformanceModeDialog({
     return () => document.removeEventListener("keydown", onKey);
   }, [open, onCancel]);
 
-  if (!open) return null;
+  // No mounted-state flag needed: `open` only flips true from a click, so this
+  // never renders during SSR.
+  if (!open || typeof document === "undefined") return null;
 
-  return (
+  return createPortal(
     <div
       className="fixed inset-0 z-[80] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
       onClick={onCancel}
@@ -43,7 +51,7 @@ export function PerformanceModeDialog({
       aria-label="Turn on Performance Mode"
     >
       <div
-        className="w-full max-w-sm overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl"
+        className="w-full max-w-sm overflow-hidden rounded-2xl border border-emerald-500/40 bg-zinc-900 shadow-[0_0_0_1px_rgba(16,185,129,0.15),0_0_60px_-10px_rgba(16,185,129,0.55),0_24px_60px_-20px_rgba(0,0,0,0.9)]"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-2.5 border-b border-zinc-800 px-5 py-3.5">
@@ -92,7 +100,8 @@ export function PerformanceModeDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

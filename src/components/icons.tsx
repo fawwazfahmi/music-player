@@ -278,10 +278,15 @@ export function RetryIcon(props: IconProps) {
   );
 }
 
+// The path is drawn from an absolute start point followed by relative
+// commands. Its bounding box is 9 wide x 17 tall; the opening moveto is
+// positioned so that box centres on (12,12) — the original started at
+// (7,21), which left the bolt 4.5px left of centre and half a pixel low in
+// every place the icon appears.
 export function BoltIcon(props: IconProps) {
   return (
     <Icon {...props}>
-      <path d="M7 21h-1l1 -7h-4l5 -10h1l-1 7h4z" />
+      <path d="M11.5 20.5h-1l1 -7h-4l5 -10h1l-1 7h4z" />
     </Icon>
   );
 }
