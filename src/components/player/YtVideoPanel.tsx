@@ -84,6 +84,7 @@ export function YtVideoPanel() {
   const isPlaying = usePlayerStore((s) => s.isPlaying);
   const position = usePlayerStore((s) => s.position);
   const playbackKey = usePlayerStore((s) => s.playbackKey);
+  const videoPresenting = usePlayerStore((s) => s.videoPresenting);
   const track = queue[currentIndex] ?? null;
   const ytVideoId = (track as { ytVideoId?: string | null } | null)?.ytVideoId;
 
@@ -298,15 +299,29 @@ export function YtVideoPanel() {
     };
   }, []);
 
-  // Play / pause sync
+  // Play / pause sync. `videoPresenting` participates because a video nobody
+  // can see should not be decoding — but it must not tear the player down,
+  // only pause it.
   useEffect(() => {
     const p = playerRef.current;
     if (!ready || !p || !isPlayerAlive(p)) return;
     try {
-      if (isPlaying) p.playVideo();
+      if (isPlaying && videoPresenting) p.playVideo();
       else p.pauseVideo();
     } catch {}
-  }, [isPlaying, ready]);
+  }, [isPlaying, ready, videoPresenting]);
+
+  // Coming back on screen: the paused player is sitting wherever the audio was
+  // when it was hidden, which by now is stale. Re-sync before it becomes
+  // visible so the first frame is the right one rather than a jump.
+  useEffect(() => {
+    if (!videoPresenting) return;
+    const p = playerRef.current;
+    if (!ready || !p || !isPlayerAlive(p)) return;
+    try {
+      p.seekTo(positionRef.current, true);
+    } catch {}
+  }, [videoPresenting, ready]);
 
   // Position sync
   useEffect(() => {

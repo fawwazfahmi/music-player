@@ -27,6 +27,7 @@ import { readSeenVersion, unseenReleases } from "@/lib/patch-notes";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useIsMobile } from "@/hooks/use-media-query";
 import { useIsHydrated } from "@/hooks/use-hydrated";
+import { isVideoPresenting, shouldMountVideoStage } from "@/lib/video-stage-policy";
 import { useDocumentVisible } from "@/hooks/use-document-visible";
 import {
   updateMediaPositionState,
@@ -67,16 +68,20 @@ export function AppShell() {
   // Effective art mode: performance mode always wins.
   const artMode = player.performanceMode || mobileArtMode;
 
-  // The iframe exists only when someone can actually see it. On desktop that's
-  // whenever performance mode is off; on a phone it additionally requires the
-  // sheet open, art mode off, and the app on screen. Rebuilding costs ~500ms
-  // when she reopens the sheet, which is the right trade against decoding
-  // video in her pocket for a whole album.
-  const currentHasVideo = !!player.queue[player.currentIndex]?.ytVideoId;
-  const showVideoStage =
-    !player.performanceMode &&
-    (!isMobile ||
-      (sheetVisible && !mobileArtMode && documentVisible && currentHasVideo));
+  // Exists vs. visible are separate questions — see video-stage-policy for why
+  // conflating them has bitten three times.
+  const showVideoStage = shouldMountVideoStage({
+    performanceMode: player.performanceMode,
+    isMobile,
+    mobileArtMode,
+    documentVisible,
+    currentHasVideo: !!player.queue[player.currentIndex]?.ytVideoId,
+  });
+
+  const setVideoPresenting = usePlayerStore((s) => s.setVideoPresenting);
+  useEffect(() => {
+    setVideoPresenting(isVideoPresenting({ isMobile, sheetOpen: sheetVisible }));
+  }, [isMobile, sheetVisible, setVideoPresenting]);
 
   // Global keyboard shortcuts — space=play/pause, arrows for seek/track,
   // ?=help, /=search. Disabled while typing in inputs.

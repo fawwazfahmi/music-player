@@ -71,6 +71,10 @@ let _root: Root | null = null;
  */
 export const VIDEO_REFLOW_EVENT = "kyowave-video-reflow";
 
+/** Easing used when the video moves between slots. Suspended during a drag. */
+const SLOT_TRANSITION =
+  "top 220ms ease, left 220ms ease, width 220ms ease, height 220ms ease";
+
 function emitSlotMoved() {
   window.dispatchEvent(new CustomEvent("music-video-slot-moved"));
 }
@@ -90,7 +94,7 @@ function getOrCreateContainer(): HTMLDivElement {
     "height:360px",
     "z-index:40", // above sidebar (z-30) + player bar; below mobile drawers' backdrop
     "overflow:hidden",
-    "transition:top 220ms ease, left 220ms ease, width 220ms ease, height 220ms ease",
+    `transition:${SLOT_TRANSITION}`,
     // pointer-events:none → clicks pass through to whatever's beneath (the
     // slot's Expand button, app controls, etc). The user controls playback
     // via the player bar, not YT's native iframe controls.
@@ -205,9 +209,25 @@ export function VideoStage() {
 
     scheduleApply();
 
+    // The container eases between slots, which is right when the video jumps
+    // from the panel to fullscreen — and wrong during a drag, where it has to
+    // track the finger exactly. Easing there leaves the video visibly trailing
+    // the sheet by a fifth of a second, which is most of what "glitchy" was.
+    // Cut the easing for the duration of the gesture, restore once it settles.
+    let restoreTimer: ReturnType<typeof setTimeout> | null = null;
+    function applyImmediate() {
+      container.style.transition = "none";
+      if (restoreTimer !== null) clearTimeout(restoreTimer);
+      restoreTimer = setTimeout(() => {
+        restoreTimer = null;
+        container.style.transition = SLOT_TRANSITION;
+      }, 200);
+      scheduleApply();
+    }
+
     window.addEventListener("resize", scheduleApply);
     window.addEventListener("scroll", scheduleApply, true);
-    window.addEventListener(VIDEO_REFLOW_EVENT, scheduleApply);
+    window.addEventListener(VIDEO_REFLOW_EVENT, applyImmediate);
 
     // Watch for slot insertion/removal as user navigates
     const mutation = new MutationObserver(scheduleApply);
@@ -216,7 +236,8 @@ export function VideoStage() {
     return () => {
       window.removeEventListener("resize", scheduleApply);
       window.removeEventListener("scroll", scheduleApply, true);
-      window.removeEventListener(VIDEO_REFLOW_EVENT, scheduleApply);
+      window.removeEventListener(VIDEO_REFLOW_EVENT, applyImmediate);
+      if (restoreTimer !== null) clearTimeout(restoreTimer);
       mutation.disconnect();
       observer?.disconnect();
       if (rafRef.current !== null) {

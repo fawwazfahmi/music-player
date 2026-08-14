@@ -77,6 +77,12 @@ interface PlayerState {
   /** Mobile sheet — show album art in place of the video. Hers to toggle;
       performance mode forces it on. Persisted per-device. */
   mobileArtMode: boolean;
+  /** Whether a slot is currently on screen for the video to occupy: always
+      true on desktop, and on mobile only while the sheet is open.
+      The iframe stays ALIVE when this is false and merely pauses — rebuilding
+      it on every sheet open cost a visible second of black, and sometimes it
+      never started at all. Not persisted. */
+  videoPresenting: boolean;
   currentTrack: () => QueueTrack | null;
   setQueue: (queue: QueueTrack[], startIndex?: number) => void;
   /** Append a track to the end of the queue. If the queue is empty, starts
@@ -114,6 +120,7 @@ interface PlayerState {
   setPerformanceMode: (v: boolean) => void;
   togglePerformanceMode: () => void;
   setVideoGateEnabled: (v: boolean) => void;
+  setVideoPresenting: (v: boolean) => void;
   setMobileArtMode: (v: boolean) => void;
   toggleMobileArtMode: () => void;
 }
@@ -199,6 +206,7 @@ export const usePlayerStore = create<PlayerState>()(
       performanceMode: false,
       videoGateEnabled: true,
       mobileArtMode: false,
+      videoPresenting: true,
       currentTrack: () => {
         const s = get();
         return s.queue[s.currentIndex] ?? null;
@@ -447,6 +455,7 @@ export const usePlayerStore = create<PlayerState>()(
       // to stop existing.
       setVideoGateEnabled: (v) =>
         set(v ? { videoGateEnabled: true } : { videoGateEnabled: false, videoLoading: false }),
+      setVideoPresenting: (v) => set({ videoPresenting: v }),
       setMobileArtMode: (v) => set({ mobileArtMode: v }),
       toggleMobileArtMode: () => set((s) => ({ mobileArtMode: !s.mobileArtMode })),
     }),
