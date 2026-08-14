@@ -163,6 +163,27 @@
   -webkit-overflow-scrolling: touch;
 }
 
+/* iOS zooms the whole page when you focus an input smaller than 16px, and
+   never zooms back out. The app's inputs are text-sm (14px), so every search
+   or rename left the layout stranded mid-zoom.
+   One rule rather than a `text-base md:text-sm` on each input: it covers the
+   inputs that exist today and the ones added next month, and it is scoped
+   below `md` so desktop typography is untouched. This is also why the viewport
+   does NOT set maximum-scale=1 — that would "fix" the zoom by taking pinch
+   away from someone who needs it. */
+@media (max-width: 767px) {
+  input[type="text"],
+  input[type="password"],
+  input[type="search"],
+  input[type="email"],
+  input[type="url"],
+  input[type="number"],
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
 /* Kyowave mark — the rings breathe while something is playing. Scaling an SVG
    circle needs fill-box, or the transform pivots on the viewport origin and
    the ring slides off instead of growing from its centre. */

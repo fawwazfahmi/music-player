@@ -24,10 +24,10 @@ function getPersistName(): string {
  */
 function migrateLegacyKey(key: string): void {
   try {
-    if (typeof localStorage === "undefined" || !localStorage?.getItem) return;
-    if (localStorage.getItem(key)) return;
-    const legacy = localStorage.getItem(key.replace(KEY_PREFIX, LEGACY_KEY_PREFIX));
-    if (legacy) localStorage.setItem(key, legacy);
+    if (typeof window === "undefined" || !window.localStorage?.getItem) return;
+    if (window.localStorage.getItem(key)) return;
+    const legacy = window.localStorage.getItem(key.replace(KEY_PREFIX, LEGACY_KEY_PREFIX));
+    if (legacy) window.localStorage.setItem(key, legacy);
   } catch {
     /* storage disabled or full — starting fresh is acceptable here */
   }
@@ -138,6 +138,47 @@ export function videoGateOpen(s: {
   videoGateEnabled: boolean;
 }): boolean {
   return !s.performanceMode && s.videoGateEnabled;
+}
+
+/**
+ * A storage object that is safe to call, whatever the environment hands us.
+ *
+ * Three cases have to work:
+ *   - the server, where there is no window at all;
+ *   - a browser with storage switched off, which is Safari private mode and any
+ *     locked-down profile — persist writes on nearly every action, so an
+ *     unguarded `setItem` there takes the whole app down on the first play;
+ *   - Node, where the bare `localStorage` identifier can resolve to Node's own
+ *     experimental global, which is an inert object with no methods unless
+ *     --localstorage-file points somewhere real.
+ *
+ * In all three the app runs; it just forgets preferences between visits, which
+ * is the correct thing to degrade to.
+ */
+function usableStorage(): Storage {
+  const memory = new Map<string, string>();
+  const fallback = {
+    getItem: (k: string) => memory.get(k) ?? null,
+    setItem: (k: string, v: string) => void memory.set(k, v),
+    removeItem: (k: string) => void memory.delete(k),
+    clear: () => memory.clear(),
+    key: (i: number) => Array.from(memory.keys())[i] ?? null,
+    get length() {
+      return memory.size;
+    },
+  } as Storage;
+
+  if (typeof window === "undefined") return fallback;
+  try {
+    const ls = window.localStorage;
+    if (typeof ls?.getItem !== "function" || typeof ls?.setItem !== "function") {
+      return fallback;
+    }
+    return ls;
+  } catch {
+    // Merely reading window.localStorage throws when cookies are blocked.
+    return fallback;
+  }
 }
 
 const PERSIST_KEY = getPersistName();
@@ -413,15 +454,7 @@ export const usePlayerStore = create<PlayerState>()(
       // Per-device persistence: localStorage on the user's own machine.
       // Only saves preferences (volume, shuffle, repeat) — never queue/playback state.
       name: PERSIST_KEY,
-      storage: createJSONStorage(() =>
-        typeof window === "undefined"
-          ? {
-              getItem: () => null,
-              setItem: () => undefined,
-              removeItem: () => undefined,
-            }
-          : localStorage,
-      ),
+      storage: createJSONStorage(usableStorage),
       partialize: (state) => ({
         volume: state.volume,
         shuffle: state.shuffle,

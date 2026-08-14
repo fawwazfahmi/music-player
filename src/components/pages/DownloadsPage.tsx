@@ -215,7 +215,7 @@ export function DownloadsPage() {
                 <button
                   type="button"
                   onClick={() => queueOne(r)}
-                  className="flex shrink-0 items-center gap-1 rounded-full border border-zinc-700 px-3 py-1 text-xs text-zinc-300 opacity-0 transition hover:bg-zinc-800 group-hover:opacity-100"
+                  className="flex shrink-0 items-center gap-1 rounded-full border border-zinc-700 px-3 py-1 text-xs text-zinc-300 transition hover:bg-zinc-800 md:opacity-0 md:group-hover:opacity-100"
                 >
                   <QueueIcon size={13} /> Add to queue
                 </button>

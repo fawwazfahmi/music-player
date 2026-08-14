@@ -151,7 +151,10 @@ export function NowPlayingSheet({
         </button>
 
         <div className="relative border-y border-zinc-800/70 bg-black">
-          {artMode ? (
+          {/* A track with no YouTube video has nothing to put in a 16:9 slot,
+              so it gets the art treatment too — otherwise it's a dead black
+              rectangle eating 69px that the lyrics could have had. */}
+          {artMode || !track?.ytVideoId ? (
             <div className="flex h-[150px] items-center justify-center bg-zinc-950">
               {art ? (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -173,11 +176,15 @@ export function NowPlayingSheet({
             <div data-video-slot="sheet" className="aspect-video w-full" />
           )}
 
-          <BoltChip
-            lit={artMode}
-            locked={performanceMode}
-            onToggle={() => setMobileArtMode(!mobileArtMode)}
-          />
+          {/* Nothing to toggle to when the track has no video, so the chip
+              stays out of the way rather than sitting there doing nothing. */}
+          {track?.ytVideoId && (
+            <BoltChip
+              lit={artMode}
+              locked={performanceMode}
+              onToggle={() => setMobileArtMode(!mobileArtMode)}
+            />
+          )}
         </div>
       </div>
 

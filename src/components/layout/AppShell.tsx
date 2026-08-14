@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useIpodStore } from "@/stores/ipod-store";
 import { usePlayerStore } from "@/stores/player-store";
 import { useDownloadStore } from "@/stores/download-store";
@@ -23,9 +23,10 @@ import { OverlayPresence } from "@/components/overlay/OverlayPresence";
 import { PartyBanner } from "@/components/party/PartyBanner";
 import { KeyboardHelpDialog } from "@/components/player/KeyboardHelpDialog";
 import { PatchNotesDialog } from "@/components/player/PatchNotesDialog";
-import { readSeenVersion, unseenReleases, type Release } from "@/lib/patch-notes";
+import { readSeenVersion, unseenReleases } from "@/lib/patch-notes";
 import { useKeyboardShortcuts } from "@/hooks/use-keyboard-shortcuts";
 import { useIsMobile } from "@/hooks/use-media-query";
+import { useIsHydrated } from "@/hooks/use-hydrated";
 import { useDocumentVisible } from "@/hooks/use-document-visible";
 import {
   updateMediaPositionState,
@@ -71,9 +72,11 @@ export function AppShell() {
   // sheet open, art mode off, and the app on screen. Rebuilding costs ~500ms
   // when she reopens the sheet, which is the right trade against decoding
   // video in her pocket for a whole album.
+  const currentHasVideo = !!player.queue[player.currentIndex]?.ytVideoId;
   const showVideoStage =
     !player.performanceMode &&
-    (!isMobile || (sheetVisible && !mobileArtMode && documentVisible));
+    (!isMobile ||
+      (sheetVisible && !mobileArtMode && documentVisible && currentHasVideo));
 
   // Global keyboard shortcuts — space=play/pause, arrows for seek/track,
   // ?=help, /=search. Disabled while typing in inputs.
@@ -99,11 +102,19 @@ export function AppShell() {
   // import time, and the audio element's first `timeupdate` fires with 0,
   // which would otherwise wipe the saved value before we could use it.
   // Consumed exactly once, so a later track change starts from the top.
-  // What's new, shown once per release. Computed on first render from
-  // localStorage, so a fresh browser or cleared storage sees it again —
-  // Settings has a permanent way in for exactly that case.
-  const [patchNotes, setPatchNotes] = useState<Release[] | null>(() =>
-    typeof window === "undefined" ? null : (unseenReleases(readSeenVersion()) || null),
+  // What's new, shown once per release. Read from localStorage, so a fresh
+  // browser or cleared storage sees it again — Settings has a permanent way in
+  // for exactly that case.
+  //
+  // Gated on `hydrated` rather than `typeof window`: that check is already true
+  // during the hydration render, so the client produced a dialog where the
+  // server had sent none, and React threw away and rebuilt the entire tree on
+  // every load with unread notes.
+  const hydrated = useIsHydrated();
+  const [notesDismissed, setNotesDismissed] = useState(false);
+  const patchNotes = useMemo(
+    () => (hydrated ? unseenReleases(readSeenVersion()) : []),
+    [hydrated],
   );
 
   const resumeAtRef = useRef<number | null>(
@@ -310,8 +321,16 @@ export function AppShell() {
       <PartyBanner />
 
       <div className="flex min-h-0 flex-1 overflow-hidden">
-        {/* Sidebar */}
+        {/* Sidebar.
+            On mobile it is a drawer, and tapping anything actionable inside it
+            should dismiss it — otherwise she navigates to Songs and is still
+            looking at the menu, with the list she asked for hidden behind it.
+            Handled here rather than by threading a callback through Sidebar's
+            five separate navigation call sites. */}
         <div
+          onClick={(e) => {
+            if ((e.target as HTMLElement).closest("button, a")) setSidebarOpen(false);
+          }}
           className={
             "shrink-0 transition-transform md:block " +
             (sidebarOpen
@@ -383,9 +402,9 @@ export function AppShell() {
       <InstallHint />
       <KeyboardHelpDialog open={helpOpen} onClose={closeHelp} />
       <PatchNotesDialog
-        open={!!patchNotes && patchNotes.length > 0}
-        releases={patchNotes ?? []}
-        onClose={() => setPatchNotes(null)}
+        open={!notesDismissed && patchNotes.length > 0}
+        releases={patchNotes}
+        onClose={() => setNotesDismissed(true)}
       />
     </div>
   );

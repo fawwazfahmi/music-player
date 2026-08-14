@@ -26,6 +26,21 @@ export interface Release {
 
 export const PATCH_NOTES: Release[] = [
   {
+    version: "2026.08.15",
+    date: "2026-08-15",
+    title: "Kyowave on your phone",
+    changes: [
+      { kind: "added", text: "Add it to your home screen. Opens full screen, no address bar." },
+      { kind: "added", text: "Swipe up on the player for video, lyrics and queue." },
+      { kind: "added", text: "Tap the bolt to swap the video for album art — more lyrics." },
+      { kind: "added", text: "Hold a song to open its menu." },
+      { kind: "fixed", text: "Song lists fit a phone now. No more squashed titles." },
+      { kind: "fixed", text: "Album art shows on your lock screen for YouTube songs." },
+      { kind: "fixed", text: "The lock screen scrubber follows the song." },
+      { kind: "changed", text: "Video stops when your screen locks, and comes back after." },
+    ],
+  },
+  {
     version: "2026.08.14",
     date: "2026-08-14",
     title: "Kyowave",
@@ -64,8 +79,8 @@ export function unseenReleases(seen: string | null): Release[] {
 
 export function readSeenVersion(): string | null {
   try {
-    if (typeof localStorage === "undefined" || !localStorage?.getItem) return null;
-    return localStorage.getItem(SEEN_STORAGE_KEY);
+    if (typeof window === "undefined" || !window.localStorage?.getItem) return null;
+    return window.localStorage.getItem(SEEN_STORAGE_KEY);
   } catch {
     return null;
   }
@@ -73,8 +88,8 @@ export function readSeenVersion(): string | null {
 
 export function markSeen(version: string = CURRENT_VERSION): void {
   try {
-    if (typeof localStorage === "undefined" || !localStorage?.setItem) return;
-    localStorage.setItem(SEEN_STORAGE_KEY, version);
+    if (typeof window === "undefined" || !window.localStorage?.setItem) return;
+    window.localStorage.setItem(SEEN_STORAGE_KEY, version);
   } catch {
     /* storage disabled — they'll just be shown the notes again */
   }
