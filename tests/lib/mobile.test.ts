@@ -4,6 +4,8 @@ import {
   isIOSDevice,
   isMenuButtonPref,
   isStandaloneDisplay,
+  safariMajorVersion,
+  shareMenuLocation,
   shouldShowInstallHint,
   shouldShowLongPressTip,
   shouldShowMenuButton,
@@ -96,6 +98,39 @@ describe("shouldShowInstallHint", () => {
     expect(
       shouldShowInstallHint({ nav: nav(ANDROID, 5), matchMedia: noMatch, dismissed: false }),
     ).toBe(false);
+  });
+});
+
+describe("shareMenuLocation", () => {
+  // Verified on an iPhone 13 running iOS 26.5: the Safari toolbar is
+  // back / URL / reload / ···, with no share glyph. Share is inside the ···
+  // menu. Telling her to "tap Share" points at a button that isn't there.
+  it("sends iOS 26 through the overflow menu", () => {
+    expect(shareMenuLocation(nav(IPHONE.replace("Version/17.5", "Version/26.0"), 5))).toBe(
+      "overflow",
+    );
+  });
+
+  it("keeps the toolbar path for iOS 17 and 18", () => {
+    expect(shareMenuLocation(nav(IPHONE, 5))).toBe("toolbar");
+    expect(shareMenuLocation(nav(IPHONE.replace("Version/17.5", "Version/18.2"), 5))).toBe(
+      "toolbar",
+    );
+  });
+
+  it("assumes the newer path when the version is unreadable", () => {
+    expect(shareMenuLocation(nav("Mozilla/5.0 (iPhone)", 5))).toBe("overflow");
+  });
+});
+
+describe("safariMajorVersion", () => {
+  it("reads the Version token, which an iPad-as-Mac still carries", () => {
+    expect(safariMajorVersion(nav(IPAD_AS_MAC, 5))).toBe(17);
+    expect(safariMajorVersion(nav(IPHONE, 5))).toBe(17);
+  });
+
+  it("returns null when there is no version to read", () => {
+    expect(safariMajorVersion(nav("Mozilla/5.0 (iPhone)", 5))).toBeNull();
   });
 });
 
