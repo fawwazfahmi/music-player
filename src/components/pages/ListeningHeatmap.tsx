@@ -152,7 +152,7 @@ export function ListeningHeatmap({ range }: { range: StatsRange }) {
                       });
                     }}
                     onMouseLeave={() => setHovered(null)}
-                    className="aspect-square w-full rounded-[2px] transition-transform hover:scale-[1.35]"
+                    className="h-[10px] w-full rounded-[2px] transition-transform hover:scale-y-[1.6] hover:scale-x-[1.15]"
                     style={{ background: b < 0 ? EMPTY : RAMP[b] }}
                   />
                 );
@@ -162,9 +162,9 @@ export function ListeningHeatmap({ range }: { range: StatsRange }) {
 
           <div className="mt-3 flex items-center justify-end gap-1.5 text-[10px] text-zinc-500">
             <span>Less</span>
-            <span className="h-3 w-3 rounded-[2px]" style={{ background: EMPTY }} />
+            <span className="h-2.5 w-2.5 rounded-[2px]" style={{ background: EMPTY }} />
             {RAMP.map((c) => (
-              <span key={c} className="h-3 w-3 rounded-[2px]" style={{ background: c }} />
+              <span key={c} className="h-2.5 w-2.5 rounded-[2px]" style={{ background: c }} />
             ))}
             <span>More</span>
           </div>
