@@ -147,8 +147,13 @@
    home indicator, so anything anchored to an edge has to pad itself back out.
    Written as utilities rather than inline arbitrary values so the intent is
    greppable and there is exactly one definition to change. */
+/* max(), not a bare env(): off-device — desktop, responsive design mode, an
+   Android without gesture nav — the inset is 0px, and because this rule wins
+   over Tailwind's `pb-*` it was zeroing the padding rather than adding to it.
+   The mini player sat flush against the bottom edge. The floor is the padding
+   the design wants anyway; the inset only ever adds to it. */
 .kw-safe-bottom {
-  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.75rem);
 }
 .kw-safe-top {
   padding-top: env(safe-area-inset-top, 0px);

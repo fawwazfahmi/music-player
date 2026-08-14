@@ -9,6 +9,7 @@ import { coverUrl } from "@/lib/cover-url";
 import { formatDuration } from "@/lib/format-duration";
 import { LyricsPanel } from "@/components/player/LyricsPanel";
 import { QueuePanel } from "@/components/player/QueuePanel";
+import { VIDEO_REFLOW_EVENT } from "@/components/player/VideoStage";
 import {
   BoltIcon,
   HeartIcon,
@@ -107,8 +108,25 @@ export function NowPlayingSheet({
     const onMove = (e: TouchEvent) => {
       if (dragStartY.current !== null && e.cancelable) e.preventDefault();
     };
+    // A gesture can end without a touchend — an incoming call, a system edge
+    // gesture, the app being backgrounded mid-drag. Left unhandled the sheet
+    // stays translated wherever the finger was, which reads as "the app is
+    // gone": open, but parked off the bottom of the screen.
+    const onAbort = () => {
+      dragStartY.current = null;
+      setDragging(false);
+      setDragY(0);
+    };
     el.addEventListener("touchmove", onMove, { passive: false });
-    return () => el.removeEventListener("touchmove", onMove);
+    window.addEventListener("touchcancel", onAbort);
+    window.addEventListener("pointercancel", onAbort);
+    window.addEventListener("blur", onAbort);
+    return () => {
+      el.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchcancel", onAbort);
+      window.removeEventListener("pointercancel", onAbort);
+      window.removeEventListener("blur", onAbort);
+    };
   }, []);
 
   function onDragStart(e: React.TouchEvent) {
@@ -123,6 +141,10 @@ export function NowPlayingSheet({
     // Downward only. Dragging up would lift the sheet off the top of the
     // screen, which is nowhere.
     setDragY(Math.max(0, y - y0));
+    // The iframe is positioned from the slot's bounding rect, and a transform
+    // change fires neither resize nor scroll — without this nudge the video
+    // stays put while the sheet slides away from under it.
+    window.dispatchEvent(new Event(VIDEO_REFLOW_EVENT));
   }
 
   // Always lands back at 0, whether it closed or sprang back — so the next
@@ -151,18 +173,36 @@ export function NowPlayingSheet({
       aria-modal="true"
       aria-label="Now playing"
       aria-hidden={!open}
+      // No background on the root, on purpose. The shared YouTube iframe lives
+      // in a fixed container on document.body at z-40, and this sheet is z-70
+      // with a transform — so it forms a stacking context above the iframe and
+      // an opaque root painted straight over the video. That is why the slot
+      // was a black rectangle.
+      //
+      // Raising the iframe above the sheet instead would bury the bolt chip,
+      // which lives inside this stacking context and so can never out-paint it.
+      // Every section below carries its own background, and the video slot
+      // carries none — a transparent hole the iframe shows through.
       className={
-        "fixed inset-0 z-[70] flex flex-col bg-zinc-950 md:hidden " +
+        "fixed inset-0 z-[70] flex flex-col md:hidden " +
         (dragging ? "" : "transition-transform duration-300 ease-out ") +
         (open ? "" : "pointer-events-none")
       }
-      style={{ transform: open ? `translateY(${dragY}px)` : "translateY(100%)" }}
+      // The offset only applies while a finger is actually down. Belt to the
+      // abort handler's braces: a stale dragY can never strand the sheet
+      // off-screen, because the moment dragging is false it stops counting.
+      style={{
+        transform: open ? `translateY(${dragging ? dragY : 0}px)` : "translateY(100%)",
+      }}
     >
       {/* ── Drag region: handle + media slot ───────────────────────────────
           Only this area drags. If the whole sheet did, scrolling the lyrics
           would fight the dismiss gesture on every flick. */}
       <div
         ref={dragRef}
+        // No background here — this wrapper spans the handle AND the media
+        // slot, so tinting it paints over the video. The handle strip below
+        // carries its own.
         className="kw-safe-top kw-pressable shrink-0"
         onTouchStart={onDragStart}
         onTouchMove={onDragMove}
@@ -172,13 +212,13 @@ export function NowPlayingSheet({
         <button
           type="button"
           onClick={onClose}
-          className="flex w-full items-center justify-center py-2.5"
+          className="flex w-full items-center justify-center bg-zinc-950 py-2.5"
           aria-label="Close now playing"
         >
           <span className="h-1 w-9 rounded-full bg-zinc-700" />
         </button>
 
-        <div className="relative border-y border-zinc-800/70 bg-black">
+        <div className="relative border-y border-zinc-800/70">
           {/* A track with no YouTube video has nothing to put in a 16:9 slot,
               so it gets the art treatment too — otherwise it's a dead black
               rectangle eating 69px that the lyrics could have had. */}
@@ -201,7 +241,14 @@ export function NowPlayingSheet({
             // VideoStage positions the shared iframe over this slot. It is only
             // in the DOM while the sheet is open, which is what stops the phone
             // decoding video for a whole listening session.
-            <div data-video-slot="sheet" className="aspect-video w-full" />
+            // Only claims the slot while actually open. The sheet stays
+            // mounted when closed (it animates out), so an unconditional
+            // attribute would keep the iframe pinned to an off-screen sheet
+            // and starve the desktop panel.
+            <div
+              data-video-slot={open ? "sheet" : undefined}
+              className="aspect-video w-full"
+            />
           )}
 
           {/* Nothing to toggle to when the track has no video, so the chip
@@ -217,13 +264,13 @@ export function NowPlayingSheet({
       </div>
 
       {/* ── Tabs ───────────────────────────────────────────────────────── */}
-      <div className="flex shrink-0 border-b border-zinc-800/70 text-xs">
+      <div className="flex shrink-0 border-b border-zinc-800/70 bg-zinc-950 text-xs">
         <TabButton label="Lyrics" active={tab === "lyrics"} onClick={() => setTab("lyrics")} />
         <TabButton label="Queue" active={tab === "queue"} onClick={() => setTab("queue")} />
       </div>
 
       {/* ── Lyrics / Queue ─────────────────────────────────────────────── */}
-      <div className="kw-contain-scroll min-h-0 flex-1 overflow-hidden">
+      <div className="kw-contain-scroll min-h-0 flex-1 overflow-hidden bg-zinc-950">
         {tab === "lyrics" ? <LyricsPanel key={track?.id ?? "none"} /> : <QueuePanel />}
       </div>
 

@@ -23,12 +23,24 @@ import { YtVideoPanel } from "./YtVideoPanel";
 // the sheet is open, and while it is open it is the only thing on screen.
 // Checking it after "big" would hand the iframe to a nowPlayingFull slot
 // sitting behind the sheet, where nobody can see it.
+/**
+ * A slot only counts if it is actually on screen.
+ *
+ * Without this, a slot that exists in the DOM but is laid out at 0x0 — a
+ * `md:hidden` mobile sheet while on desktop, a panel behind `display:none` —
+ * still wins the lookup, and the iframe never reaches the slot that IS
+ * visible. That regressed the desktop right-panel video the moment the mobile
+ * sheet started declaring a slot of its own.
+ */
+function visibleSlot(name: string): HTMLElement | null {
+  const el = document.querySelector<HTMLElement>(`[data-video-slot="${name}"]`);
+  if (!el) return null;
+  const r = el.getBoundingClientRect();
+  return r.width > 0 && r.height > 0 ? el : null;
+}
+
 function findActiveSlot(): HTMLElement | null {
-  const sheet = document.querySelector<HTMLElement>('[data-video-slot="sheet"]');
-  if (sheet) return sheet;
-  const big = document.querySelector<HTMLElement>('[data-video-slot="big"]');
-  if (big) return big;
-  return document.querySelector<HTMLElement>('[data-video-slot="small"]');
+  return visibleSlot("sheet") ?? visibleSlot("big") ?? visibleSlot("small");
 }
 
 // Debug-flag: set window.__MU_DEBUG_VIDEO__ = true in the console to log
@@ -50,6 +62,14 @@ function debugLog(...args: unknown[]) {
 // on document.body at z-index 40, still covering the cover art beneath it.
 let _container: HTMLDivElement | null = null;
 let _root: Root | null = null;
+
+/**
+ * Ask the stage to re-measure its slot.
+ *
+ * Dispatched by anything that moves a slot in a way the browser doesn't
+ * report — chiefly a CSS transform, which fires neither resize nor scroll.
+ */
+export const VIDEO_REFLOW_EVENT = "kyowave-video-reflow";
 
 function emitSlotMoved() {
   window.dispatchEvent(new CustomEvent("music-video-slot-moved"));
@@ -187,6 +207,7 @@ export function VideoStage() {
 
     window.addEventListener("resize", scheduleApply);
     window.addEventListener("scroll", scheduleApply, true);
+    window.addEventListener(VIDEO_REFLOW_EVENT, scheduleApply);
 
     // Watch for slot insertion/removal as user navigates
     const mutation = new MutationObserver(scheduleApply);
@@ -195,6 +216,7 @@ export function VideoStage() {
     return () => {
       window.removeEventListener("resize", scheduleApply);
       window.removeEventListener("scroll", scheduleApply, true);
+      window.removeEventListener(VIDEO_REFLOW_EVENT, scheduleApply);
       mutation.disconnect();
       observer?.disconnect();
       if (rafRef.current !== null) {

@@ -108,7 +108,10 @@ export function MiniPlayer({ onOpen }: { onOpen: () => void }) {
         </div>
       )}
 
-      <div className="kw-safe-bottom flex items-center gap-3 px-3 pb-2 pt-1">
+      {/* Bottom padding comes from kw-safe-bottom, which floors at 0.75rem and
+          grows to clear the home indicator. Don't add pb-* here — that rule
+          wins and the two would silently fight. */}
+      <div className="kw-safe-bottom flex items-center gap-3 px-3 pt-1">
         {/* Everything except the three buttons opens the sheet. */}
         <button
           type="button"
