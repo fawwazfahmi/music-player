@@ -18,10 +18,11 @@ import { usePlayerStore } from "@/stores/player-store";
 import { useIpodStore } from "@/stores/ipod-store";
 import { coverUrl } from "@/lib/cover-url";
 import { PageHeader, buildQueueTrack } from "./_shared";
+import { ListeningHeatmap } from "./ListeningHeatmap";
 import { PlayIcon } from "@/components/icons";
 import { formatDuration } from "@/lib/format-duration";
 
-type Tab = "tracks" | "artists" | "albums" | "recent";
+type Tab = "tracks" | "artists" | "albums" | "recent" | "rhythm";
 
 const RANGES: { value: StatsRange; label: string }[] = [
   { value: "7d", label: "Last 7 days" },
@@ -35,6 +36,7 @@ const TABS: { value: Tab; label: string }[] = [
   { value: "artists", label: "Top Artists" },
   { value: "albums", label: "Top Albums" },
   { value: "recent", label: "Recently Played" },
+  { value: "rhythm", label: "Rhythm" },
 ];
 
 export function StatsPage() {
@@ -124,6 +126,7 @@ export function StatsPage() {
         {tab === "artists" && <TopArtistsList items={artists} />}
         {tab === "albums" && <TopAlbumsList items={albums} />}
         {tab === "recent" && <RecentList items={recent} />}
+        {tab === "rhythm" && <ListeningHeatmap range={range} />}
       </div>
     </div>
   );

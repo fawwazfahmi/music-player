@@ -22,6 +22,11 @@ const Schema = z.object({
   // either would ship live Google session credentials to the backup target.
   // Defaults (in yt-cookies.ts) to ~/.config/music-universe/yt-cookies.
   YT_COOKIES_DIR: z.string().min(1).optional(),
+  // playedAt is stored as UTC in a `timestamp without time zone` column, so
+  // any hour-of-day analysis has to convert or it lands 8 hours out — UTC
+  // 16:00 is local midnight here, which would turn a late-night listening
+  // peak into an afternoon one.
+  APP_TIMEZONE: z.string().min(1).default("Asia/Kuala_Lumpur"),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 });
 

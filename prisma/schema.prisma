@@ -268,10 +268,15 @@ model ListeningHistory {
   durationListened Int
   completed        Boolean        @default(false)
   source           PlaybackSource
+  // Which of the two identities played this ("ainul" | "fawwaz"), from the
+  // mu_name cookie. Nullable because a play can be recorded before login
+  // resolves. Rows predating this column were backfilled to ainul.
+  listener         String?
   track            Track          @relation(fields: [trackId], references: [id], onDelete: Cascade)
 
   @@index([playedAt])
   @@index([trackId, playedAt])
+  @@index([listener, playedAt])
 }
 
 enum PlaybackSource {

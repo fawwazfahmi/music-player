@@ -2,6 +2,7 @@
 
 import { db } from "@/server/db";
 import { resolveTrackCoverHash } from "@/lib/cover-url";
+import { env } from "@/lib/env";
 
 export type StatsRange = "7d" | "30d" | "365d" | "all";
 
@@ -302,5 +303,79 @@ export async function getStatsOverview(range: StatsRange): Promise<StatsOverview
     totalSeconds: agg._sum.durationListened ?? 0,
     uniqueTracks: uniqueTracks.length,
     uniqueArtists,
+  };
+}
+
+// ─── Listening heatmap ────────────────────────────────────────────────────
+//
+// Hour-of-day × day-of-week, weighted by seconds listened rather than play
+// count so a 20-second skip doesn't count the same as a full song.
+//
+// This shape was chosen because it aggregates *across* days: with only ~28
+// active listening days there isn't enough history for a GitHub-style
+// calendar heatmap, but every one of those days still feeds the same 168
+// cells, which came out ~48% populated — dense enough to show a pattern.
+
+export interface HeatmapCell {
+  /** 0 = Sunday … 6 = Saturday, in local time. */
+  dow: number;
+  /** 0–23, local time. */
+  hour: number;
+  seconds: number;
+  plays: number;
+}
+
+export interface HeatmapResult {
+  cells: HeatmapCell[];
+  /** Busiest cell, for scaling the colour ramp. 0 when there's no data. */
+  maxSeconds: number;
+  totalSeconds: number;
+  totalPlays: number;
+  /** Identities present in the data, for the filter control. */
+  listeners: string[];
+  /** Timezone the buckets were computed in, so the UI can say so. */
+  timeZone: string;
+}
+
+/**
+ * `listener` filters to one identity; omit for everyone combined.
+ *
+ * playedAt is a `timestamp without time zone` holding UTC, so it is converted
+ * to the app timezone before bucketing. Skipping that conversion puts every
+ * bucket 8 hours out here — local midnight would read as 16:00.
+ */
+export async function getListeningHeatmap(
+  listener?: string | null,
+  range: StatsRange = "all",
+): Promise<HeatmapResult> {
+  const since = sinceFor(range);
+  const tz = env.APP_TIMEZONE;
+
+  const rows = await db.$queryRaw<
+    { dow: number; hour: number; seconds: number; plays: number }[]
+  >`
+    SELECT
+      EXTRACT(DOW  FROM ("playedAt" AT TIME ZONE 'UTC' AT TIME ZONE ${tz}))::int AS dow,
+      EXTRACT(HOUR FROM ("playedAt" AT TIME ZONE 'UTC' AT TIME ZONE ${tz}))::int AS hour,
+      COALESCE(SUM("durationListened"), 0)::int AS seconds,
+      COUNT(*)::int AS plays
+    FROM "ListeningHistory"
+    WHERE (${listener ?? null}::text IS NULL OR "listener" = ${listener ?? null})
+      AND (${since ?? null}::timestamp IS NULL OR "playedAt" >= ${since ?? null})
+    GROUP BY 1, 2
+  `;
+
+  const listenerRows = await db.$queryRaw<{ listener: string }[]>`
+    SELECT DISTINCT "listener" FROM "ListeningHistory"
+    WHERE "listener" IS NOT NULL ORDER BY 1
+  `;
+
+  return {
+    cells: rows,
+    maxSeconds: rows.reduce((m, r) => Math.max(m, r.seconds), 0),
+    totalSeconds: rows.reduce((s, r) => s + r.seconds, 0),
+    totalPlays: rows.reduce((s, r) => s + r.plays, 0),
+    listeners: listenerRows.map((r) => r.listener),
+    timeZone: tz,
   };
 }
