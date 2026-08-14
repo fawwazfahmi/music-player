@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
 import {
   PATCH_NOTES,
@@ -41,21 +41,25 @@ export function PatchNotesDialog({
   releases?: Release[];
   onClose: () => void;
 }) {
+  // Every way out marks the release seen. Escape used to close without
+  // marking, so the dialog came back on the next load after you had already
+  // read it — the button and the backdrop did mark it, which made the
+  // behaviour look random rather than deliberate.
+  const dismiss = useCallback(() => {
+    markSeen();
+    onClose();
+  }, [onClose]);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") dismiss();
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [open, dismiss]);
 
   if (!open || typeof document === "undefined") return null;
-
-  function dismiss() {
-    markSeen();
-    onClose();
-  }
 
   return createPortal(
     <div
