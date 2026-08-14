@@ -63,7 +63,7 @@ export function PerformanceModeDialog({
 
         <div className="px-5 py-4">
           <p className="text-xs text-zinc-400">
-            For running kyote in a background tab while you&apos;re gaming. It turns off:
+            For running Kyowave in a background tab while you&apos;re gaming. It turns off:
           </p>
           <ul className="mt-3 space-y-2">
             <Item

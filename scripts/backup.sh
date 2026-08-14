@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Music Universe backup
+# Kyowave backup
 #
 #   • PostgreSQL → custom-format pg_dump (compressed, pg_restore-able)
 #   • Music library folder → tar.gz of MUSIC_LIBRARY_PATH

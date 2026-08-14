@@ -1,4 +1,4 @@
-# Music Universe — Deployment Runbook
+# Kyowave — Deployment Runbook
 
 Production deployment is the user's own Mac, exposed to the public internet
 via a named Cloudflare Tunnel. Both services run as launchd LaunchAgents so

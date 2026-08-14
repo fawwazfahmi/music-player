@@ -6,7 +6,7 @@
     1. cloudflared installed (brew install cloudflared)
     2. `cloudflared tunnel login` run once (browser auth)
     3. Tunnel created: `cloudflared tunnel create music-universe`
-    4. DNS routed: `cloudflared tunnel route dns music-universe kyote.fawwaz.fun`
+    4. DNS routed: `cloudflared tunnel route dns music-universe kyowave.wazfahmi.site`
     5. ~/.cloudflared/config.yml populated from deploy/cloudflared/config.example.yml
 
   Install:
