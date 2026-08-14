@@ -46,7 +46,11 @@ export function StatsPage() {
   // that regardless, so this just decides whether to render the control.
   const identity = useIdentity();
   const isAdmin = identity === "fawwaz";
-  const [who, setWho] = useState<string>("");
+  // Admin included: you land on your own stats and switch away deliberately.
+  // Derived so identity can resolve after hydration without a setState in an
+  // effect; "" is a real choice meaning Everyone, so ?? is the right operator.
+  const [whoOverride, setWhoOverride] = useState<string | null>(null);
+  const who = whoOverride ?? identity ?? "";
   const listener = isAdmin ? who : (identity ?? "");
 
   const [overview, setOverview] = useState<StatsOverview | null>(null);
@@ -97,7 +101,7 @@ export function StatsPage() {
           isAdmin ? (
             <select
               value={who}
-              onChange={(e) => setWho(e.target.value)}
+              onChange={(e) => setWhoOverride(e.target.value)}
               className="rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 focus:border-sky-500 focus:outline-none"
             >
               <option value="">Everyone</option>
