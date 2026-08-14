@@ -10,13 +10,13 @@ they survive reboots.
 
 | Thing         | Value                                                        |
 | ------------- | ------------------------------------------------------------ |
-| Public URL    | `https://kyote.wazfahmi.site`                                |
+| Public URL    | `https://kyowave.wazfahmi.site`                                |
 | Local origin  | `http://127.0.0.1:3100` (`next start`, PORT set in the plist)|
 | Tunnel name   | `music-universe`                                             |
 | Tunnel UUID   | `29284152-420d-4bb1-93dc-7e0f49bc3344`                       |
 | Password      | `Kyowo` (gates the whole app; bcrypt hash in `.env`)         |
 | DB            | PostgreSQL on `localhost:5433` (Homebrew service)            |
-| Audio source  | `~/Music/MusicUniverse` (`MUSIC_LIBRARY_PATH` in `.env`)     |
+| Audio source  | `~/Music/Kyowave` (`MUSIC_LIBRARY_PATH` in `.env`)     |
 
 ---
 
@@ -25,10 +25,10 @@ they survive reboots.
 ### View live logs
 
 ```bash
-tail -f ~/Library/Logs/MusicUniverse/app.out.log
-tail -f ~/Library/Logs/MusicUniverse/app.err.log
-tail -f ~/Library/Logs/MusicUniverse/tunnel.out.log
-tail -f ~/Library/Logs/MusicUniverse/tunnel.err.log
+tail -f ~/Library/Logs/Kyowave/app.out.log
+tail -f ~/Library/Logs/Kyowave/app.err.log
+tail -f ~/Library/Logs/Kyowave/tunnel.out.log
+tail -f ~/Library/Logs/Kyowave/tunnel.err.log
 ```
 
 ### Deploy a code change
@@ -50,7 +50,7 @@ The manual equivalent, if you ever need to run the steps by hand:
 
 ```bash
 pnpm build
-launchctl kickstart -k gui/$(id -u)/com.musicuniverse.app
+launchctl kickstart -k gui/$(id -u)/com.kyowave.app
 ```
 
 **Never run `pnpm build` on its own here.** It does not merely leave the site
@@ -78,33 +78,33 @@ a restart — it auto-reconnects through network blips — but if you ever
 need to:
 
 ```bash
-launchctl kickstart -k gui/$(id -u)/com.musicuniverse.tunnel
+launchctl kickstart -k gui/$(id -u)/com.kyowave.tunnel
 ```
 
 ### Stop everything (e.g. to use `pnpm dev` for hot-reload work)
 
 ```bash
-launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.musicuniverse.app.plist
-launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.musicuniverse.tunnel.plist
+launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.kyowave.app.plist
+launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.kyowave.tunnel.plist
 ```
 
 Re-enable later with:
 
 ```bash
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.musicuniverse.app.plist
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.musicuniverse.tunnel.plist
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.kyowave.app.plist
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.kyowave.tunnel.plist
 ```
 
 ### Check what's running
 
 ```bash
-launchctl list | grep musicuniverse
+launchctl list | grep kyowave
 # Two lines with non-negative PIDs = healthy.
 # `-` in the PID column = job loaded but not currently running.
 ```
 
 ```bash
-curl -sI -o /dev/null -w "HTTP %{http_code} via %{remote_ip}\n" https://kyote.wazfahmi.site/login
+curl -sI -o /dev/null -w "HTTP %{http_code} via %{remote_ip}\n" https://kyowave.wazfahmi.site/login
 # Expected: HTTP 200 via 104.x.x.x
 ```
 
@@ -118,7 +118,7 @@ Run on demand:
 ./scripts/backup.sh
 ```
 
-Output lands in `~/Backups/MusicUniverse/<timestamp>/`:
+Output lands in `~/Backups/Kyowave/<timestamp>/`:
 
 - `db.dump` — pg_dump custom format (restore via `pg_restore`)
 - `music.tar.gz` — gzipped tar of the music library (excludes `.cache` and `.DS_Store`)
@@ -130,13 +130,13 @@ Backups older than 30 days auto-prune. Tweak with `RETENTION_DAYS=N`.
 ```bash
 pg_restore --clean --if-exists --no-owner \
   --dbname="$DATABASE_URL" \
-  ~/Backups/MusicUniverse/<timestamp>/db.dump
+  ~/Backups/Kyowave/<timestamp>/db.dump
 ```
 
 ### Restore the music library
 
 ```bash
-tar -xzf ~/Backups/MusicUniverse/<timestamp>/music.tar.gz -C ~/Music/
+tar -xzf ~/Backups/Kyowave/<timestamp>/music.tar.gz -C ~/Music/
 # then trigger a rescan from the Settings page, or:
 # the chokidar watcher picks up new files automatically
 ```
@@ -149,7 +149,7 @@ tar -xzf ~/Backups/MusicUniverse/<timestamp>/music.tar.gz -C ~/Music/
 
 ```bash
 brew upgrade cloudflared
-launchctl kickstart -k gui/$(id -u)/com.musicuniverse.tunnel
+launchctl kickstart -k gui/$(id -u)/com.kyowave.tunnel
 ```
 
 ### Inspect tunnel state
@@ -171,9 +171,9 @@ If `~/.cloudflared/<UUID>.json` is ever compromised:
 ```bash
 cloudflared tunnel delete music-universe
 cloudflared tunnel create music-universe   # writes a new UUID + JSON
-cloudflared tunnel route dns music-universe kyote.wazfahmi.site
+cloudflared tunnel route dns music-universe kyowave.wazfahmi.site
 # update tunnel + credentials-file in ~/.cloudflared/config.yml with the new UUID
-launchctl kickstart -k gui/$(id -u)/com.musicuniverse.tunnel
+launchctl kickstart -k gui/$(id -u)/com.kyowave.tunnel
 ```
 
 ---
@@ -188,7 +188,7 @@ pnpm install
 pnpm exec prisma migrate deploy
 # 4. always:
 pnpm build
-launchctl kickstart -k gui/$(id -u)/com.musicuniverse.app
+launchctl kickstart -k gui/$(id -u)/com.kyowave.app
 ```
 
 For hot-reload iteration, see "Stop everything" above, then `pnpm dev`.
@@ -199,14 +199,14 @@ For hot-reload iteration, see "Stop everything" above, then `pnpm dev`.
 
 ### Tunnel is up but the URL 502s
 
-The app crashed. Check `~/Library/Logs/MusicUniverse/app.err.log`. launchd
+The app crashed. Check `~/Library/Logs/Kyowave/app.err.log`. launchd
 will retry after `ThrottleInterval` (10s) — if it's crash-looping, fix the
 crash and re-kickstart.
 
 ### Port 3100 is already in use / the app job silently never runs
 
-The failure mode to watch for: `launchctl list | grep musicuniverse` shows
-`-` in the PID column for `com.musicuniverse.app` with exit status `1`, yet
+The failure mode to watch for: `launchctl list | grep kyowave` shows
+`-` in the PID column for `com.kyowave.app` with exit status `1`, yet
 the site still loads. That means an **orphaned `pnpm start`** (PPID 1, from a
 manual run) is holding 3100, and the managed job has been crash-looping on
 `EADDRINUSE` behind it — possibly for days. The site serves whatever build
@@ -220,28 +220,28 @@ lsof -nP -iTCP:3100 -sTCP:LISTEN     # find the listener
 ps -o pid,ppid,lstart,command -p <PID>   # PPID 1 => orphan, not launchd
 kill <listener-pid> <its-parent-pid>
 # KeepAlive restarts the managed job within ~10s; confirm it took the port:
-launchctl list | grep musicuniverse   # app should now show a real PID
+launchctl list | grep kyowave   # app should now show a real PID
 ```
 
-### `kyote.wazfahmi.site` resolves but never connects
+### `kyowave.wazfahmi.site` resolves but never connects
 
 Either the tunnel job isn't running (`launchctl list | grep tunnel`) or
 the DNS CNAME got removed from your Cloudflare zone. Re-route:
 
 ```bash
-cloudflared tunnel route dns music-universe kyote.wazfahmi.site
+cloudflared tunnel route dns music-universe kyowave.wazfahmi.site
 ```
 
 ### "Successfully installed" but the app says wrong password
 
-The session cookie cache is per-host. Clear cookies for `kyote.wazfahmi.site`
+The session cookie cache is per-host. Clear cookies for `kyowave.wazfahmi.site`
 and try again.
 
 ### Whisper transcriptions hang
 
 `whisper-cli` or `ffmpeg` aren't on the launchd `PATH`. The plist sets
 `PATH=/opt/homebrew/bin:...` which covers Homebrew installs. If you used
-a custom path, edit `deploy/launchd/com.musicuniverse.app.plist`
+a custom path, edit `deploy/launchd/com.kyowave.app.plist`
 accordingly and reload the job.
 
 ---
@@ -250,13 +250,13 @@ accordingly and reload the job.
 
 | Path                                                          | What                                          |
 | ------------------------------------------------------------- | --------------------------------------------- |
-| `~/Library/LaunchAgents/com.musicuniverse.app.plist`          | App service definition (managed copy)         |
-| `~/Library/LaunchAgents/com.musicuniverse.tunnel.plist`       | Tunnel service definition (managed copy)      |
+| `~/Library/LaunchAgents/com.kyowave.app.plist`          | App service definition (managed copy)         |
+| `~/Library/LaunchAgents/com.kyowave.tunnel.plist`       | Tunnel service definition (managed copy)      |
 | `~/.cloudflared/config.yml`                                   | Cloudflared ingress rules                     |
 | `~/.cloudflared/29284152-...json`                             | Tunnel credentials (keep secret)              |
 | `~/.cloudflared/cert.pem`                                     | Origin certificate (CF login token)           |
-| `~/Library/Logs/MusicUniverse/`                               | All service stdout/stderr                     |
-| `~/Backups/MusicUniverse/`                                    | pg_dump + music tarball backups               |
+| `~/Library/Logs/Kyowave/`                               | All service stdout/stderr                     |
+| `~/Backups/Kyowave/`                                    | pg_dump + music tarball backups               |
 | `deploy/launchd/`                                             | Source-of-truth plists (in repo)              |
 | `deploy/cloudflared/config.example.yml`                       | Source-of-truth tunnel config template        |
 | `scripts/backup.sh`                                           | Backup runner                                 |

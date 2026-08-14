@@ -6,7 +6,7 @@
 #   • Music library folder → tar.gz of MUSIC_LIBRARY_PATH
 #
 # Output:
-#   ~/Backups/MusicUniverse/YYYY-MM-DD_HHMMSS/
+#   ~/Backups/Kyowave/YYYY-MM-DD_HHMMSS/
 #     ├── db.dump
 #     └── music.tar.gz
 #
@@ -23,7 +23,7 @@
 
 set -euo pipefail
 
-BACKUP_ROOT="${BACKUP_ROOT:-$HOME/Backups/MusicUniverse}"
+BACKUP_ROOT="${BACKUP_ROOT:-$HOME/Backups/Kyowave}"
 RETENTION_DAYS="${RETENTION_DAYS:-30}"
 # Any dump file smaller than this is considered broken. Real dumps of even
 # a fresh empty schema are typically 5–15 KB compressed.
@@ -124,7 +124,7 @@ done < <(find "$BACKUP_ROOT" -mindepth 1 -maxdepth 1 -type d -mtime "+$RETENTION
 echo "  ✓ pruned $PRUNED old backup(s)"
 
 # ── Off-host copy (optional but recommended) ──────────────────────────────────
-# Configure OFFSITE_DIR to e.g. ~/Library/Mobile Documents/com~apple~CloudDocs/MusicUniverse-Backups
+# Configure OFFSITE_DIR to e.g. ~/Library/Mobile Documents/com~apple~CloudDocs/Kyowave-Backups
 # (iCloud Drive) or an external/NAS path to mirror today's snapshot off-host.
 # Without this, your only copy is on the same disk as the source — a dead
 # SSD takes both at once.

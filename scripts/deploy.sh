@@ -31,8 +31,8 @@
 set -euo pipefail
 
 PORT="${PORT:-3100}"
-LABEL="${LABEL:-com.musicuniverse.app}"
-PUBLIC_URL="${PUBLIC_URL:-https://kyote.wazfahmi.site}"
+LABEL="${LABEL:-com.kyowave.app}"
+PUBLIC_URL="${PUBLIC_URL:-https://kyowave.wazfahmi.site}"
 HEALTH_TIMEOUT_SEC="${HEALTH_TIMEOUT_SEC:-60}"
 
 SKIP_MIGRATE=0
@@ -165,7 +165,7 @@ bold "→ Verifying"
 
 deadline=$(( $(date +%s) + HEALTH_TIMEOUT_SEC ))
 until curl -fsS --max-time 5 "http://127.0.0.1:$PORT/api/health" 2>/dev/null | grep -q '"ok":true'; do
-  [[ $(date +%s) -lt $deadline ]] || die "local health never came up within ${HEALTH_TIMEOUT_SEC}s. Check: tail -50 ~/Library/Logs/MusicUniverse/app.err.log"
+  [[ $(date +%s) -lt $deadline ]] || die "local health never came up within ${HEALTH_TIMEOUT_SEC}s. Check: tail -50 ~/Library/Logs/Kyowave/app.err.log"
   sleep 2
 done
 ok "local health ok"
