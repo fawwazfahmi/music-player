@@ -126,6 +126,10 @@
   }
   html {
     @apply font-sans;
+    /* The app is dark-only, but without this the browser still paints its own
+       chrome light: scrollbars, form controls, the autofill highlight. The
+       main scroll area showed a bright strip down the edge of the page. */
+    color-scheme: dark;
   }
 }
 /* Kyowave mark — the rings breathe while something is playing. Scaling an SVG
