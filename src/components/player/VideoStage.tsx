@@ -101,7 +101,9 @@ function getOrCreateContainer(): HTMLDivElement {
     "pointer-events:none",
     "background:black",
     "display:block",
-    "visibility:visible",
+    // Born hidden. It reveals itself the first time applyRect finds a real
+    // slot, so the iframe can never flash over the page before it has a home.
+    "visibility:hidden",
   ].join(";");
   document.body.appendChild(div);
   _container = div;
@@ -160,6 +162,14 @@ export function VideoStage() {
       if (!slot) {
         // No slot in DOM → park container offscreen at a real size so the
         // iframe stays alive and renderable (don't shrink to 1x1).
+        //
+        // Instantly, and hidden. Easing this move animates the video flying up
+        // off the screen, and the position alone is not enough: until the move
+        // lands the video is still painted over whatever page is underneath.
+        // On a phone that was the library list, with a video sitting in the
+        // middle of it after the sheet closed.
+        container.style.transition = "none";
+        container.style.visibility = "hidden";
         container.style.top = "-10000px";
         container.style.left = "0px";
         container.style.width = "640px";
@@ -180,10 +190,22 @@ export function VideoStage() {
         });
         return; // not yet laid out
       }
+      // Coming back from parked: place it before revealing it, or it eases in
+      // from -10000px and reads as the video falling into position.
+      const wasParked = container.style.visibility === "hidden";
+      if (wasParked) container.style.transition = "none";
       container.style.top = `${r.top}px`;
       container.style.left = `${r.left}px`;
       container.style.width = `${r.width}px`;
       container.style.height = `${r.height}px`;
+      if (wasParked) {
+        container.style.visibility = "visible";
+        // Restore easing only after this placement has been committed, so the
+        // next slot-to-slot move animates but this one doesn't.
+        requestAnimationFrame(() => {
+          container.style.transition = SLOT_TRANSITION;
+        });
+      }
 
       if (slot !== lastSlot) {
         lastSlot = slot;
@@ -231,7 +253,17 @@ export function VideoStage() {
 
     // Watch for slot insertion/removal as user navigates
     const mutation = new MutationObserver(scheduleApply);
-    mutation.observe(document.body, { childList: true, subtree: true });
+    // attributes matters as much as childList: the mobile sheet stays mounted
+    // and toggles its `data-video-slot` on and off rather than being removed.
+    // Watching only childList meant closing the sheet fired nothing, so the
+    // video sat where the sheet had been — over the library — until some
+    // unrelated scroll or resize happened to trigger a re-measure.
+    mutation.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["data-video-slot"],
+    });
 
     return () => {
       window.removeEventListener("resize", scheduleApply);

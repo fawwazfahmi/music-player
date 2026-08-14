@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { useEffect } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { useLongPress, LONG_PRESS_MS, LONG_PRESS_MOVE_TOLERANCE } from "@/hooks/use-long-press";
 
@@ -10,7 +11,11 @@ let consumed: { current: boolean } | null = null;
 
 function Row({ onFire, enabled = true }: { onFire: () => void; enabled?: boolean }) {
   const { handlers, pressing, consumedRef } = useLongPress(onFire, { enabled });
-  consumed = consumedRef;
+  // In an effect, not during render — assigning to an outer binding while
+  // rendering is a side effect, and the lint rule is right to say so.
+  useEffect(() => {
+    consumed = consumedRef;
+  }, [consumedRef]);
   return (
     <div data-testid="row" data-pressing={pressing ? "1" : "0"} {...handlers}>
       row

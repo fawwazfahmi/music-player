@@ -82,3 +82,59 @@ describe("VideoStage lifecycle", () => {
     expect(document.querySelectorAll(STAGE)).toHaveLength(1);
   });
 });
+
+describe("VideoStage slot occupancy", () => {
+  /** jsdom gives every element a 0x0 rect, so a slot has to be faked. */
+  function withRect(el: HTMLElement, rect: Partial<DOMRect>) {
+    el.getBoundingClientRect = () =>
+      ({ top: 0, left: 0, width: 320, height: 180, ...rect }) as DOMRect;
+  }
+
+  it("stays hidden while no slot exists", async () => {
+    const { VideoStage } = await import("@/components/player/VideoStage");
+    render(<VideoStage />);
+    const stage = document.querySelector<HTMLElement>(STAGE)!;
+    expect(stage.style.visibility).toBe("hidden");
+  });
+
+  it("hides again the moment a slot stops claiming the video", async () => {
+    // The bug this guards, caught on video: the mobile sheet stays mounted and
+    // toggles `data-video-slot` on and off rather than being removed. The
+    // MutationObserver watched only childList, so closing the sheet fired
+    // nothing — and the video stayed painted over the library list until some
+    // unrelated scroll happened to trigger a re-measure.
+    const { VideoStage } = await import("@/components/player/VideoStage");
+    const slot = document.createElement("div");
+    slot.setAttribute("data-video-slot", "sheet");
+    withRect(slot, { top: 40, left: 0, width: 320, height: 180 });
+    document.body.appendChild(slot);
+
+    render(<VideoStage />);
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
+    const stage = document.querySelector<HTMLElement>(STAGE)!;
+    expect(stage.style.visibility).toBe("visible");
+    expect(stage.style.top).toBe("40px");
+
+    slot.removeAttribute("data-video-slot");
+    await new Promise((r) => setTimeout(r, 50));
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
+
+    expect(stage.style.visibility).toBe("hidden");
+    slot.remove();
+  });
+
+  it("ignores a slot that is present but laid out at zero size", async () => {
+    // The desktop right panel is `hidden md:block`; on a phone its slot is
+    // still in the DOM at 0x0. Letting it win starved the visible slot.
+    const { VideoStage } = await import("@/components/player/VideoStage");
+    const hidden = document.createElement("div");
+    hidden.setAttribute("data-video-slot", "small");
+    withRect(hidden, { width: 0, height: 0 });
+    document.body.appendChild(hidden);
+
+    render(<VideoStage />);
+    await new Promise((r) => requestAnimationFrame(() => r(null)));
+    expect(document.querySelector<HTMLElement>(STAGE)!.style.visibility).toBe("hidden");
+    hidden.remove();
+  });
+});
