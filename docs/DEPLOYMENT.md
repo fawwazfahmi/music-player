@@ -38,6 +38,26 @@ pnpm build
 launchctl kickstart -k gui/$(id -u)/com.musicuniverse.app
 ```
 
+**Never run `pnpm build` on its own here.** It does not merely leave the site
+stale — it breaks it immediately. `next start` holds one BUILD_ID in memory,
+and a rebuild replaces every content-hashed chunk in `.next/static`. The
+running server keeps serving HTML that points at the *old* filenames, which
+no longer exist, so:
+
+- every CSS chunk 500s and the site renders as unstyled HTML;
+- server actions fail the build-ID check, so pages look empty (e.g. "Library
+  is empty" with a full database).
+
+Seen 12 Aug 2026 after a `git switch` + `pnpm build` with no kickstart. The
+fix is just the kickstart — nothing is corrupted. To confirm you have hit
+this rather than something real:
+
+```bash
+cat .next/BUILD_ID                      # what is on disk
+ps -o lstart -p $(lsof -tnP -iTCP:3100 -sTCP:LISTEN | head -1)   # when the server booted
+# server older than BUILD_ID's mtime => stale process, kickstart it
+```
+
 `-k` forces a restart even if the job is running. The tunnel rarely needs
 a restart — it auto-reconnects through network blips — but if you ever
 need to:
