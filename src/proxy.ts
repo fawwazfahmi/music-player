@@ -1,7 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE_NAME, verifyCookie, SESSION_COOKIE_VALUE } from "@/server/auth";
 
-const PUBLIC_PATHS = ["/login", "/api/login", "/api/health"];
+// /overlay + /api/overlay: public OBS overlay (browser source has no login
+// cookie). /api/art: album covers the overlay needs — public, non-sensitive.
+// NOTE: /api/presence is intentionally NOT public — only the logged-in kyote
+// tab may push now-playing.
+const PUBLIC_PATHS = ["/login", "/api/login", "/api/health", "/overlay", "/api/overlay", "/api/art"];
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
