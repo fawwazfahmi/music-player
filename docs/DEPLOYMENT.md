@@ -31,7 +31,22 @@ tail -f ~/Library/Logs/MusicUniverse/tunnel.out.log
 tail -f ~/Library/Logs/MusicUniverse/tunnel.err.log
 ```
 
-### Restart after a code change
+### Deploy a code change
+
+```bash
+./scripts/deploy.sh
+```
+
+Preflight → migrate → build → restart → verify, exiting non-zero on any
+failure. It refuses to leave the box in a mismatched state, reclaims the port
+from an orphaned process, and finishes by fetching the stylesheet the live
+login page references — the check that catches a stale server while
+`/api/health` still reports OK.
+
+Flags: `--skip-migrate`, `--skip-verify`. Overridable env: `PORT`, `LABEL`,
+`PUBLIC_URL`, `HEALTH_TIMEOUT_SEC`.
+
+The manual equivalent, if you ever need to run the steps by hand:
 
 ```bash
 pnpm build
