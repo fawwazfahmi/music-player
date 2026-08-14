@@ -20,6 +20,14 @@ export const metadata: Metadata = {
     title: "Kyowave",
     statusBarStyle: "black-translucent",
   },
+  other: {
+    // Next emits only the modern `mobile-web-app-capable`, which Safari has
+    // honoured since 15.4 and which iOS 16.4+ supersedes with the manifest's
+    // display:standalone anyway. The legacy Apple spelling is one line and is
+    // the difference between a full-screen app and a Safari window with an
+    // address bar on anything older.
+    "apple-mobile-web-app-capable": "yes",
+  },
   icons: {
     // Two SVG variants, picked by the browser's colour scheme. Each is drawn
     // to read against that scheme's chrome: icon.svg is bright blue on near

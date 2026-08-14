@@ -215,9 +215,12 @@ whole listening session to render a picture nobody is looking at.
 1. **Artwork fallback.** Use the same resolution the UI uses — `coverUrl(hash,
    ytVideoId)` — so a track with no `coverArtHash` falls back to its YouTube
    thumbnail instead of sending `artwork: []`.
-2. **Three sizes, not one.** `96×96`, `256×256`, `512×512`. iOS picks by size;
-   handing it a lone 500×500 to downsample is visibly softer in the compact
-   Island.
+2. **Sizes declared only where the images are genuinely different.** The art
+   endpoint serves one fixed file with no resizing, so stored art gets a single
+   `500x500` entry — listing one URL three times under three sizes would be a
+   lie that costs a download. YouTube does publish real distinct renditions, so
+   the fallback offers `mqdefault` (320×180) and `hqdefault` (480×360) and lets
+   the platform choose.
 3. **`setPositionState()`.** Called on load and whenever the playhead moves by
    more than a second, plus on seek and pause. Without it the lock-screen
    scrubber does not track the song. Wrapped in try/catch — it throws if
