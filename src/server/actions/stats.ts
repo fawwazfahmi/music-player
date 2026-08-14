@@ -3,6 +3,8 @@
 import { db } from "@/server/db";
 import { resolveTrackCoverHash } from "@/lib/cover-url";
 import { env } from "@/lib/env";
+import { cookies } from "next/headers";
+import { NAME_COOKIE_NAME, isValidName } from "@/server/auth";
 
 export type StatsRange = "7d" | "30d" | "365d" | "all";
 
@@ -24,6 +26,41 @@ function sinceFor(range: StatsRange): Date | undefined {
 // the same threshold used elsewhere to set `completed`. This filters out skips.
 const COMPLETED_ONLY = { completed: true } as const;
 
+/** Only this identity may look at anyone else's listening. Everyone else is
+    scoped to their own, whatever they ask for.
+
+    Enforced here rather than by hiding the picker, so the answer doesn't
+    change based on what the client sends. Worth being honest about the
+    ceiling though: mu_name is an unsigned cookie (see auth.ts) and both
+    people share one app password, so either could set it to the other's name.
+    This stops the UI leaking by accident; it is not a security boundary, and
+    nothing built on mu_name can be. */
+const STATS_ADMIN = "fawwaz";
+
+/** Which listener the caller is actually allowed to see. `requested` is a
+    hint from the client and is honoured only for the admin. */
+async function resolveListener(requested?: string | null): Promise<string | null> {
+  const raw = (await cookies()).get(NAME_COOKIE_NAME)?.value;
+  const decoded = raw ? decodeURIComponent(raw) : "";
+  const me = isValidName(decoded) ? decoded : null;
+  if (me === STATS_ADMIN) return requested ?? null;
+  // No identity cookie: nothing to scope to, and blocking would leave the page
+  // blank for a session that predates the cookie. Same convenience ceiling.
+  return me;
+}
+
+/** The one place the Stats page decides what it is counting: real plays, in
+    the selected range, optionally for one listener. Every panel uses it, so a
+    card and the heatmap beside it can't drift apart. */
+function historyWhere(range: StatsRange, listener?: string | null) {
+  const since = sinceFor(range);
+  return {
+    ...COMPLETED_ONLY,
+    ...(since ? { playedAt: { gte: since } } : {}),
+    ...(listener ? { listener } : {}),
+  };
+}
+
 export interface TopTrack {
   trackId: string;
   title: string;
@@ -35,14 +72,15 @@ export interface TopTrack {
   playCount: number;
 }
 
-export async function getTopTracks(range: StatsRange, limit = 50): Promise<TopTrack[]> {
-  const since = sinceFor(range);
+export async function getTopTracks(
+  range: StatsRange,
+  listener?: string | null,
+  limit = 50,
+): Promise<TopTrack[]> {
+  listener = await resolveListener(listener);
   const rows = await db.listeningHistory.groupBy({
     by: ["trackId"],
-    where: {
-      ...COMPLETED_ONLY,
-      ...(since ? { playedAt: { gte: since } } : {}),
-    },
+    where: historyWhere(range, listener),
     _count: { _all: true },
     orderBy: { _count: { trackId: "desc" } },
     take: limit,
@@ -91,16 +129,17 @@ export interface TopArtist {
   playCount: number;
 }
 
-export async function getTopArtists(range: StatsRange, limit = 30): Promise<TopArtist[]> {
-  const since = sinceFor(range);
+export async function getTopArtists(
+  range: StatsRange,
+  listener?: string | null,
+  limit = 30,
+): Promise<TopArtist[]> {
+  listener = await resolveListener(listener);
   // groupBy doesn't reach across relations, so we pull trackId counts and
   // aggregate by primaryArtistId in JS. Cardinality is bounded by our library.
   const rows = await db.listeningHistory.groupBy({
     by: ["trackId"],
-    where: {
-      ...COMPLETED_ONLY,
-      ...(since ? { playedAt: { gte: since } } : {}),
-    },
+    where: historyWhere(range, listener),
     _count: { _all: true },
   });
 
@@ -146,14 +185,15 @@ export interface TopAlbum {
   playCount: number;
 }
 
-export async function getTopAlbums(range: StatsRange, limit = 30): Promise<TopAlbum[]> {
-  const since = sinceFor(range);
+export async function getTopAlbums(
+  range: StatsRange,
+  listener?: string | null,
+  limit = 30,
+): Promise<TopAlbum[]> {
+  listener = await resolveListener(listener);
   const rows = await db.listeningHistory.groupBy({
     by: ["trackId"],
-    where: {
-      ...COMPLETED_ONLY,
-      ...(since ? { playedAt: { gte: since } } : {}),
-    },
+    where: historyWhere(range, listener),
     _count: { _all: true },
   });
 
@@ -213,12 +253,19 @@ export interface RecentPlay {
   playedAt: string; // ISO
 }
 
-export async function getRecentlyPlayed(limit = 30): Promise<RecentPlay[]> {
+export async function getRecentlyPlayed(
+  listener?: string | null,
+  limit = 30,
+): Promise<RecentPlay[]> {
+  listener = await resolveListener(listener);
   // Distinct on trackId, latest first — so a song played 5 times in a row shows
   // up once. Prisma doesn't have distinctOn for orderBy joins so we fetch a
   // window and dedupe in JS.
   const rows = await db.listeningHistory.findMany({
-    where: { durationListened: { gte: 5 } }, // ignore accidental clicks
+    where: {
+      durationListened: { gte: 5 }, // ignore accidental clicks
+      ...(listener ? { listener } : {}),
+    },
     orderBy: { playedAt: "desc" },
     take: limit * 4,
     select: {
@@ -268,12 +315,11 @@ export interface StatsOverview {
   uniqueArtists: number;
 }
 
-export async function getStatsOverview(range: StatsRange): Promise<StatsOverview> {
-  const since = sinceFor(range);
-  const where = {
-    ...COMPLETED_ONLY,
-    ...(since ? { playedAt: { gte: since } } : {}),
-  };
+export async function getStatsOverview(
+  range: StatsRange,
+  listener?: string | null,
+): Promise<StatsOverview> {
+  const where = historyWhere(range, await resolveListener(listener));
 
   const [agg, uniqueTracks] = await Promise.all([
     db.listeningHistory.aggregate({
@@ -348,6 +394,7 @@ export async function getListeningHeatmap(
   listener?: string | null,
   range: StatsRange = "all",
 ): Promise<HeatmapResult> {
+  listener = await resolveListener(listener);
   const since = sinceFor(range);
   const tz = env.APP_TIMEZONE;
 

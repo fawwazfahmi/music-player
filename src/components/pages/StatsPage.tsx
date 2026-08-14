@@ -19,6 +19,7 @@ import { useIpodStore } from "@/stores/ipod-store";
 import { coverUrl } from "@/lib/cover-url";
 import { PageHeader, buildQueueTrack } from "./_shared";
 import { ListeningHeatmap } from "./ListeningHeatmap";
+import { NAMES, useIdentity } from "@/hooks/use-identity";
 import { PlayIcon } from "@/components/icons";
 import { formatDuration } from "@/lib/format-duration";
 
@@ -41,6 +42,12 @@ const TABS: { value: Tab; label: string }[] = [
 export function StatsPage() {
   const [tab, setTab] = useState<Tab>("tracks");
   const [range, setRange] = useState<StatsRange>("30d");
+  // Whose stats to show. Only the admin can change it — the server enforces
+  // that regardless, so this just decides whether to render the control.
+  const identity = useIdentity();
+  const isAdmin = identity === "fawwaz";
+  const [who, setWho] = useState<string>("");
+  const listener = isAdmin ? who : (identity ?? "");
 
   const [overview, setOverview] = useState<StatsOverview | null>(null);
   const [tracks, setTracks] = useState<{ key: string; items: TopTrack[] } | null>(null);
@@ -51,39 +58,58 @@ export function StatsPage() {
   // Refetch overview + active tab data when range or tab changes
   useEffect(() => {
     let cancelled = false;
-    void getStatsOverview(range).then((r) => {
+    void getStatsOverview(range, listener || null).then((r) => {
       if (!cancelled) setOverview(r);
     });
     return () => {
       cancelled = true;
     };
-  }, [range]);
+  }, [range, listener]);
 
-  const dataKey = `${tab}:${range}`;
+  const dataKey = `${tab}:${range}:${listener}`;
 
   useEffect(() => {
     let cancelled = false;
-    const key = `${tab}:${range}`;
+    const key = `${tab}:${range}:${listener}`;
     // No synchronous null-reset: staleness is expressed by the stored key not
     // matching the current one, so the lists below read as loading until the
     // fetch for *this* key lands.
     if (tab === "tracks") {
-      void getTopTracks(range).then((r) => !cancelled && setTracks({ key, items: r }));
+      void getTopTracks(range, listener || null).then((r) => !cancelled && setTracks({ key, items: r }));
     } else if (tab === "artists") {
-      void getTopArtists(range).then((r) => !cancelled && setArtists({ key, items: r }));
+      void getTopArtists(range, listener || null).then((r) => !cancelled && setArtists({ key, items: r }));
     } else if (tab === "albums") {
-      void getTopAlbums(range).then((r) => !cancelled && setAlbums({ key, items: r }));
+      void getTopAlbums(range, listener || null).then((r) => !cancelled && setAlbums({ key, items: r }));
     } else if (tab === "recent") {
-      void getRecentlyPlayed().then((r) => !cancelled && setRecent({ key, items: r }));
+      void getRecentlyPlayed(listener || null).then((r) => !cancelled && setRecent({ key, items: r }));
     }
     return () => {
       cancelled = true;
     };
-  }, [tab, range]);
+  }, [tab, range, listener]);
 
   return (
     <div className="flex h-full flex-col">
-      <PageHeader title="Stats" subtitle="Your listening" />
+      <PageHeader
+        title="Stats"
+        subtitle={isAdmin && who ? `${who}'s listening` : "Your listening"}
+        actions={
+          isAdmin ? (
+            <select
+              value={who}
+              onChange={(e) => setWho(e.target.value)}
+              className="rounded-md border border-zinc-800 bg-zinc-900 px-2 py-1 text-xs text-zinc-200 focus:border-sky-500 focus:outline-none"
+            >
+              <option value="">Everyone</option>
+              {NAMES.map((n) => (
+                <option key={n} value={n}>
+                  {n}
+                </option>
+              ))}
+            </select>
+          ) : undefined
+        }
+      />
 
       <div className="border-b border-zinc-800/50 px-6 pb-3">
         <OverviewCards overview={overview} range={range} />
@@ -92,7 +118,7 @@ export function StatsPage() {
       {/* Sits above the tabs rather than behind one: it describes the whole
           range, the same as the cards above it, not one slice of it. */}
       <div className="shrink-0 border-b border-zinc-800/50 px-6 py-4">
-        <ListeningHeatmap range={range} />
+        <ListeningHeatmap range={range} listener={listener || null} />
       </div>
 
       <div className="flex items-center justify-between gap-4 border-b border-zinc-800/50 px-6 py-2">

@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 
-const NAMES = ["ainul", "fawwaz"] as const;
+export const NAMES = ["ainul", "fawwaz"] as const;
 export type AppUserName = (typeof NAMES)[number];
 
 function readNameCookie(): AppUserName | null {
