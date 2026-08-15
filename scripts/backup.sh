@@ -152,10 +152,35 @@ if [[ -n "${OFFSITE_DIR:-}" ]]; then
   # Plain cp, not `cp -p`. iCloud Drive rejects the attribute-preserving copy
   # with "Operation not permitted", which failed silently on every run — 52
   # consecutive failures before anyone looked at the log.
-  cp "$DEST/db.dump" "$OFFSITE_DIR/db.dump.latest" \
-    || { echo "  ! offsite copy failed (db.dump.latest)" >&2; OFFSITE_OK=0; }
-  cp "$DEST/db.dump" "$OFFSITE_DIR/db.dump.$STAMP" \
-    || { echo "  ! offsite copy failed (db.dump.$STAMP)" >&2; OFFSITE_OK=0; }
+  #
+  # And remove before writing, for a related but separate reason.
+  #
+  # macOS lets this job modify files IT created in iCloud Drive, and refuses on
+  # files created by another process (they carry that process's
+  # com.apple.provenance). The first scheduled run copied db.dump.<stamp> fine
+  # — a fresh create — and failed on db.dump.latest, which an interactive shell
+  # had created days earlier. So "latest" sat a day stale. Testing by hand
+  # never reproduces it, because by hand you ARE the other process.
+  #
+  # REPAIR, if the err log ever shows this again: delete the offending file
+  # from Finder or a shell, then run the job once. It recreates the file, owns
+  # it, and can overwrite it from then on. Verified by doing exactly that.
+  offsite_put() {
+    local src=$1 dest=$2 label=$3
+    rm -f "$dest" 2>/dev/null || true
+    cp "$src" "$dest" \
+      || { echo "  ! offsite copy failed ($label)" >&2; OFFSITE_OK=0; return 1; }
+  }
+  offsite_put "$DEST/db.dump" "$OFFSITE_DIR/db.dump.latest" "db.dump.latest" || true
+  offsite_put "$DEST/db.dump" "$OFFSITE_DIR/db.dump.$STAMP" "db.dump.$STAMP" || true
+
+  # Assert rather than assume: a "latest" that is older than this run's dump is
+  # the exact silent failure this whole block exists to prevent.
+  if [[ "${OFFSITE_OK:-1}" == "1" ]] \
+     && ! cmp -s "$DEST/db.dump" "$OFFSITE_DIR/db.dump.latest"; then
+    echo "  ! offsite db.dump.latest does not match this run's dump" >&2
+    OFFSITE_OK=0
+  fi
   # The audio mirror is deliberately not pushed to iCloud: 3 GB of immutable
   # m4a would churn the sync client daily for no benefit. Point OFFSITE_DIR at
   # an external drive if you want the audio off-host too.
