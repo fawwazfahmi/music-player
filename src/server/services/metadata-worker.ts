@@ -6,6 +6,7 @@ import {
   aggressivelyCleanTitle,
   splitCamelCase,
 } from "@/server/services/yt-title-parser";
+import { tagTrackGenres } from "@/server/services/genre-tagger";
 
 let running = false;
 let stop = false;
@@ -204,5 +205,13 @@ async function processTrackJob(trackId: string): Promise<void> {
         console.warn("[mu] cover art fetch failed:", err);
       }
     }
+  }
+
+  // Populate genres from the freshly-resolved MBIDs (MB first, Ollama fallback).
+  // Best-effort: a genre failure must not fail the enrichment job.
+  try {
+    await tagTrackGenres(trackId);
+  } catch (err) {
+    console.warn("[mu] genre tagging failed:", err);
   }
 }
