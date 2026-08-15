@@ -103,6 +103,7 @@ model Track {
   primaryArtist     Artist               @relation("TrackPrimaryArtist", fields: [primaryArtistId], references: [id])
   additionalArtists TrackArtist[]
   tags              TrackTag[]
+  genres            TrackGenre[]
   notes             SongNote[]
   history           ListeningHistory[]
   playlistEntries   PlaylistTrack[]
@@ -147,6 +148,7 @@ model Genre {
   mbid    String?       @unique
   artists ArtistGenre[]
   albums  AlbumGenre[]
+  tracks  TrackGenre[]
 }
 
 model ArtistGenre {
@@ -165,6 +167,16 @@ model AlbumGenre {
   genre   Genre  @relation(fields: [genreId], references: [id])
 
   @@id([albumId, genreId])
+}
+
+model TrackGenre {
+  trackId String
+  genreId String
+  track   Track  @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  genre   Genre  @relation(fields: [genreId], references: [id])
+
+  @@id([trackId, genreId])
+  @@index([genreId])
 }
 
 model Tag {
