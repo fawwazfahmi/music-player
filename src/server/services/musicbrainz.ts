@@ -1,5 +1,6 @@
 import PQueue from "p-queue";
 import { env } from "@/lib/env";
+import { normalizeGenre } from "@/lib/genre";
 
 const BASE = "https://musicbrainz.org/ws/2";
 
@@ -99,6 +100,21 @@ export async function getArtist(mbid: string): Promise<ArtistInfo> {
       buildShortBio(data.disambiguation, data.type, data.country, data["life-span"]?.begin);
     return { name: data.name, bio };
   }) as Promise<ArtistInfo>;
+}
+
+export async function getGenres(
+  entityType: "recording" | "artist" | "release",
+  mbid: string,
+): Promise<string[]> {
+  return queue.add(async () => {
+    const res = await mbFetch(`/${entityType}/${mbid}`, { inc: "genres" });
+    const data = (await res.json()) as { genres?: { name: string; count?: number }[] };
+    return (data.genres ?? [])
+      .slice()
+      .sort((a, b) => (b.count ?? 0) - (a.count ?? 0))
+      .map((g) => normalizeGenre(g.name))
+      .filter((g) => g.length > 0);
+  }) as Promise<string[]>;
 }
 
 function buildShortBio(

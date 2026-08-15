@@ -95,4 +95,34 @@ describe("musicbrainz service", () => {
     expect(results).toEqual([]);
     expect(vi.mocked(fetch).mock.calls.length).toBe(2);
   }, 10_000);
+
+  it("getGenres parses inc=genres and sorts by count desc", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        genres: [
+          { name: "indie rock", count: 3 },
+          { name: "Pop", count: 9 },
+        ],
+      }),
+    } as never);
+
+    const { getGenres } = await import("@/server/services/musicbrainz");
+    const genres = await getGenres("recording", "abc-123");
+    expect(genres).toEqual(["pop", "indie rock"]);
+    const [url] = vi.mocked(fetch).mock.calls[0]!;
+    expect(String(url)).toContain("/recording/abc-123");
+    expect(String(url)).toContain("inc=genres");
+  });
+
+  it("getGenres returns [] when MB has no genres", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({}),
+    } as never);
+    const { getGenres } = await import("@/server/services/musicbrainz");
+    expect(await getGenres("artist", "artist-mb-1")).toEqual([]);
+  });
 });
