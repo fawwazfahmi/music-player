@@ -27,6 +27,10 @@ const Schema = z.object({
   // 16:00 is local midnight here, which would turn a late-night listening
   // peak into an afternoon one.
   APP_TIMEZONE: z.string().min(1).default("Asia/Kuala_Lumpur"),
+  // Local Ollama for genre/mood intelligence. Optional — when the server is
+  // unreachable, features degrade gracefully rather than failing.
+  OLLAMA_URL: z.string().url().default("http://127.0.0.1:11434"),
+  OLLAMA_MODEL: z.string().min(1).default("llama3.1:8b"),
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
 });
 
