@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { useIpodStore } from "@/stores/ipod-store";
+import { useIpodStore, screenKey } from "@/stores/ipod-store";
 
 describe("ipod-store", () => {
   beforeEach(() => {
@@ -46,5 +46,10 @@ describe("ipod-store", () => {
     useIpodStore.getState().setSelectionFor({ name: "artistDetail", artistId: "b" }, 7);
     expect(useIpodStore.getState().getSelectionFor({ name: "artistDetail", artistId: "a" })).toBe(3);
     expect(useIpodStore.getState().getSelectionFor({ name: "artistDetail", artistId: "b" })).toBe(7);
+  });
+
+  it("screenKey encodes genre screens", () => {
+    expect(screenKey({ name: "genreList" })).toBe("genreList");
+    expect(screenKey({ name: "genreDetail", genreId: "g1" })).toBe("genreDetail:g1");
   });
 });

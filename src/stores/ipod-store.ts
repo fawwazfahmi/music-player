@@ -22,7 +22,9 @@ export type ScreenState =
   | { name: "nowPlayingFull" }
   | { name: "stats" }
   | { name: "tagList" }
-  | { name: "tagDetail"; tagId: string };
+  | { name: "tagDetail"; tagId: string }
+  | { name: "genreList" }
+  | { name: "genreDetail"; genreId: string };
 
 export function screenKey(s: ScreenState): string {
   switch (s.name) {
@@ -40,6 +42,8 @@ export function screenKey(s: ScreenState): string {
       return `notes:${s.trackId}`;
     case "tagDetail":
       return `tagDetail:${s.tagId}`;
+    case "genreDetail":
+      return `genreDetail:${s.genreId}`;
     default:
       return s.name;
   }
