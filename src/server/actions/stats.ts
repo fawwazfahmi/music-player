@@ -56,6 +56,8 @@ function historyWhere(range: StatsRange, listener?: string | null) {
   const since = sinceFor(range);
   return {
     ...COMPLETED_ONLY,
+    // Ephemeral "trying it out" picks don't count toward library stats.
+    track: { inLibrary: true },
     ...(since ? { playedAt: { gte: since } } : {}),
     ...(listener ? { listener } : {}),
   };
@@ -264,6 +266,7 @@ export async function getRecentlyPlayed(
   const rows = await db.listeningHistory.findMany({
     where: {
       durationListened: { gte: 5 }, // ignore accidental clicks
+      track: { inLibrary: true }, // ephemeral picks aren't "recently played" library history
       ...(listener ? { listener } : {}),
     },
     orderBy: { playedAt: "desc" },

@@ -46,14 +46,15 @@ export async function searchLibrary(query: string): Promise<SearchResults> {
       FROM "Track" t
       JOIN "Artist" ar ON t."primaryArtistId" = ar.id
       LEFT JOIN "Album" al ON t."albumId" = al.id
-      WHERE t.playable = true AND t.title % ${q}
+      WHERE t.playable = true AND t."inLibrary" = true AND t.title % ${q}
       ORDER BY score DESC
       LIMIT ${LIMIT_PER_CATEGORY}
     `,
     db.$queryRaw<SearchArtistResult[]>`
       SELECT id, name, similarity(name, ${q}) AS score
-      FROM "Artist"
+      FROM "Artist" a
       WHERE name % ${q}
+        AND EXISTS (SELECT 1 FROM "Track" tt WHERE tt."primaryArtistId" = a.id AND tt."inLibrary" = true)
       ORDER BY score DESC
       LIMIT ${LIMIT_PER_CATEGORY}
     `,
@@ -63,6 +64,7 @@ export async function searchLibrary(query: string): Promise<SearchResults> {
       FROM "Album" al
       JOIN "Artist" ar ON al."artistId" = ar.id
       WHERE al.title % ${q}
+        AND EXISTS (SELECT 1 FROM "Track" tt WHERE tt."albumId" = al.id AND tt."inLibrary" = true)
       ORDER BY score DESC
       LIMIT ${LIMIT_PER_CATEGORY}
     `,
