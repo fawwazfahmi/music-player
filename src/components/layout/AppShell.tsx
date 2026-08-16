@@ -40,6 +40,7 @@ export function AppShell() {
   const player = usePlayerStore();
   const pop = useIpodStore((s) => s.pop);
   const navStackLen = useIpodStore((s) => s.navStack.length);
+  const currentName = useIpodStore((s) => s.current().name);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -357,7 +358,10 @@ export function AppShell() {
 
         {/* Main */}
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          {navStackLen > 1 && (
+          {/* Full video mode owns its own exit (the rail's ✕ and the right
+              panel's Back pill), so this generic chevron would read as a
+              second, competing way out. */}
+          {navStackLen > 1 && currentName !== "nowPlayingFull" && (
             <button
               type="button"
               onClick={pop}

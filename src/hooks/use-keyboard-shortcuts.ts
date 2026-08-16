@@ -20,6 +20,13 @@ function isTypingInInput(target: EventTarget | null): boolean {
   return false;
 }
 
+/** True when a dialog is actually on screen, not just mounted in the DOM. */
+function isDialogOpen(): boolean {
+  return Array.from(document.querySelectorAll('[role="dialog"]')).some(
+    (el) => el instanceof HTMLElement && el.getClientRects().length > 0,
+  );
+}
+
 export interface ShortcutEntry {
   combo: string;
   desc: string;
@@ -37,7 +44,7 @@ export const SHORTCUT_HELP: ShortcutEntry[] = [
   { combo: "R", desc: "Cycle repeat mode" },
   { combo: "/", desc: "Focus search" },
   { combo: "?", desc: "Show this help" },
-  { combo: "Esc", desc: "Close dialogs" },
+  { combo: "Esc", desc: "Close dialogs / exit full video" },
 ];
 
 /** Global keyboard shortcut handler. Mount once at the AppShell level. */
@@ -150,6 +157,24 @@ export function useKeyboardShortcuts() {
           if (helpOpen) {
             e.preventDefault();
             setHelpOpen(false);
+            return;
+          }
+          // Escape leaves full video mode. Any open dialog gets it first —
+          // each one binds Escape itself, and popping the screen out from
+          // behind a dialog would leave the dialog floating over a screen
+          // the user never asked to leave.
+          //
+          // "Open" has to mean *rendered*, not merely present: the mobile
+          // now-playing sheet keeps its role="dialog" in the DOM at all times
+          // and hides itself with `md:hidden`, so a bare querySelector matches
+          // on every desktop load and swallows Escape forever.
+          if (isDialogOpen()) return;
+          {
+            const ipod = useIpodStore.getState();
+            if (ipod.current().name === "nowPlayingFull") {
+              e.preventDefault();
+              ipod.pop();
+            }
           }
           return;
       }
