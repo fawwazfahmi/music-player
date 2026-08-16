@@ -2,6 +2,7 @@
 
 import { getAllMoods } from "@/server/services/mood-store";
 import { runMoodSession, type MoodSessionResult } from "@/server/services/mood-session";
+import { applyMoodSignal, type MoodSignal } from "@/server/services/mood-learning";
 import { currentListenerOr } from "@/server/current-listener";
 
 export interface MoodChip {
@@ -32,4 +33,18 @@ export async function startMoodSession(input: StartMoodSessionInput): Promise<Mo
     freeText: input.freeText,
     limit: input.limit,
   });
+}
+
+/** Record a learning signal for a track within a mood session. Fire-and-forget
+    from the client; failures are swallowed so they never disrupt playback. */
+export async function recordMoodSignal(
+  sessionId: string,
+  trackId: string,
+  signal: MoodSignal,
+): Promise<void> {
+  try {
+    await applyMoodSignal({ sessionId, trackId, signal });
+  } catch {
+    /* learning is best-effort */
+  }
 }
