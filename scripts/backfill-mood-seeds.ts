@@ -8,19 +8,22 @@ import { ensureBuiltinMoods } from "@/server/services/mood-store";
 interface BackfillOpts {
   limit?: number;
   onProgress?: (done: number, total: number) => void;
+  /** Re-seed tracks that already have seeds (uses richer lyrics/energy signal). */
+  force?: boolean;
   /** Injectable for tests; defaults to the real seeder. */
   seeder?: (trackId: string) => Promise<string[]>;
 }
 
-/** Seed mood affinities for every track without any. Sequential — the seeder
-    calls Ollama per track, so parallelism buys nothing. */
+/** Seed mood affinities for tracks. By default only tracks without seeds;
+    with `force`, re-seeds everything. Sequential — the seeder calls Ollama and
+    ffmpeg per track, so parallelism buys nothing. */
 export async function backfillMoodSeeds(
   opts: BackfillOpts = {},
 ): Promise<{ seeded: number; scanned: number }> {
   await ensureBuiltinMoods();
-  const seeder = opts.seeder ?? seedTrackMoodAffinities;
+  const seeder = opts.seeder ?? ((id: string) => seedTrackMoodAffinities(id, { force: opts.force }));
   const tracks = await db.track.findMany({
-    where: { moodSeeds: { none: {} } },
+    where: opts.force ? {} : { moodSeeds: { none: {} } },
     select: { id: true },
     take: opts.limit,
   });
@@ -35,9 +38,11 @@ export async function backfillMoodSeeds(
 
 // CLI entry
 if (process.argv[1] && process.argv[1].endsWith("backfill-mood-seeds.ts")) {
-  const limitArg = process.argv[2] ? Number(process.argv[2]) : undefined;
+  const force = process.argv.includes("--force");
+  const limitArg = process.argv.find((a) => /^\d+$/.test(a));
   backfillMoodSeeds({
-    limit: Number.isFinite(limitArg) ? limitArg : undefined,
+    force,
+    limit: limitArg ? Number(limitArg) : undefined,
     onProgress: (done, total) => {
       if (done % 10 === 0 || done === total) console.log(`[moods] ${done}/${total}`);
     },

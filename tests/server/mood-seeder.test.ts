@@ -59,6 +59,7 @@ describe.skipIf(!RUN)("seedTrackMoodAffinities", () => {
     const { seedTrackMoodAffinities } = await import("@/server/services/mood-seeder");
     const applied = await seedTrackMoodAffinities(trackId, {
       seedTrackMoods: vi.fn(async () => ({ chill: 0.8, nostalgic: 0.5 })),
+      analyzeEnergy: async () => null,
     });
     expect(applied.sort()).toEqual(["chill", "nostalgic"]);
     const { db } = await import("@/server/db");
@@ -76,6 +77,7 @@ describe.skipIf(!RUN)("seedTrackMoodAffinities", () => {
     const { seedTrackMoodAffinities } = await import("@/server/services/mood-seeder");
     const applied = await seedTrackMoodAffinities(trackId, {
       seedTrackMoods: vi.fn(async () => ({})),
+      analyzeEnergy: async () => null,
     });
     expect(applied).toContain("nostalgic"); // dark wave → nostalgic
     const { db } = await import("@/server/db");
@@ -90,6 +92,7 @@ describe.skipIf(!RUN)("seedTrackMoodAffinities", () => {
     const { seedTrackMoodAffinities } = await import("@/server/services/mood-seeder");
     const applied = await seedTrackMoodAffinities(trackId, {
       seedTrackMoods: vi.fn(async () => ({ chill: 0, happy: 0, energetic: 0 })),
+      analyzeEnergy: async () => null,
     });
     // dark wave → nostalgic via heuristic, since the LLM gave nothing usable
     expect(applied).toContain("nostalgic");
@@ -103,11 +106,53 @@ describe.skipIf(!RUN)("seedTrackMoodAffinities", () => {
 
   it("is idempotent — a second run adds nothing", async () => {
     const { seedTrackMoodAffinities } = await import("@/server/services/mood-seeder");
-    const deps = { seedTrackMoods: vi.fn(async () => ({ chill: 0.8 })) };
+    const deps = {
+      seedTrackMoods: vi.fn(async () => ({ chill: 0.8 })),
+      analyzeEnergy: async () => null,
+    };
     await seedTrackMoodAffinities(trackId, deps);
     const second = await seedTrackMoodAffinities(trackId, deps);
     expect(second).toEqual([]);
     const { db } = await import("@/server/db");
     expect(await db.trackMoodSeed.count({ where: { trackId } })).toBe(1);
+  });
+
+  it("force re-seeds, replacing existing seeds", async () => {
+    const { seedTrackMoodAffinities } = await import("@/server/services/mood-seeder");
+    const { db } = await import("@/server/db");
+    await seedTrackMoodAffinities(trackId, {
+      seedTrackMoods: vi.fn(async () => ({ chill: 0.8 })),
+      analyzeEnergy: async () => null,
+    });
+    const applied = await seedTrackMoodAffinities(trackId, {
+      seedTrackMoods: vi.fn(async () => ({ energetic: 0.9 })),
+      analyzeEnergy: async () => null,
+      force: true,
+    });
+    expect(applied).toEqual(["energetic"]);
+    const names = (
+      await db.trackMoodSeed.findMany({
+        where: { trackId },
+        select: { mood: { select: { name: true } } },
+      })
+    ).map((r) => r.mood.name);
+    expect(names).toEqual(["energetic"]); // chill replaced
+  });
+
+  it("passes lyrics and energy to the seeder", async () => {
+    const { seedTrackMoodAffinities } = await import("@/server/services/mood-seeder");
+    const { db } = await import("@/server/db");
+    await db.track.update({ where: { id: trackId }, data: { lyricsPlain: "so lonely tonight" } });
+    const seedTrackMoods = vi.fn(
+      async (_input: { lyrics?: string; energy?: number }, _moods: string[]) => ({ sad: 0.9 }),
+    );
+    await seedTrackMoodAffinities(trackId, {
+      seedTrackMoods,
+      analyzeEnergy: async () => 0.15,
+      force: true,
+    });
+    const arg = seedTrackMoods.mock.calls[0]![0];
+    expect(arg.lyrics).toContain("lonely");
+    expect(arg.energy).toBe(0.15);
   });
 });

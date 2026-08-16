@@ -150,15 +150,32 @@ export async function interpretMood(
     artist, and any known genres. Returns only known moods; {} when Ollama is
     unavailable. */
 export async function seedTrackMoods(
-  input: { title: string; artist: string; genres: string[] },
+  input: {
+    title: string;
+    artist: string;
+    genres: string[];
+    /** Cleaned lyrics excerpt — by far the strongest mood signal when present. */
+    lyrics?: string;
+    /** Objective audio energy 0..1 from ffmpeg loudness analysis. */
+    energy?: number;
+  },
   moodNames: string[],
 ): Promise<Record<string, number>> {
   const genrePart = input.genres.length > 0 ? ` Genres: ${input.genres.join(", ")}.` : "";
+  const energyPart =
+    typeof input.energy === "number"
+      ? ` Audio energy (0=calm/quiet, 1=intense/loud): ${input.energy.toFixed(2)}.`
+      : "";
+  const lyricsPart =
+    input.lyrics && input.lyrics.trim().length > 0
+      ? `\nLyrics excerpt (weigh this heavily): "${input.lyrics.trim().slice(0, 600)}"`
+      : "";
   const prompt =
     `Rate how well a song fits each mood. Known moods: ${moodNames.join(", ")}. ` +
     `Respond ONLY with JSON: {"moods": {"<mood>": <0..1>}}. Score every mood that ` +
-    `applies (0 = not at all, 1 = perfect). Only use the known moods.\n` +
-    `Song: "${input.title}" by "${input.artist}".${genrePart}`;
+    `applies (0 = not at all, 1 = perfect). Only use the known moods. Judge from the ` +
+    `lyrics and energy, not just the title.\n` +
+    `Song: "${input.title}" by "${input.artist}".${genrePart}${energyPart}${lyricsPart}`;
 
   const parsed = await ollamaGenerateJson<{ moods?: Record<string, unknown> }>(prompt);
   if (!parsed) return {};

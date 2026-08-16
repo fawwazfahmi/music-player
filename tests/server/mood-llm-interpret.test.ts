@@ -83,4 +83,20 @@ describe("seedTrackMoods", () => {
     const r = await seedTrackMoods({ title: "x", artist: "y", genres: [] }, MOODS);
     expect(r).toEqual({});
   });
+
+  it("includes lyrics and energy in the prompt when provided", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: async () => ({ response: JSON.stringify({ moods: { sad: 0.9 } }) }),
+    } as never);
+    const { seedTrackMoods } = await import("@/server/services/mood-llm");
+    await seedTrackMoods(
+      { title: "x", artist: "y", genres: [], lyrics: "tears on my pillow", energy: 0.2 },
+      MOODS,
+    );
+    const body = JSON.parse((vi.mocked(fetch).mock.calls[0]![1] as RequestInit).body as string);
+    expect(body.prompt).toContain("tears on my pillow");
+    expect(body.prompt).toContain("0.20");
+  });
 });

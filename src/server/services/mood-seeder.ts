@@ -1,15 +1,31 @@
 import { db } from "@/server/db";
 import { getAllMoods } from "@/server/services/mood-store";
 import { seedTrackMoods as ollamaSeedTrackMoods } from "@/server/services/mood-llm";
+import { analyzeEnergy as realAnalyzeEnergy } from "@/server/services/audio-features";
 import { genreMoodHeuristic } from "@/lib/moods";
 
 const MIN_SCORE = 0.05; // below this, not worth storing
 
+/** Strip [mm:ss.xx] timestamps from synced lyrics so the model sees plain text. */
+function cleanLyrics(plain: string | null, synced: string | null): string {
+  const src = plain && plain.trim() ? plain : (synced ?? "");
+  return src.replace(/\[\d+:\d+(?:\.\d+)?\]/g, "").replace(/\n{2,}/g, "\n").trim();
+}
+
 export interface MoodSeederDeps {
   seedTrackMoods?: (
-    input: { title: string; artist: string; genres: string[] },
+    input: {
+      title: string;
+      artist: string;
+      genres: string[];
+      lyrics?: string;
+      energy?: number;
+    },
     moodNames: string[],
   ) => Promise<Record<string, number>>;
+  analyzeEnergy?: (filePath: string) => Promise<number | null>;
+  /** Re-seed even if seeds already exist (clears the old ones first). */
+  force?: boolean;
 }
 
 /** Seed a track's listener-agnostic baseline mood affinities (TrackMoodSeed).
@@ -21,14 +37,21 @@ export async function seedTrackMoodAffinities(
   deps: MoodSeederDeps = {},
 ): Promise<string[]> {
   const seedFn = deps.seedTrackMoods ?? ollamaSeedTrackMoods;
+  const analyzeEnergy = deps.analyzeEnergy ?? realAnalyzeEnergy;
 
   const existing = await db.trackMoodSeed.count({ where: { trackId } });
-  if (existing > 0) return [];
+  if (existing > 0) {
+    if (!deps.force) return [];
+    await db.trackMoodSeed.deleteMany({ where: { trackId } });
+  }
 
   const track = await db.track.findUnique({
     where: { id: trackId },
     select: {
       title: true,
+      filePath: true,
+      lyricsPlain: true,
+      lyricsSynced: true,
       primaryArtist: { select: { name: true } },
       genres: { select: { genre: { select: { name: true } } } },
     },
@@ -36,6 +59,13 @@ export async function seedTrackMoodAffinities(
   if (!track) return [];
 
   const genres = track.genres.map((g) => g.genre.name);
+  const lyrics = cleanLyrics(track.lyricsPlain, track.lyricsSynced);
+  let energy: number | undefined;
+  if (track.filePath) {
+    const e = await analyzeEnergy(track.filePath).catch(() => null);
+    if (e !== null) energy = e;
+  }
+
   const moods = await getAllMoods();
   const moodNames = moods.map((m) => m.name);
   const idByName = new Map(moods.map((m) => [m.name, m.id]));
@@ -44,7 +74,13 @@ export async function seedTrackMoodAffinities(
   let source: "LLM_SEED" | "HEURISTIC" = "LLM_SEED";
   try {
     scores = await seedFn(
-      { title: track.title, artist: track.primaryArtist.name, genres },
+      {
+        title: track.title,
+        artist: track.primaryArtist.name,
+        genres,
+        lyrics: lyrics || undefined,
+        energy,
+      },
       moodNames,
     );
   } catch {
