@@ -174,16 +174,20 @@ export async function readCookiePath(name: AppUserName): Promise<string | null> 
   return status === "connected" ? cookiePathFor(name) : null;
 }
 
-/** A jar for background downloads, which have no request identity. Uses the
-    first connected jar among the app users — both share the app, so either
-    person's YouTube session is fine for authenticating a download, and having
-    ANY logged-in jar is what stops YouTube 403-ing the media fetch. */
-export async function anyConnectedCookiePath(): Promise<string | null> {
+/** The first app user with a connected jar, or null. Both share the app, so
+    either person's YouTube session authenticates downloads for both. */
+export async function firstConnectedUser(): Promise<AppUserName | null> {
   for (const name of VALID_NAMES) {
-    const p = await readCookiePath(name);
-    if (p) return p;
+    if ((await cookieStatus(name)) === "connected") return name;
   }
   return null;
+}
+
+/** A jar for background downloads, which have no request identity. Having ANY
+    logged-in jar is what stops YouTube 403-ing the media fetch. */
+export async function anyConnectedCookiePath(): Promise<string | null> {
+  const name = await firstConnectedUser();
+  return name ? cookiePathFor(name) : null;
 }
 
 export interface CookieBearingRequest {

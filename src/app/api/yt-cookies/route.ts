@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import {
   cookieStatus,
+  firstConnectedUser,
   removeCookies,
   saveCookies,
   validateNetscapeCookies,
@@ -28,7 +29,13 @@ export async function GET(req: NextRequest) {
   const name = identityOf(req);
   if (!name) return NextResponse.json({ error: "no_identity" }, { status: 400 });
   return NextResponse.json(
-    { name, status: await cookieStatus(name) },
+    {
+      name,
+      status: await cookieStatus(name),
+      // Downloads use whichever jar is connected, so surface that too — your own
+      // jar can be "none" while downloads are still authenticated via the other.
+      downloadsCoveredBy: await firstConnectedUser(),
+    },
     { headers: { "cache-control": "no-store" } },
   );
 }

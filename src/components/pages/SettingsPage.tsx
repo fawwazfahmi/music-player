@@ -24,30 +24,30 @@ type CookieStatus = "none" | "connected" | "stale";
 function YouTubeCookiesSection() {
   const [status, setStatus] = useState<CookieStatus | null>(null);
   const [name, setName] = useState<string | null>(null);
+  const [coveredBy, setCoveredBy] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Initial status load. Subsequent changes come straight from the upload /
-  // disconnect responses, so there's nothing to re-poll.
+  async function refresh() {
+    try {
+      const res = await fetch("/api/yt-cookies", { cache: "no-store" });
+      if (!res.ok) return;
+      const j = (await res.json()) as {
+        name: string;
+        status: CookieStatus;
+        downloadsCoveredBy?: string | null;
+      };
+      setStatus(j.status);
+      setName(j.name);
+      setCoveredBy(j.downloadsCoveredBy ?? null);
+    } catch {
+      /* cosmetic — the section just stays in its unknown state */
+    }
+  }
+
   useEffect(() => {
-    let cancelled = false;
-    const load = async () => {
-      try {
-        const res = await fetch("/api/yt-cookies", { cache: "no-store" });
-        if (!res.ok) return;
-        const j = (await res.json()) as { name: string; status: CookieStatus };
-        if (cancelled) return;
-        setStatus(j.status);
-        setName(j.name);
-      } catch {
-        /* cosmetic — the section just stays in its unknown state */
-      }
-    };
-    void load();
-    return () => {
-      cancelled = true;
-    };
+    void refresh();
   }, []);
 
   async function onFile(file: File) {
@@ -66,6 +66,7 @@ function YouTubeCookiesSection() {
       if (!res.ok) throw new Error(j?.message ?? j?.error ?? `HTTP ${res.status}`);
       setStatus(j?.status ?? "connected");
       setMessage("Connected. Mixes will now resolve as your YouTube account.");
+      void refresh();
     } catch (e: unknown) {
       setMessage(e instanceof Error ? e.message : String(e));
     } finally {
@@ -80,6 +81,7 @@ function YouTubeCookiesSection() {
       await fetch("/api/yt-cookies", { method: "DELETE" });
       setStatus("none");
       setMessage("Disconnected. Mixes will resolve anonymously again.");
+      void refresh();
     } finally {
       setBusy(false);
     }
@@ -87,10 +89,19 @@ function YouTubeCookiesSection() {
 
   const badge =
     status === "connected"
-      ? { text: "Connected", cls: "bg-sky-500/15 text-sky-300" }
+      ? { text: "Connected", cls: "bg-sky-500/15 text-sky-300", dot: "bg-sky-400" }
       : status === "stale"
-        ? { text: "Expired — reconnect", cls: "bg-amber-500/15 text-amber-300" }
-        : { text: "Not connected", cls: "bg-zinc-800 text-zinc-400" };
+        ? { text: "Expired — reconnect", cls: "bg-amber-500/15 text-amber-300", dot: "bg-amber-400" }
+        : { text: "Not connected", cls: "bg-zinc-800 text-zinc-400", dot: "bg-zinc-500" };
+
+  // Downloads use whichever jar is connected. Show that health separately, since
+  // your own jar can be "none" while downloads are fine via the other person's.
+  const downloads =
+    coveredBy === null
+      ? { text: "No YouTube connected — downloads may hit 403s", cls: "text-amber-400", dot: "bg-amber-400" }
+      : coveredBy === name
+        ? { text: "Downloads authenticated — via your connection", cls: "text-zinc-400", dot: "bg-emerald-400" }
+        : { text: `Downloads authenticated — via ${coveredBy}'s connection`, cls: "text-zinc-400", dot: "bg-emerald-400" };
 
   return (
     <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
@@ -98,13 +109,20 @@ function YouTubeCookiesSection() {
         <h3 className="text-sm font-semibold text-zinc-100">
           Connect YouTube{name ? ` · ${name}` : ""}
         </h3>
-        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${badge.cls}`}>
+        <span
+          className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold ${badge.cls}`}
+        >
+          <span className={`h-1.5 w-1.5 rounded-full ${badge.dot}`} />
           {badge.text}
         </span>
       </div>
       <p className="mt-2 text-xs text-zinc-500">
         Makes mixes match your taste instead of a generic one.
       </p>
+      <div className={`mt-2 flex items-center gap-1.5 text-xs ${downloads.cls}`}>
+        <span className={`h-1.5 w-1.5 rounded-full ${downloads.dot}`} />
+        {downloads.text}
+      </div>
       <ul className="mt-2 space-y-1 text-xs text-zinc-500">
         <li>1. Sign in to YouTube.</li>
         <li>
