@@ -204,6 +204,9 @@ export function VideoStage() {
       container.style.left = `${r.left}px`;
       container.style.width = `${r.width}px`;
       container.style.height = `${r.height}px`;
+      // Square corners in the right-panel thumbnail; the full-video stage keeps
+      // its rounded corners.
+      container.style.borderRadius = slot.getAttribute("data-video-slot") === "small" ? "0px" : "14px";
       if (wasParked) {
         container.style.visibility = "visible";
         // Restore easing only after this placement has been committed, so the
