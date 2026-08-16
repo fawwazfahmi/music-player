@@ -10,12 +10,14 @@ export async function register() {
     { startMetadataWorker },
     { resetStuckDownloads },
     { startPartyIdleSweeper },
+    { startEphemeralSweeper },
     { env },
   ] = await Promise.all([
     import("@/server/services/library-scanner"),
     import("@/server/services/metadata-worker"),
     import("@/server/services/yt-download"),
     import("@/server/services/party-service"),
+    import("@/server/services/ephemeral-sweeper"),
     import("@/lib/env"),
   ]);
   startWatcher(env.MUSIC_LIBRARY_PATH);
@@ -24,6 +26,8 @@ export async function register() {
   console.log(`[mu] metadata worker started`);
   startPartyIdleSweeper();
   console.log(`[mu] party idle sweeper started`);
+  startEphemeralSweeper();
+  console.log(`[mu] ephemeral sweeper started`);
   // Reap downloads that died when the process restarted — otherwise their
   // Track rows stay in the library list as un-playable rows that just 425.
   void resetStuckDownloads().catch((err) =>
