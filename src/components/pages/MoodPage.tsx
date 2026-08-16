@@ -194,7 +194,14 @@ export function MoodPage() {
             </button>
           </form>
 
-          {result && (
+          {busy && (
+            <div className="flex items-center gap-2 py-6 text-sm text-sky-300">
+              <span className="h-2 w-2 animate-pulse rounded-full bg-sky-400" />
+              Reading the room…
+            </div>
+          )}
+
+          {result && !busy && (
             <div>
               <div className="mb-3 flex items-center justify-between">
                 <div>

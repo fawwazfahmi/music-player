@@ -39,7 +39,10 @@ export interface MoodPlaylistTrack {
   fit: number;
 }
 
-const RERANK_POOL = 40; // formula shortlist handed to the LLM re-ranker
+// The LLM re-ranker only perfects the songs she hears first, so we hand it a
+// small pool — the rest keep formula order. Small pool keeps the "tap a mood"
+// wait short (~4s vs ~13s for 40).
+const RERANK_POOL = 12;
 
 export interface SelectParams {
   listener: string;
