@@ -1,11 +1,21 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { getMoods, startMoodSession, recordMoodSignal, type MoodChip } from "@/server/actions/moods";
+import {
+  getMoods,
+  startMoodSession,
+  recordMoodSignal,
+  getMoodYtSuggestions,
+  adoptYtPickIntoMood,
+  type MoodChip,
+} from "@/server/actions/moods";
 import type { MoodSessionResult } from "@/server/services/mood-session";
+import type { YtSearchResult } from "@/server/services/yt-service";
 import { useIdentity } from "@/hooks/use-identity";
 import { usePlayerStore } from "@/stores/player-store";
 import { useMoodLearningStore } from "@/stores/mood-learning-store";
+import { useDownloadStore } from "@/stores/download-store";
+import { formatDuration } from "@/lib/format-duration";
 import { PageHeader, PageLoading, SongRow, buildQueueTrack } from "./_shared";
 import { PlayIcon } from "@/components/icons";
 
@@ -16,6 +26,8 @@ export function MoodPage() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<MoodSessionResult | null>(null);
   const [reactions, setReactions] = useState<Record<string, "up" | "down">>({});
+  const [ytPicks, setYtPicks] = useState<YtSearchResult[] | null>(null);
+  const [kept, setKept] = useState<Record<string, "keeping" | "kept">>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -34,6 +46,10 @@ export function MoodPage() {
       const r = await startMoodSession({ ...input, limit: 30 });
       setResult(r);
       setReactions({});
+      setYtPicks(null);
+      setKept({});
+      // Fresh YouTube picks load lazily so the library playlist is instant.
+      void getMoodYtSuggestions(r.sessionId).then((picks) => setYtPicks(picks));
       // Drop straight into a playing playlist, like starting any playlist.
       if (r.tracks.length > 0) {
         const queue = r.tracks.map((t) =>
@@ -64,6 +80,53 @@ export function MoodPage() {
     setReactions((prev) => ({ ...prev, [trackId]: verdict }));
     useMoodLearningStore.getState().markReacted(trackId);
     void recordMoodSignal(result.sessionId, trackId, verdict === "up" ? "thumbUp" : "thumbDown");
+  }
+
+  // Keep a YouTube fresh pick: download it into the library (existing flow),
+  // then adopt it into this mood so it's remembered.
+  async function keep(pick: YtSearchResult) {
+    if (!result || kept[pick.videoId]) return;
+    setKept((prev) => ({ ...prev, [pick.videoId]: "keeping" }));
+    try {
+      const res = await fetch("/api/yt-download", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(pick),
+      });
+      if (!res.ok) throw new Error(`Download failed (HTTP ${res.status})`);
+      const { trackId, status } = (await res.json()) as {
+        trackId: string;
+        status: "READY" | "DOWNLOADING";
+      };
+      void adoptYtPickIntoMood(result.sessionId, trackId);
+
+      const queueTrack = buildQueueTrack({
+        id: trackId,
+        title: pick.title,
+        duration: pick.duration,
+        artistName: pick.uploader,
+        albumTitle: "YouTube",
+        ytVideoId: pick.videoId,
+      });
+      if (status === "READY") {
+        usePlayerStore.getState().addToQueue(queueTrack);
+      } else {
+        useDownloadStore.getState().start({
+          id: pick.videoId,
+          title: pick.title,
+          artist: pick.uploader,
+          trackId,
+          queueTrack,
+        });
+      }
+      setKept((prev) => ({ ...prev, [pick.videoId]: "kept" }));
+    } catch {
+      setKept((prev) => {
+        const next = { ...prev };
+        delete next[pick.videoId];
+        return next;
+      });
+    }
   }
 
   const name = identity ? identity[0]!.toUpperCase() + identity.slice(1) : null;
@@ -207,6 +270,45 @@ export function MoodPage() {
                     }
                   />
                 ))
+              )}
+
+              {ytPicks && ytPicks.length > 0 && (
+                <div className="mt-6">
+                  <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                    Fresh from YouTube
+                  </p>
+                  <p className="mb-3 text-xs text-zinc-600">
+                    Not in your library yet — keep one and it downloads in for good.
+                  </p>
+                  {ytPicks.map((p) => (
+                    <div
+                      key={p.videoId}
+                      className="flex items-center gap-3 rounded-md px-3 py-2 hover:bg-zinc-800/40"
+                    >
+                      <span className="rounded bg-red-500/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-red-300">
+                        YT
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium text-zinc-100">{p.title}</div>
+                        <div className="truncate text-xs text-zinc-400">
+                          {p.uploader} · {formatDuration(p.duration)}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={!!kept[p.videoId]}
+                        onClick={() => void keep(p)}
+                        className="shrink-0 rounded-full border border-zinc-700 px-3 py-1 text-xs font-semibold text-zinc-200 transition hover:border-sky-500/50 hover:bg-sky-500/10 hover:text-sky-300 disabled:opacity-50"
+                      >
+                        {kept[p.videoId] === "kept"
+                          ? "Kept ✓"
+                          : kept[p.videoId] === "keeping"
+                            ? "Keeping…"
+                            : "＋ Keep"}
+                      </button>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
           )}

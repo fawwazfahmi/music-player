@@ -1,8 +1,12 @@
 "use server";
 
+import { db } from "@/server/db";
 import { getAllMoods } from "@/server/services/mood-store";
 import { runMoodSession, type MoodSessionResult } from "@/server/services/mood-session";
 import { applyMoodSignal, type MoodSignal } from "@/server/services/mood-learning";
+import { suggestYtForMood } from "@/server/services/mood-yt";
+import { seedTrackMoodAffinities } from "@/server/services/mood-seeder";
+import type { YtSearchResult } from "@/server/services/yt-service";
 import { currentListenerOr } from "@/server/current-listener";
 
 export interface MoodChip {
@@ -46,5 +50,39 @@ export async function recordMoodSignal(
     await applyMoodSignal({ sessionId, trackId, signal });
   } catch {
     /* learning is best-effort */
+  }
+}
+
+/** Fresh YouTube picks for a mood session (Phase 4). Loaded lazily so mood
+    generation stays instant; returns [] on any failure. */
+export async function getMoodYtSuggestions(sessionId: string): Promise<YtSearchResult[]> {
+  try {
+    const session = await db.moodSession.findUnique({
+      where: { id: sessionId },
+      select: { freeText: true, mood: { select: { label: true } }, interpretation: true },
+    });
+    if (!session) return [];
+    const interp = session.interpretation as { genreHints?: string[] } | null;
+    const moodLabel = session.mood?.label ?? session.freeText ?? "";
+    if (!moodLabel) return [];
+    return await suggestYtForMood({
+      moodLabel,
+      genreHints: Array.isArray(interp?.genreHints) ? interp!.genreHints! : [],
+      limit: 4,
+    });
+  } catch {
+    return [];
+  }
+}
+
+/** Adopt a freshly-downloaded YouTube pick into a mood (Phase 5): seed its
+    baseline mood affinities and record that she kept it for this mood — a
+    strong positive that carries the choice into future playlists. */
+export async function adoptYtPickIntoMood(sessionId: string, trackId: string): Promise<void> {
+  try {
+    await seedTrackMoodAffinities(trackId);
+    await applyMoodSignal({ sessionId, trackId, signal: "favorite" });
+  } catch {
+    /* best-effort */
   }
 }
