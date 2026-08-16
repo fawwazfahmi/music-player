@@ -57,28 +57,32 @@ async function mbFetch(pathName: string, search: Record<string, string>): Promis
   throw new Error(`MusicBrainz exhausted retries: ${url}`);
 }
 
+function mapRecordings(recordings: MBRecording[]): RecordingResult[] {
+  return recordings.map((r) => {
+    const credit = r["artist-credit"]?.[0]?.artist;
+    const releases = (r.releases ?? [])
+      .filter((rel) => !!rel?.id)
+      .map((rel) => ({ mbid: rel.id, title: rel.title ?? "" }));
+    const release = releases[0];
+    return {
+      mbid: r.id,
+      score: r.score ?? 0,
+      title: r.title,
+      artistName: credit?.name ?? "Unknown",
+      artistMbid: credit?.id,
+      releaseMbid: release?.mbid,
+      releaseTitle: release?.title,
+      releases,
+    };
+  });
+}
+
 export async function searchRecording(artist: string, title: string): Promise<RecordingResult[]> {
   return queue.add(async () => {
     const q = `artist:"${artist}" AND recording:"${title}"`;
     const res = await mbFetch("/recording", { query: q, limit: "5" });
     const data = (await res.json()) as { recordings?: MBRecording[] };
-    return (data.recordings ?? []).map((r) => {
-      const credit = r["artist-credit"]?.[0]?.artist;
-      const releases = (r.releases ?? [])
-        .filter((rel) => !!rel?.id)
-        .map((rel) => ({ mbid: rel.id, title: rel.title ?? "" }));
-      const release = releases[0];
-      return {
-        mbid: r.id,
-        score: r.score ?? 0,
-        title: r.title,
-        artistName: credit?.name ?? "Unknown",
-        artistMbid: credit?.id,
-        releaseMbid: release?.mbid,
-        releaseTitle: release?.title,
-        releases,
-      };
-    });
+    return mapRecordings(data.recordings ?? []);
   }) as Promise<RecordingResult[]>;
 }
 

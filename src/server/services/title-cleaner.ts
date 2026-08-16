@@ -34,6 +34,12 @@ function stripTopic(name: string): string {
  *      with the artist taken only from the literal text ("- Topic" stripped).
  * Always returns a best-effort clean result; the caller decides whether it
  * differs enough to apply.
+ *
+ * NB: a MusicBrainz freeform fallback was prototyped and rejected — on this
+ * re-upload-heavy library its recording search returns confidently-wrong
+ * artists for common titles (VØJ→Hurakion, "Purple Rain"→"November Rain"), so
+ * it corrupts more than it fixes. The handful of genuinely garbled re-uploads
+ * are corrected by hand instead (grounded in the real video title).
  */
 export async function resolveCleanMeta(
   input: CleanInput,
