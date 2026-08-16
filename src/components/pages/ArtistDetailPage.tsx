@@ -14,6 +14,7 @@ interface Props {
 export function ArtistDetailPage({ artistId }: Props) {
   const [name, setName] = useState("");
   const [bio, setBio] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [tracks, setTracks] = useState<Awaited<ReturnType<typeof getTracksByArtist>>>([]);
   const [fav, setFav] = useState(false);
 
@@ -28,6 +29,7 @@ export function ArtistDetailPage({ artistId }: Props) {
       const artist = artists.find((a) => a.id === artistId);
       setName(artist?.name ?? "Unknown");
       setBio(artist?.bio ?? null);
+      setImageUrl(artist?.imageUrl ?? null);
       setTracks(ts);
       setFav(f);
     });
@@ -85,10 +87,18 @@ export function ArtistDetailPage({ artistId }: Props) {
           </>
         }
       />
-      {bio && (
-        <p className="border-b border-zinc-800/50 px-6 py-3 text-sm leading-relaxed text-zinc-400">
-          {bio}
-        </p>
+      {(imageUrl || bio) && (
+        <div className="flex items-start gap-4 border-b border-zinc-800/50 px-6 py-3">
+          {imageUrl && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={imageUrl}
+              alt=""
+              className="h-20 w-20 shrink-0 rounded-full object-cover ring-1 ring-zinc-800"
+            />
+          )}
+          {bio && <p className="text-sm leading-relaxed text-zinc-400">{bio}</p>}
+        </div>
       )}
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         {queue.length === 0 ? (

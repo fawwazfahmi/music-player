@@ -1,21 +1,55 @@
 "use server";
 
 import { db } from "@/server/db";
+import { coverUrl, resolveTrackCoverHash } from "@/lib/cover-url";
+
+// A track that carries *some* art, used to give artists/albums a representative
+// image when they have none of their own. Prefer real cover art; YT thumbnail
+// is the last resort.
+const repTrackSelect = {
+  where: {
+    OR: [
+      { coverArtHash: { not: null } },
+      { album: { coverArtHash: { not: null } } },
+      { ytVideoId: { not: null } },
+    ],
+  },
+  take: 1,
+  select: {
+    coverArtHash: true,
+    ytVideoId: true,
+    album: { select: { coverArtHash: true } },
+  },
+};
+
+function repImage(
+  t:
+    | { coverArtHash: string | null; ytVideoId: string | null; album: { coverArtHash: string | null } | null }
+    | undefined,
+): string | null {
+  if (!t) return null;
+  return coverUrl(
+    resolveTrackCoverHash({ trackCoverArtHash: t.coverArtHash, albumCoverArtHash: t.album?.coverArtHash }),
+    t.ytVideoId,
+  );
+}
 
 export async function getArtists() {
-  return db.artist.findMany({
+  const artists = await db.artist.findMany({
     orderBy: { sortName: "asc" },
     select: {
       id: true,
       name: true,
       bio: true,
       _count: { select: { tracks: true, albums: true } },
+      tracks: repTrackSelect,
     },
   });
+  return artists.map(({ tracks, ...a }) => ({ ...a, imageUrl: repImage(tracks[0]) }));
 }
 
 export async function getAlbumsByArtist(artistId: string) {
-  return db.album.findMany({
+  const albums = await db.album.findMany({
     where: { artistId },
     orderBy: { releaseDate: "asc" },
     select: {
@@ -24,12 +58,17 @@ export async function getAlbumsByArtist(artistId: string) {
       coverArtPath: true,
       coverArtHash: true,
       _count: { select: { tracks: true } },
+      tracks: repTrackSelect,
     },
   });
+  return albums.map(({ tracks, ...a }) => ({
+    ...a,
+    imageUrl: a.coverArtHash ? coverUrl(a.coverArtHash) : repImage(tracks[0]),
+  }));
 }
 
 export async function getAllAlbums() {
-  return db.album.findMany({
+  const albums = await db.album.findMany({
     orderBy: [{ artist: { sortName: "asc" } }, { releaseDate: "asc" }],
     select: {
       id: true,
@@ -37,8 +76,13 @@ export async function getAllAlbums() {
       coverArtPath: true,
       coverArtHash: true,
       artist: { select: { id: true, name: true } },
+      tracks: repTrackSelect,
     },
   });
+  return albums.map(({ tracks, ...a }) => ({
+    ...a,
+    imageUrl: a.coverArtHash ? coverUrl(a.coverArtHash) : repImage(tracks[0]),
+  }));
 }
 
 export async function getAllSongs() {

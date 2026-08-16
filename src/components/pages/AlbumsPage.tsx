@@ -35,10 +35,10 @@ export function AlbumsPage() {
                 onClick={() => push({ name: "albumDetail", albumId: a.id })}
                 className="group flex flex-col items-start gap-2 rounded-lg p-3 text-left transition hover:bg-zinc-800/50"
               >
-                {a.coverArtHash ? (
+                {a.imageUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
-                    src={`/api/art/${a.coverArtHash}`}
+                    src={a.imageUrl}
                     alt=""
                     className="aspect-square w-full rounded object-cover shadow-lg transition group-hover:scale-105"
                   />
