@@ -197,3 +197,25 @@ Each phase ships usable value and gets its own spec → plan → build cycle.
   supports it later via `Mood.kind = CUSTOM`.
 - Precise scoring constants (smoothing, decay rate, freshness window, artist-diversity cap)
   are tuning parameters, settled during Phase 2/3 implementation, not here.
+
+## Phase 6 — Audio analysis (added after the original vision)
+
+Added because inferring mood from title/artist/genre alone proved too thin. The
+engine now **hears the song**:
+
+- **Signal:** local Essentia + pre-trained MTG **MusiCNN-MSD** models —
+  `mood_happy`, `mood_sad`, `mood_relaxed`, `mood_aggressive`, `mood_party`,
+  `danceability` — plus objective `tempo`/`key`/`scale`. Run in a Python venv
+  (`.venv-audio`, gitignored) reproduced by `scripts/audio/setup.sh`; extractor
+  at `scripts/audio/extract_features.py`.
+- **Storage:** `TrackAudioFeatures` table. Node side: `audio-analysis.ts` maps
+  model outputs onto our mood axes (`audioMoodScores`) and blends them into the
+  seeder **audio-weighted 0.6** (`blendSeedScores`).
+- **Lyrics + loudness** also feed the seeder (70/73 tracks had Whisper lyrics;
+  ffmpeg gives an energy proxy) — a lighter upgrade shipped alongside.
+- **Not a trained-from-scratch model:** valence/danceability can't be trained
+  here (no labels), so we run open *pre-trained* models. Valence/arousal
+  (emomusic/deam) weren't available at the `/classifiers/` URL, so only the six
+  mood/danceability heads are wired; romantic/nostalgic remain LLM/lyrics-driven.
+- **Population:** new downloads analyzed in the metadata worker (best-effort);
+  `scripts/backfill-audio-features.ts` for the existing library.
