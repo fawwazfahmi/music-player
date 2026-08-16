@@ -12,6 +12,7 @@ import {
   GenreIcon,
   HeartIcon,
   HomeIcon,
+  MoodIcon,
   MusicNoteIcon,
   PlayIcon,
   PlaylistIcon,
@@ -98,6 +99,12 @@ export function Sidebar() {
         active={activeName === "search"}
       />
       <NowPlayingNavItem activeName={activeName} />
+      <NavItem
+        label="Mood"
+        icon={<MoodIcon size={18} />}
+        target={{ name: "mood" }}
+        active={activeName === "mood"}
+      />
 
       <div className="mt-4 px-3 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
         Library

@@ -24,7 +24,8 @@ export type ScreenState =
   | { name: "tagList" }
   | { name: "tagDetail"; tagId: string }
   | { name: "genreList" }
-  | { name: "genreDetail"; genreId: string };
+  | { name: "genreDetail"; genreId: string }
+  | { name: "mood" };
 
 export function screenKey(s: ScreenState): string {
   switch (s.name) {

@@ -38,6 +38,22 @@ export function GenreIcon(props: IconProps) {
   );
 }
 
+export function MoodIcon(props: IconProps) {
+  return (
+    <Icon {...props} fill="none">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2" />
+      <circle cx="9" cy="10" r="1.3" fill="currentColor" />
+      <circle cx="15" cy="10" r="1.3" fill="currentColor" />
+      <path
+        d="M8.2 14a4.2 4.2 0 007.6 0"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </Icon>
+  );
+}
+
 export function PauseIcon(props: IconProps) {
   return (
     <Icon {...props}>
