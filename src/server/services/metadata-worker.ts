@@ -6,9 +6,7 @@ import {
   aggressivelyCleanTitle,
   splitCamelCase,
 } from "@/server/services/yt-title-parser";
-import { tagTrackGenres } from "@/server/services/genre-tagger";
-import { seedTrackMoodAffinities } from "@/server/services/mood-seeder";
-import { analyzeTrackFile, storeAudioFeatures } from "@/server/services/audio-analysis";
+import { enrichTrackExtras } from "@/server/services/track-enrich";
 
 let running = false;
 let stop = false;
@@ -119,16 +117,15 @@ async function processTrackJob(trackId: string): Promise<void> {
   }
 
   if (!top) {
-    // None of the strategies returned a confident match — mark as fetched
-    // (with no MBID) so we don't keep retrying. User can manually fix via
-    // the (future) Needs Review screen.
+    // No confident MusicBrainz match — mark fetched (don't retry MB forever).
+    // We deliberately DON'T bail here: genres, audio features and mood seeds
+    // don't need MusicBrainz, and many YouTube tracks never get a confident
+    // match. They're populated by enrichTrackExtras at the end regardless.
     await db.track.update({
       where: { id: trackId },
       data: { metadataFetched: new Date() },
     });
-    throw new Error(`weak-match: no strategy produced a confident match`);
-  }
-
+  } else {
   console.log(`[mu] enriched "${track.title}" via ${strategyUsed} → "${top.title}" by "${top.artistName}"`);
 
   // If MB's artist name differs from our current artist row, re-link the
@@ -209,35 +206,10 @@ async function processTrackJob(trackId: string): Promise<void> {
     }
   }
 
-  // Populate genres from the freshly-resolved MBIDs (MB first, Ollama fallback).
-  // Best-effort: a genre failure must not fail the enrichment job.
-  try {
-    await tagTrackGenres(trackId);
-  } catch (err) {
-    console.warn("[mu] genre tagging failed:", err);
   }
 
-  // Analyze the actual audio (Essentia) so mood seeding can "hear" the song,
-  // not just read its metadata. Best-effort — no-op if the venv/models aren't
-  // installed (analyzeTrackFile returns null).
-  try {
-    const t = await db.track.findUnique({
-      where: { id: trackId },
-      select: { filePath: true },
-    });
-    if (t?.filePath) {
-      const feats = await analyzeTrackFile(t.filePath);
-      if (feats) await storeAudioFeatures(trackId, feats);
-    }
-  } catch (err) {
-    console.warn("[mu] audio analysis failed:", err);
-  }
-
-  // Seed baseline mood affinities (uses the genres + audio just gathered).
-  // Best-effort.
-  try {
-    await seedTrackMoodAffinities(trackId);
-  } catch (err) {
-    console.warn("[mu] mood seeding failed:", err);
-  }
+  // Genres + audio + mood — runs for EVERY track, matched or not (none of it
+  // needs MusicBrainz). For a freshly-created YouTube track the file may not be
+  // on disk yet, so audio is (re)done after the download finalizes too.
+  await enrichTrackExtras(trackId);
 }

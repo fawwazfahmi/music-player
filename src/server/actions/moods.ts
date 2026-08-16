@@ -5,7 +5,6 @@ import { getAllMoods } from "@/server/services/mood-store";
 import { runMoodSession, type MoodSessionResult } from "@/server/services/mood-session";
 import { applyMoodSignal, type MoodSignal } from "@/server/services/mood-learning";
 import { suggestYtForMood } from "@/server/services/mood-yt";
-import { seedTrackMoodAffinities } from "@/server/services/mood-seeder";
 import type { YtSearchResult } from "@/server/services/yt-service";
 import { currentListenerOr } from "@/server/current-listener";
 
@@ -75,12 +74,12 @@ export async function getMoodYtSuggestions(sessionId: string): Promise<YtSearchR
   }
 }
 
-/** Adopt a freshly-downloaded YouTube pick into a mood (Phase 5): seed its
-    baseline mood affinities and record that she kept it for this mood — a
-    strong positive that carries the choice into future playlists. */
+/** Adopt a freshly-kept YouTube pick into a mood (Phase 5): record that she
+    kept it for this mood — a strong positive that carries the choice into
+    future playlists. The track's baseline mood seed (genres + audio-informed)
+    is produced by the post-download enrichment once the file lands. */
 export async function adoptYtPickIntoMood(sessionId: string, trackId: string): Promise<void> {
   try {
-    await seedTrackMoodAffinities(trackId);
     await applyMoodSignal({ sessionId, trackId, signal: "favorite" });
   } catch {
     /* best-effort */

@@ -24,6 +24,7 @@ import { env } from "@/lib/env";
 import { downloadAudio, type YtSearchResult } from "@/server/services/yt-service";
 import { parseYtTitle } from "@/server/services/yt-title-parser";
 import { scrubCookiePaths } from "@/server/services/yt-cookies";
+import { enrichTrackExtras } from "@/server/services/track-enrich";
 
 const CACHE_DIR = path.join(env.MUSIC_LIBRARY_PATH, ".cache", "yt");
 
@@ -254,6 +255,10 @@ export async function runDownloadJob(
         errorMessage: null,
       },
     });
+    // The file is now on disk, so genres + audio + mood can all run for real.
+    // Force re-seed: the early metadata job may have seeded moods before the
+    // audio existed; now we redo them audio-informed. Never throws.
+    await enrichTrackExtras(trackId, { force: true }).catch(() => {});
     log("end:ok", { totalMs: Date.now() - t0 });
   } catch (err) {
     // Scrub before logging or persisting: yt-dlp stderr can echo the
