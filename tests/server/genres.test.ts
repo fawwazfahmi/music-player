@@ -51,33 +51,33 @@ describe.skipIf(!RUN)("genre actions", () => {
       await db.album.deleteMany({ where: { artistId: artist.id } });
       await db.artist.delete({ where: { id: artist.id } });
     }
-    await db.genre.deleteMany({ where: { name: { in: ["indie rock", "pop"] } } });
+    await db.genre.deleteMany({ where: { name: { in: ["zt indie rock", "zt-pop"] } } });
   });
 
   it("addGenreToTrack normalizes, dedupes, and is idempotent", async () => {
     const { addGenreToTrack, getGenresForTrack } = await import("@/server/actions/genres");
-    await addGenreToTrack(trackIds[0]!, "Indie  Rock");
-    await addGenreToTrack(trackIds[0]!, "indie rock"); // same after normalize
+    await addGenreToTrack(trackIds[0]!, "Zt Indie  Rock");
+    await addGenreToTrack(trackIds[0]!, "zt indie rock"); // same after normalize
     const genres = await getGenresForTrack(trackIds[0]!);
-    expect(genres.map((g) => g.name)).toEqual(["indie rock"]);
+    expect(genres.map((g) => g.name)).toEqual(["zt indie rock"]);
   });
 
   it("getAllGenres reports per-genre track counts", async () => {
     const { addGenreToTrack, getAllGenres } = await import("@/server/actions/genres");
-    await addGenreToTrack(trackIds[0]!, "pop");
-    await addGenreToTrack(trackIds[1]!, "pop");
+    await addGenreToTrack(trackIds[0]!, "zt-pop");
+    await addGenreToTrack(trackIds[1]!, "zt-pop");
     const all = await getAllGenres();
-    const pop = all.find((g) => g.name === "pop");
+    const pop = all.find((g) => g.name === "zt-pop");
     expect(pop?.trackCount).toBe(2);
   });
 
   it("getTracksByGenre returns playable tracks for the genre", async () => {
     const { addGenreToTrack, getTracksByGenre } = await import("@/server/actions/genres");
     const { db } = await import("@/server/db");
-    await addGenreToTrack(trackIds[0]!, "pop");
-    const genre = await db.genre.findUnique({ where: { name: "pop" }, select: { id: true } });
+    await addGenreToTrack(trackIds[0]!, "zt-pop");
+    const genre = await db.genre.findUnique({ where: { name: "zt-pop" }, select: { id: true } });
     const res = await getTracksByGenre(genre!.id);
-    expect(res.genre?.name).toBe("pop");
+    expect(res.genre?.name).toBe("zt-pop");
     expect(res.tracks.map((t) => t.id)).toContain(trackIds[0]);
   });
 
@@ -86,9 +86,9 @@ describe.skipIf(!RUN)("genre actions", () => {
       "@/server/actions/genres"
     );
     const { db } = await import("@/server/db");
-    const added = await addGenreToTrack(trackIds[0]!, "pop");
+    const added = await addGenreToTrack(trackIds[0]!, "zt-pop");
     await removeGenreFromTrack(trackIds[0]!, added!.id);
     expect(await getGenresForTrack(trackIds[0]!)).toEqual([]);
-    expect(await db.genre.findUnique({ where: { name: "pop" } })).toBeNull();
+    expect(await db.genre.findUnique({ where: { name: "zt-pop" } })).toBeNull();
   });
 });

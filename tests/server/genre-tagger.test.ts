@@ -46,40 +46,42 @@ describe.skipIf(!RUN)("tagTrackGenres", () => {
       await db.track.deleteMany({ where: { id: { in: ids } } });
       await db.artist.delete({ where: { id: artist.id } });
     }
-    await db.genre.deleteMany({ where: { name: { in: ["pop", "dream pop", "bedroom pop"] } } });
+    await db.genre.deleteMany({
+      where: { name: { in: ["ztag-pop", "ztag-dream pop", "ztag-bedroom pop"] } },
+    });
   });
 
   it("uses recording genres from MusicBrainz when available", async () => {
     const { tagTrackGenres } = await import("@/server/services/genre-tagger");
     const applied = await tagTrackGenres(trackId, {
-      fetchMbGenres: vi.fn(async (entity) => (entity === "recording" ? ["pop", "dream pop"] : [])),
+      fetchMbGenres: vi.fn(async (entity) => (entity === "recording" ? ["ztag-pop", "ztag-dream pop"] : [])),
       classifyGenre: vi.fn(async () => ["should-not-be-used"]),
     });
-    expect(applied).toEqual(["pop", "dream pop"]);
+    expect(applied).toEqual(["ztag-pop", "ztag-dream pop"]);
     const { db } = await import("@/server/db");
     const rows = await db.trackGenre.findMany({
       where: { trackId },
       select: { genre: { select: { name: true } } },
     });
-    expect(rows.map((r) => r.genre.name).sort()).toEqual(["dream pop", "pop"]);
+    expect(rows.map((r) => r.genre.name).sort()).toEqual(["ztag-dream pop", "ztag-pop"]);
   });
 
   it("falls back to Ollama when MusicBrainz has none", async () => {
     const { tagTrackGenres } = await import("@/server/services/genre-tagger");
-    const classify = vi.fn(async () => ["bedroom pop"]);
+    const classify = vi.fn(async () => ["ztag-bedroom pop"]);
     const applied = await tagTrackGenres(trackId, {
       fetchMbGenres: vi.fn(async () => []),
       classifyGenre: classify,
     });
     expect(classify).toHaveBeenCalledOnce();
-    expect(applied).toEqual(["bedroom pop"]);
+    expect(applied).toEqual(["ztag-bedroom pop"]);
   });
 
   it("writes ArtistGenre when genres come from the artist MBID", async () => {
     const { tagTrackGenres } = await import("@/server/services/genre-tagger");
     await tagTrackGenres(trackId, {
       // recording empty, artist has genres → those are artist-level
-      fetchMbGenres: vi.fn(async (entity) => (entity === "artist" ? ["pop"] : [])),
+      fetchMbGenres: vi.fn(async (entity) => (entity === "artist" ? ["ztag-pop"] : [])),
       classifyGenre: vi.fn(async () => []),
     });
     const { db } = await import("@/server/db");
@@ -91,7 +93,7 @@ describe.skipIf(!RUN)("tagTrackGenres", () => {
     const { tagTrackGenres } = await import("@/server/services/genre-tagger");
     const deps = {
       fetchMbGenres: vi.fn(async (entity: "recording" | "artist") =>
-        entity === "recording" ? ["pop"] : [],
+        entity === "recording" ? ["ztag-pop"] : [],
       ),
       classifyGenre: vi.fn(async () => []),
     };
