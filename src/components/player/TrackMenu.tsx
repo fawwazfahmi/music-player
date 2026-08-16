@@ -12,8 +12,10 @@ import {
   DeleteIcon,
   AlbumIcon,
   NoteIcon,
+  RetryIcon,
 } from "@/components/icons";
 import { usePlayerStore, type QueueTrack } from "@/stores/player-store";
+import { useIpodStore } from "@/stores/ipod-store";
 import { deleteTrack } from "@/server/actions/library";
 import { addToPlaylist, getPlaylists } from "@/server/actions/playlists";
 import { transcribeTrack } from "@/server/actions/lyrics";
@@ -166,6 +168,12 @@ export function TrackMenu({
     setCoverOpen(true);
   }
 
+  function openNotes(e: React.MouseEvent) {
+    stop(e);
+    setOpen(false);
+    useIpodStore.getState().push({ name: "notes", trackId: track.id });
+  }
+
   async function handleReTranscribe(e: React.MouseEvent) {
     stop(e);
     setTranscribing(true);
@@ -290,12 +298,17 @@ export function TrackMenu({
           />
           <div className="my-1 border-t border-zinc-800" />
           <MenuItem
+            icon={<NoteIcon size={14} />}
+            label="Notes, tags & genres"
+            onClick={openNotes}
+          />
+          <MenuItem
             icon={<AlbumIcon size={14} />}
             label="Change cover…"
             onClick={openCoverPicker}
           />
           <MenuItem
-            icon={<NoteIcon size={14} />}
+            icon={<RetryIcon size={14} />}
             label={transcribing ? "Transcribing…" : "Re-transcribe"}
             onClick={handleReTranscribe}
             disabled={transcribing}
