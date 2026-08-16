@@ -9,12 +9,15 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 
+# The venv lives OUTSIDE the repo: a Python venv's symlinks break Turbopack's
+# project scan during `next build`. Point AUDIO_ANALYZER_PY at it (see .env).
 PY="${AUDIO_PYTHON:-python3.12}"
-VENV="$ROOT/.venv-audio"
+VENV="${AUDIO_VENV:-$HOME/.cache/kyowave/audio-venv}"
 MODELS="$ROOT/models/audio"
 BASE_URL="https://essentia.upf.edu/models/classifiers"
 
 echo "→ Creating venv at $VENV ($($PY --version))"
+mkdir -p "$(dirname "$VENV")"
 "$PY" -m venv "$VENV"
 "$VENV/bin/python" -m pip install --quiet --upgrade pip
 echo "→ Installing essentia-tensorflow (this is large, ~1GB)"

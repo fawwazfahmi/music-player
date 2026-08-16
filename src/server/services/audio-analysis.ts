@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import path from "node:path";
+import os from "node:os";
 import { db } from "@/server/db";
 
 export interface RawAudioFeatures {
@@ -70,7 +71,12 @@ export interface AudioAnalysisDeps {
   runAnalyzer?: (filePath: string) => Promise<RawAudioFeatures | null>;
 }
 
-const PY = process.env.AUDIO_ANALYZER_PY ?? path.join(process.cwd(), ".venv-audio", "bin", "python");
+// The venv lives OUTSIDE the project tree — a Python venv's symlinks break
+// Turbopack's project scan. Default to ~/.cache/kyowave/audio-venv (created by
+// scripts/audio/setup.sh); override with AUDIO_ANALYZER_PY.
+const PY =
+  process.env.AUDIO_ANALYZER_PY ??
+  path.join(os.homedir(), ".cache", "kyowave", "audio-venv", "bin", "python");
 const SCRIPT = path.join(process.cwd(), "scripts", "audio", "extract_features.py");
 
 /** Run the Essentia pipeline on a single local file. Returns null on any

@@ -5,10 +5,13 @@
 
 import { spawn } from "node:child_process";
 import path from "node:path";
+import os from "node:os";
 import { db } from "@/server/db";
 import { storeAudioFeatures, type RawAudioFeatures } from "@/server/services/audio-analysis";
 
-const PY = process.env.AUDIO_ANALYZER_PY ?? path.join(process.cwd(), ".venv-audio", "bin", "python");
+const PY =
+  process.env.AUDIO_ANALYZER_PY ??
+  path.join(os.homedir(), ".cache", "kyowave", "audio-venv", "bin", "python");
 const SCRIPT = path.join(process.cwd(), "scripts", "audio", "extract_features.py");
 const CHUNK = 8; // paths per python process — amortizes model load, bounds memory
 
