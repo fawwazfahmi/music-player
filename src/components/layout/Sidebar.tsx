@@ -9,6 +9,7 @@ import {
   AlbumIcon,
   ArtistIcon,
   DownloadIcon,
+  GenreIcon,
   HeartIcon,
   HomeIcon,
   MusicNoteIcon,
@@ -118,6 +119,12 @@ export function Sidebar() {
         icon={<AlbumIcon size={18} />}
         target={{ name: "albumList" }}
         active={activeName === "albumList" || activeName === "albumDetail"}
+      />
+      <NavItem
+        label="Genres"
+        icon={<GenreIcon size={18} />}
+        target={{ name: "genreList" }}
+        active={activeName === "genreList" || activeName === "genreDetail"}
       />
       <NavItem
         label="Favorites"

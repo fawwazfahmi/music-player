@@ -20,6 +20,8 @@ import { NowPlayingFullPage } from "./NowPlayingFullPage";
 import { StatsPage } from "./StatsPage";
 import { TagsPage } from "./TagsPage";
 import { TagDetailPage } from "./TagDetailPage";
+import { GenresPage } from "./GenresPage";
+import { GenreDetailPage } from "./GenreDetailPage";
 
 export function MainContent() {
   const current = useIpodStore((s) => s.current());
@@ -67,6 +69,10 @@ export function MainContent() {
       return <TagsPage />;
     case "tagDetail":
       return <TagDetailPage tagId={current.tagId} />;
+    case "genreList":
+      return <GenresPage />;
+    case "genreDetail":
+      return <GenreDetailPage genreId={current.genreId} />;
     case "nowPlaying":
       return <HomePage />; // now playing is the right panel; main shows home
     case "musicSub":
