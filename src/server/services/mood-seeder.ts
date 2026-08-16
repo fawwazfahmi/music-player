@@ -50,14 +50,17 @@ export async function seedTrackMoodAffinities(
   } catch {
     scores = {};
   }
-  if (Object.keys(scores).length === 0) {
+  // Fall back to the genre heuristic when the LLM gives nothing USABLE — an
+  // all-zero dict (model unsure) counts as nothing, not as a real answer.
+  let usable = Object.entries(scores).filter(([, s]) => s >= MIN_SCORE);
+  if (usable.length === 0) {
     scores = genreMoodHeuristic(genres, moodNames);
+    usable = Object.entries(scores).filter(([, s]) => s >= MIN_SCORE);
     source = "HEURISTIC";
   }
 
   const applied: string[] = [];
-  for (const [name, score] of Object.entries(scores)) {
-    if (score < MIN_SCORE) continue;
+  for (const [name, score] of usable) {
     const moodId = idByName.get(name);
     if (!moodId) continue;
     await db.trackMoodSeed.upsert({

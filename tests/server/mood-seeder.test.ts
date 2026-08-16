@@ -86,6 +86,21 @@ describe.skipIf(!RUN)("seedTrackMoodAffinities", () => {
     expect(row?.source).toBe("HEURISTIC");
   });
 
+  it("falls back to the heuristic when the LLM returns all-zero scores", async () => {
+    const { seedTrackMoodAffinities } = await import("@/server/services/mood-seeder");
+    const applied = await seedTrackMoodAffinities(trackId, {
+      seedTrackMoods: vi.fn(async () => ({ chill: 0, happy: 0, energetic: 0 })),
+    });
+    // dark wave → nostalgic via heuristic, since the LLM gave nothing usable
+    expect(applied).toContain("nostalgic");
+    const { db } = await import("@/server/db");
+    const row = await db.trackMoodSeed.findFirst({
+      where: { trackId, mood: { name: "nostalgic" } },
+      select: { source: true },
+    });
+    expect(row?.source).toBe("HEURISTIC");
+  });
+
   it("is idempotent — a second run adds nothing", async () => {
     const { seedTrackMoodAffinities } = await import("@/server/services/mood-seeder");
     const deps = { seedTrackMoods: vi.fn(async () => ({ chill: 0.8 })) };
