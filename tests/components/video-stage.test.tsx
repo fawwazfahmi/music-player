@@ -37,6 +37,17 @@ describe("VideoStage lifecycle", () => {
     expect(document.querySelectorAll(STAGE)).toHaveLength(1);
   });
 
+  it("rounds the container to match the full-video slot", async () => {
+    // The container is a position:fixed overlay, so it inherits nothing from
+    // the slot beneath it. Without a matching radius the iframe paints square
+    // corners over the rounded stage in full video mode.
+    const { VideoStage } = await import("@/components/player/VideoStage");
+    render(<VideoStage />);
+    const stage = document.querySelector<HTMLElement>(STAGE)!;
+    expect(stage.style.borderRadius).toBe("14px");
+    expect(stage.style.overflow).toBe("hidden");
+  });
+
   it("removes the container when it unmounts", async () => {
     // Performance mode unmounts <VideoStage /> via
     //   {!player.performanceMode && <VideoStage />}

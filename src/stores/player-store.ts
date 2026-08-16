@@ -83,6 +83,10 @@ interface PlayerState {
       it on every sheet open cost a visible second of black, and sometimes it
       never started at all. Not persisted. */
   videoPresenting: boolean;
+  /** Which tab the desktop right panel is showing. Lifted out of RightPanel's
+      local state so the full-video rail's Queue button can switch to it.
+      Not persisted — which tab you left open is not worth remembering. */
+  rightPanelTab: "lyrics" | "queue";
   currentTrack: () => QueueTrack | null;
   setQueue: (queue: QueueTrack[], startIndex?: number) => void;
   /** Append a track to the end of the queue. If the queue is empty, starts
@@ -123,6 +127,7 @@ interface PlayerState {
   setVideoPresenting: (v: boolean) => void;
   setMobileArtMode: (v: boolean) => void;
   toggleMobileArtMode: () => void;
+  setRightPanelTab: (v: "lyrics" | "queue") => void;
 }
 
 /**
@@ -207,6 +212,7 @@ export const usePlayerStore = create<PlayerState>()(
       videoGateEnabled: true,
       mobileArtMode: false,
       videoPresenting: true,
+      rightPanelTab: "lyrics",
       currentTrack: () => {
         const s = get();
         return s.queue[s.currentIndex] ?? null;
@@ -458,6 +464,7 @@ export const usePlayerStore = create<PlayerState>()(
       setVideoPresenting: (v) => set({ videoPresenting: v }),
       setMobileArtMode: (v) => set({ mobileArtMode: v }),
       toggleMobileArtMode: () => set((s) => ({ mobileArtMode: !s.mobileArtMode })),
+      setRightPanelTab: (v) => set({ rightPanelTab: v }),
     }),
     {
       // Per-device persistence: localStorage on the user's own machine.

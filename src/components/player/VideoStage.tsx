@@ -94,6 +94,12 @@ function getOrCreateContainer(): HTMLDivElement {
     "height:360px",
     "z-index:40", // above sidebar (z-30) + player bar; below mobile drawers' backdrop
     "overflow:hidden",
+    // Matches the full-video slot's radius. The container is a fixed overlay,
+    // so it inherits nothing from the slot underneath — without this the
+    // iframe paints square corners over the rounded stage. The small
+    // right-panel slot is square, where a 14px radius is invisible anyway
+    // because the iframe fills it edge to edge.
+    "border-radius:14px",
     `transition:${SLOT_TRANSITION}`,
     // pointer-events:none → clicks pass through to whatever's beneath (the
     // slot's Expand button, app controls, etc). The user controls playback
