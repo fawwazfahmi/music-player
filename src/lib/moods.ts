@@ -31,3 +31,42 @@ export function clampWeight(w: number): number {
   if (w > 1) return 1;
   return w;
 }
+
+// Mood → genres that typically suit it. Used only as a cold-start fallback when
+// Ollama is unavailable for seeding. Deliberately broad, not exhaustive.
+const MOOD_GENRES: Record<string, string[]> = {
+  happy: ["pop", "disco", "funk", "k-pop", "j-pop", "dance-pop", "dance"],
+  chill: [
+    "lo-fi", "lofi", "ambient", "chillout", "dream pop", "bedroom pop", "acoustic",
+    "soft rock", "easy listening", "lounge", "jazz", "shoegaze",
+  ],
+  sad: ["blues", "ballad", "shoegaze", "slowcore", "emo", "soul"],
+  energetic: [
+    "metal", "heavy metal", "thrash metal", "speed metal", "power metal", "punk",
+    "punk rock", "hard rock", "rock", "dance", "dance-pop", "edm", "electronic",
+    "phonk", "phonk house", "hip hop", "rap", "pop rap", "disco", "funk",
+  ],
+  focus: ["ambient", "classical", "instrumental", "lo-fi", "lofi", "jazz"],
+  romantic: ["r&b", "contemporary r&b", "neo soul", "soul", "jazz pop", "ballad"],
+  nostalgic: [
+    "classic rock", "synth-pop", "new wave", "dark wave", "swing", "big band",
+    "dixieland", "oldies", "disco",
+  ],
+};
+
+/** Cold-start mood scores derived purely from a track's genres. Returns only
+    moods present in `moodNames`. Each matched mood gets a modest 0.6 so a real
+    LLM/learned signal outweighs it later. */
+export function genreMoodHeuristic(
+  genres: string[],
+  moodNames: string[],
+): Record<string, number> {
+  const known = new Set(moodNames);
+  const g = new Set(genres.map((x) => x.trim().toLowerCase()));
+  const out: Record<string, number> = {};
+  for (const [mood, list] of Object.entries(MOOD_GENRES)) {
+    if (!known.has(mood)) continue;
+    if (list.some((x) => g.has(x))) out[mood] = 0.6;
+  }
+  return out;
+}

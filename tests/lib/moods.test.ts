@@ -4,6 +4,7 @@ import {
   BUILTIN_MOOD_NAMES,
   normalizeMoodName,
   clampWeight,
+  genreMoodHeuristic,
 } from "@/lib/moods";
 
 describe("mood vocabulary", () => {
@@ -29,5 +30,14 @@ describe("mood vocabulary", () => {
     expect(clampWeight(1.5)).toBe(1);
     expect(clampWeight(0.4)).toBe(0.4);
     expect(clampWeight(Number.NaN)).toBe(0);
+  });
+
+  it("genreMoodHeuristic maps genres to plausible moods", () => {
+    expect(genreMoodHeuristic(["dark wave"], BUILTIN_MOOD_NAMES).nostalgic).toBe(0.6);
+    expect(genreMoodHeuristic(["heavy metal"], BUILTIN_MOOD_NAMES).energetic).toBe(0.6);
+    expect(genreMoodHeuristic(["lo-fi"], BUILTIN_MOOD_NAMES).chill).toBe(0.6);
+    expect(genreMoodHeuristic(["contemporary r&b"], BUILTIN_MOOD_NAMES).romantic).toBe(0.6);
+    // unknown genre → no moods
+    expect(genreMoodHeuristic(["zzzz"], BUILTIN_MOOD_NAMES)).toEqual({});
   });
 });
