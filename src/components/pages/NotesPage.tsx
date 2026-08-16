@@ -5,6 +5,7 @@ import { addNote, deleteNote, getNotesForTrack } from "@/server/actions/memory";
 import { DeleteIcon, NoteIcon } from "@/components/icons";
 import { TagEditor } from "@/components/tags/TagEditor";
 import { GenreEditor } from "@/components/genres/GenreEditor";
+import { AudioFeaturesCard } from "@/components/audio/AudioFeaturesCard";
 import { PageHeader } from "./_shared";
 
 interface Props {
@@ -68,6 +69,7 @@ export function NotesPage({ trackId }: Props) {
         <div className="mx-auto mb-6 max-w-2xl space-y-4">
           <TagEditor trackId={trackId} />
           <GenreEditor trackId={trackId} />
+          <AudioFeaturesCard trackId={trackId} />
         </div>
         <form onSubmit={onSubmit} className="mx-auto max-w-2xl">
           <textarea
