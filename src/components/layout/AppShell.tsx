@@ -264,7 +264,9 @@ export function AppShell() {
           };
           if (stopped) return;
           if (status.status === "READY") {
-            usePlayerStore.getState().setQueue([activeDownload!.queueTrack], 0);
+            // Append rather than replace — a pick joins the queue without
+            // nuking what's playing (auto-plays if the queue was empty).
+            usePlayerStore.getState().addToQueue(activeDownload!.queueTrack);
             useDownloadStore.getState().finish();
             return;
           }

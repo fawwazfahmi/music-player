@@ -45,12 +45,13 @@ export function YtPickerPage({ query }: Props) {
         artistName: r.uploader,
         albumTitle: "YouTube",
         ytVideoId: r.videoId,
+        ephemeral: true, // a "trying it out" pick until adopted
       });
 
       const res = await fetch("/api/yt-download", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify(r),
+        body: JSON.stringify({ ...r, ephemeral: true }),
       });
       if (!res.ok) {
         const j = (await res.json().catch(() => null)) as { message?: string } | null;
@@ -65,8 +66,8 @@ export function YtPickerPage({ query }: Props) {
       queueTrack.id = trackId;
 
       if (status === "READY") {
-        // Already cached on disk — start playback immediately.
-        usePlayerStore.getState().setQueue([queueTrack], 0);
+        // Already cached on disk — append to the queue (auto-plays if empty).
+        usePlayerStore.getState().addToQueue(queueTrack);
       } else {
         // Hand off to the background polling flow; setQueue happens when
         // the file lands. Floating DownloadIndicator shows progress.

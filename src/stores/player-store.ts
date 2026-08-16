@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import { weaveEphemeral } from "@/lib/weave-queue";
 
 // Identity-scope the localStorage key so two tabs in the same browser
 // running the app as different people (ainul vs fawwaz) keep separate
@@ -41,6 +42,8 @@ export interface QueueTrack {
   album: string;
   coverArtHash?: string | null;
   ytVideoId?: string | null;
+  /** A "trying it out" YouTube pick not yet in the library — drives the adopt nudge. */
+  ephemeral?: boolean;
 }
 
 export type RepeatMode = "off" | "one" | "all";
@@ -95,6 +98,9 @@ interface PlayerState {
   /** Append many tracks in one shot — used when adding a YT playlist /
       mix so we do a single state update instead of N back-to-back. */
   addManyToQueue: (tracks: QueueTrack[]) => void;
+  /** Splice ephemeral picks at random positions into the *upcoming* part of the
+      queue (after the current track), without disturbing what's playing. */
+  weaveUpcomingEphemeral: (picks: QueueTrack[]) => void;
   /** Insert a track right after the currently playing one. If the queue is
       empty, starts playing immediately. */
   playNext: (track: QueueTrack) => void;
@@ -261,6 +267,16 @@ export const usePlayerStore = create<PlayerState>()(
             };
           }
           return { queue: [...s.queue, ...tracks] };
+        }),
+      weaveUpcomingEphemeral: (picks) =>
+        set((s) => {
+          if (picks.length === 0) return s;
+          if (s.queue.length === 0) return { queue: [...picks] };
+          // Keep everything up to and including the current track; weave the
+          // picks into the upcoming tail so playback isn't disturbed.
+          const head = s.queue.slice(0, s.currentIndex + 1);
+          const tail = weaveEphemeral(s.queue.slice(s.currentIndex + 1), picks, Math.random);
+          return { queue: [...head, ...tail] };
         }),
       playNext: (track) =>
         set((s) => {
