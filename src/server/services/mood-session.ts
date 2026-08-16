@@ -1,6 +1,9 @@
 import { db } from "@/server/db";
 import { getAllMoods } from "@/server/services/mood-store";
-import { interpretMood as ollamaInterpretMood } from "@/server/services/mood-llm";
+import {
+  interpretMood as ollamaInterpretMood,
+  rerankByMood,
+} from "@/server/services/mood-llm";
 import { selectMoodTracks, type MoodPlaylistTrack } from "@/server/services/mood-engine";
 
 export interface MoodSessionResult {
@@ -21,6 +24,10 @@ export interface RunMoodSessionParams {
       freeText: string,
       moodNames: string[],
     ) => Promise<{ weights: Record<string, number>; genreHints: string[]; energy: unknown }>;
+    rerank?: (
+      moodLabel: string,
+      candidates: { id: string; title: string; artist: string }[],
+    ) => Promise<string[] | null>;
   };
 }
 
@@ -29,6 +36,7 @@ export interface RunMoodSessionParams {
     it's testable; the server action supplies the listener from the cookie. */
 export async function runMoodSession(params: RunMoodSessionParams): Promise<MoodSessionResult> {
   const interpret = params.deps?.interpretMood ?? ollamaInterpretMood;
+  const rerank = params.deps?.rerank ?? rerankByMood;
   const moods = await getAllMoods();
 
   let weights: Record<string, number> = {};
@@ -59,6 +67,9 @@ export async function runMoodSession(params: RunMoodSessionParams): Promise<Mood
     weights,
     genreHints,
     limit: params.limit ?? 30,
+    // Hybrid ranker: the formula shortlists, Ollama re-orders for nuance.
+    moodLabel: moodLabel || "music",
+    rerank,
   });
 
   const session = await db.moodSession.create({

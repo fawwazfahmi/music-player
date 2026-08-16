@@ -53,7 +53,12 @@ describe.skipIf(!RUN)("runMoodSession", () => {
 
   it("builds a playlist for a chip mood and persists the session", async () => {
     const { runMoodSession } = await import("@/server/services/mood-session");
-    const r = await runMoodSession({ listener: "sess", moodId: chillId, limit: 100 });
+    const r = await runMoodSession({
+      listener: "sess",
+      moodId: chillId,
+      limit: 100,
+      deps: { rerank: async (_l, c) => c.map((x) => x.id) },
+    });
     sessionIds.push(r.sessionId);
     expect(r.moodLabel).toBe("Chill");
     expect(r.tracks.some((t) => t.id === trackId)).toBe(true);
@@ -74,7 +79,7 @@ describe.skipIf(!RUN)("runMoodSession", () => {
       listener: "sess",
       freeText: "rainy sunday",
       limit: 100,
-      deps: { interpretMood },
+      deps: { interpretMood, rerank: async (_l, c) => c.map((x) => x.id) },
     });
     sessionIds.push(r.sessionId);
     expect(interpretMood).toHaveBeenCalledOnce();

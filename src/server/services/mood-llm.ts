@@ -146,6 +146,39 @@ export async function interpretMood(
   return { weights, genreHints, energy };
 }
 
+/** Re-rank a candidate pool best-first for a mood (the LLM half of the hybrid
+    ranker). Returns an ordered list of track ids covering every candidate, or
+    null when Ollama is unavailable so the caller keeps the formula order. */
+export async function rerankByMood(
+  moodLabel: string,
+  candidates: { id: string; title: string; artist: string }[],
+): Promise<string[] | null> {
+  if (candidates.length <= 1) return candidates.map((c) => c.id);
+  const list = candidates
+    .map((c) => `[${c.id}] "${c.title}" — ${c.artist}`)
+    .join("\n");
+  const prompt =
+    `Order these songs best-first for the mood "${moodLabel}". Respond ONLY with ` +
+    `JSON {"order": ["<id>", ...]} listing each id exactly once, best fit first. ` +
+    `Use the ids in [brackets] verbatim.\n${list}`;
+
+  const parsed = await ollamaGenerateJson<{ order?: unknown }>(prompt);
+  if (!parsed || !Array.isArray(parsed.order)) return null;
+
+  const valid = new Set(candidates.map((c) => c.id));
+  const seen = new Set<string>();
+  const order: string[] = [];
+  for (const x of parsed.order) {
+    if (typeof x === "string" && valid.has(x) && !seen.has(x)) {
+      seen.add(x);
+      order.push(x);
+    }
+  }
+  // Append anything the model dropped, in original order.
+  for (const c of candidates) if (!seen.has(c.id)) order.push(c.id);
+  return order;
+}
+
 /** Cold-start per-mood affinity scores (0..1) for a track, from its title,
     artist, and any known genres. Returns only known moods; {} when Ollama is
     unavailable. */

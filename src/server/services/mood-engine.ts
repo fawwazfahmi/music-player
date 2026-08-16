@@ -39,6 +39,8 @@ export interface MoodPlaylistTrack {
   fit: number;
 }
 
+const RERANK_POOL = 40; // formula shortlist handed to the LLM re-ranker
+
 export interface SelectParams {
   listener: string;
   weights: Record<string, number>; // mood name -> weight
@@ -46,6 +48,14 @@ export interface SelectParams {
   limit?: number;
   /** Injectable RNG for deterministic tests; defaults to Math.random. */
   rng?: () => number;
+  /** Human mood label for the LLM re-ranker (the hybrid ranker's LLM half). */
+  moodLabel?: string;
+  /** LLM re-ranker: reorders the formula's top pool best-first. Returns null to
+      keep the formula order. Omitted → formula-only (deterministic). */
+  rerank?: (
+    moodLabel: string,
+    candidates: { id: string; title: string; artist: string }[],
+  ) => Promise<string[] | null>;
 }
 
 /** Select and rank library tracks for a mood blend. Formula-based and
@@ -135,12 +145,33 @@ export async function selectMoodTracks(params: SelectParams): Promise<MoodPlayli
 
   scored.sort((a, b) => b.fit - a.fit);
 
+  // Hybrid ranker: let the LLM re-order the formula's top pool for nuance.
+  // Best-effort — on any failure we keep the formula order.
+  let ordered = scored;
+  if (params.rerank && params.moodLabel && scored.length > 1) {
+    const pool = scored.slice(0, RERANK_POOL);
+    let ids: string[] | null = null;
+    try {
+      ids = await params.rerank(
+        params.moodLabel,
+        pool.map((s) => ({ id: s.track.id, title: s.track.title, artist: s.track.primaryArtist.name })),
+      );
+    } catch {
+      ids = null;
+    }
+    if (ids) {
+      const byId = new Map(pool.map((s) => [s.track.id, s]));
+      const reordered = ids.map((id) => byId.get(id)).filter((s): s is (typeof pool)[number] => !!s);
+      ordered = [...reordered, ...scored.slice(RERANK_POOL)];
+    }
+  }
+
   // Artist diversity: greedily take up to ARTIST_CAP per artist, then relax to
   // fill up to the limit so a thin library is never starved.
   const perArtist = new Map<string, number>();
   const primary: typeof scored = [];
   const overflow: typeof scored = [];
-  for (const s of scored) {
+  for (const s of ordered) {
     const n = perArtist.get(s.track.primaryArtistId) ?? 0;
     if (n < ARTIST_CAP) {
       perArtist.set(s.track.primaryArtistId, n + 1);

@@ -103,6 +103,38 @@ describe.skipIf(!RUN)("selectMoodTracks", () => {
     expect(order.indexOf(ids.lo!)).toBeLessThan(order.indexOf(ids.mid!));
   });
 
+  it("applies the LLM re-rank over the formula order", async () => {
+    const { selectMoodTracks } = await import("@/server/services/mood-engine");
+    const { db } = await import("@/server/db");
+    // Force all three test tracks to the top of the pool (real library tracks
+    // now have chill seeds too), so the re-rank's ordering is what we measure.
+    await db.trackMoodSeed.updateMany({
+      where: { trackId: { in: [ids.hi!, ids.mid!, ids.lo!] }, moodId: moodIds.chill! },
+      data: { score: 0.99 },
+    });
+    // Formula order (all equal now) is stable; the re-ranker flips our three.
+    const rerank = async (
+      _label: string,
+      cands: { id: string }[],
+    ): Promise<string[]> => {
+      const mine = [ids.lo!, ids.mid!, ids.hi!];
+      const rest = cands.map((c) => c.id).filter((x) => !mine.includes(x));
+      return [...mine, ...rest];
+    };
+    const tracks = await selectMoodTracks({
+      listener: "tester",
+      weights: { chill: 1 },
+      genreHints: [],
+      limit: 500,
+      rng: () => 0,
+      moodLabel: "Chill",
+      rerank,
+    });
+    const order = tracks.map((t) => t.id).filter((id) => Object.values(ids).includes(id));
+    expect(order.indexOf(ids.lo!)).toBeLessThan(order.indexOf(ids.mid!));
+    expect(order.indexOf(ids.mid!)).toBeLessThan(order.indexOf(ids.hi!));
+  });
+
   it("respects the limit", async () => {
     const { selectMoodTracks } = await import("@/server/services/mood-engine");
     const tracks = await selectMoodTracks({
