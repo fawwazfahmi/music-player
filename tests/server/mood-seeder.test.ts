@@ -60,6 +60,7 @@ describe.skipIf(!RUN)("seedTrackMoodAffinities", () => {
     const applied = await seedTrackMoodAffinities(trackId, {
       seedTrackMoods: vi.fn(async () => ({ chill: 0.8, nostalgic: 0.5 })),
       analyzeEnergy: async () => null,
+      loadAudioFeatures: async () => null,
     });
     expect(applied.sort()).toEqual(["chill", "nostalgic"]);
     const { db } = await import("@/server/db");
@@ -78,6 +79,7 @@ describe.skipIf(!RUN)("seedTrackMoodAffinities", () => {
     const applied = await seedTrackMoodAffinities(trackId, {
       seedTrackMoods: vi.fn(async () => ({})),
       analyzeEnergy: async () => null,
+      loadAudioFeatures: async () => null,
     });
     expect(applied).toContain("nostalgic"); // dark wave → nostalgic
     const { db } = await import("@/server/db");
@@ -93,6 +95,7 @@ describe.skipIf(!RUN)("seedTrackMoodAffinities", () => {
     const applied = await seedTrackMoodAffinities(trackId, {
       seedTrackMoods: vi.fn(async () => ({ chill: 0, happy: 0, energetic: 0 })),
       analyzeEnergy: async () => null,
+      loadAudioFeatures: async () => null,
     });
     // dark wave → nostalgic via heuristic, since the LLM gave nothing usable
     expect(applied).toContain("nostalgic");
@@ -109,6 +112,7 @@ describe.skipIf(!RUN)("seedTrackMoodAffinities", () => {
     const deps = {
       seedTrackMoods: vi.fn(async () => ({ chill: 0.8 })),
       analyzeEnergy: async () => null,
+      loadAudioFeatures: async () => null,
     };
     await seedTrackMoodAffinities(trackId, deps);
     const second = await seedTrackMoodAffinities(trackId, deps);
@@ -123,10 +127,12 @@ describe.skipIf(!RUN)("seedTrackMoodAffinities", () => {
     await seedTrackMoodAffinities(trackId, {
       seedTrackMoods: vi.fn(async () => ({ chill: 0.8 })),
       analyzeEnergy: async () => null,
+      loadAudioFeatures: async () => null,
     });
     const applied = await seedTrackMoodAffinities(trackId, {
       seedTrackMoods: vi.fn(async () => ({ energetic: 0.9 })),
       analyzeEnergy: async () => null,
+      loadAudioFeatures: async () => null,
       force: true,
     });
     expect(applied).toEqual(["energetic"]);
@@ -149,10 +155,37 @@ describe.skipIf(!RUN)("seedTrackMoodAffinities", () => {
     await seedTrackMoodAffinities(trackId, {
       seedTrackMoods,
       analyzeEnergy: async () => 0.15,
+      loadAudioFeatures: async () => null,
       force: true,
     });
     const arg = seedTrackMoods.mock.calls[0]![0];
     expect(arg.lyrics).toContain("lonely");
     expect(arg.energy).toBe(0.15);
+  });
+
+  it("blends audio-model features into the seed (hearing the song)", async () => {
+    const { seedTrackMoodAffinities } = await import("@/server/services/mood-seeder");
+    const { db } = await import("@/server/db");
+    // LLM thinks chill; audio says it's an energetic dance track.
+    const applied = await seedTrackMoodAffinities(trackId, {
+      seedTrackMoods: vi.fn(async () => ({ chill: 0.7 })),
+      analyzeEnergy: async () => null,
+      loadAudioFeatures: async () => ({
+        mood_happy: 0.6,
+        mood_sad: 0.1,
+        mood_relaxed: 0.2,
+        mood_aggressive: 0.8,
+        mood_party: 0.9,
+        danceability: 0.9,
+      }),
+      force: true,
+    });
+    expect(applied).toContain("energetic"); // audio surfaced a mood the LLM missed
+    const rows = await db.trackMoodSeed.findMany({
+      where: { trackId },
+      select: { score: true, mood: { select: { name: true } } },
+    });
+    const byMood = Object.fromEntries(rows.map((r) => [r.mood.name, r.score]));
+    expect(byMood.energetic).toBeGreaterThan(0.7);
   });
 });

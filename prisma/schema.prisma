@@ -107,6 +107,7 @@ model Track {
   moodSeeds         TrackMoodSeed[]
   moodAffinities    TrackMoodAffinity[]
   moodFeedback      MoodFeedback[]
+  audioFeatures     TrackAudioFeatures?
   notes             SongNote[]
   history           ListeningHistory[]
   playlistEntries   PlaylistTrack[]
@@ -410,6 +411,26 @@ model RelatedArtist {
   toArtist     Artist @relation("ArtistTo", fields: [toArtistId], references: [id], onDelete: Cascade)
 
   @@id([fromArtistId, toArtistId, source])
+}
+
+// Objective + ML audio features from local files (Phase 6). Populated by the
+// Essentia pipeline (scripts/audio/extract_features.py). Feeds the mood seeder
+// so mood inference is grounded in the actual audio, not just metadata.
+model TrackAudioFeatures {
+  trackId         String   @id
+  moodHappy       Float?
+  moodSad         Float?
+  moodRelaxed     Float?
+  moodAggressive  Float?
+  moodParty       Float?
+  danceability    Float? // ML, 0..1
+  danceabilityDsp Float? // DSP detrended-fluctuation, ~0..3
+  tempo           Float? // BPM
+  musicalKey      String?
+  scale           String? // "major" | "minor"
+  keyStrength     Float?
+  analyzedAt      DateTime @default(now())
+  track           Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
 }
 
 // ===== Metadata caching =====

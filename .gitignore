@@ -50,3 +50,7 @@ next-env.d.ts
 /yt-cookies/
 *.cookies.txt
 /cookies.txt
+
+# Phase 6 audio analysis: python venv + pre-trained model weights (reproduce via scripts/audio/setup.sh)
+.venv-audio/
+models/audio/

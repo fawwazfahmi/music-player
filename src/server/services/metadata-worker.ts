@@ -8,6 +8,7 @@ import {
 } from "@/server/services/yt-title-parser";
 import { tagTrackGenres } from "@/server/services/genre-tagger";
 import { seedTrackMoodAffinities } from "@/server/services/mood-seeder";
+import { analyzeTrackFile, storeAudioFeatures } from "@/server/services/audio-analysis";
 
 let running = false;
 let stop = false;
@@ -216,7 +217,24 @@ async function processTrackJob(trackId: string): Promise<void> {
     console.warn("[mu] genre tagging failed:", err);
   }
 
-  // Seed baseline mood affinities (uses the genres just tagged). Best-effort.
+  // Analyze the actual audio (Essentia) so mood seeding can "hear" the song,
+  // not just read its metadata. Best-effort — no-op if the venv/models aren't
+  // installed (analyzeTrackFile returns null).
+  try {
+    const t = await db.track.findUnique({
+      where: { id: trackId },
+      select: { filePath: true },
+    });
+    if (t?.filePath) {
+      const feats = await analyzeTrackFile(t.filePath);
+      if (feats) await storeAudioFeatures(trackId, feats);
+    }
+  } catch (err) {
+    console.warn("[mu] audio analysis failed:", err);
+  }
+
+  // Seed baseline mood affinities (uses the genres + audio just gathered).
+  // Best-effort.
   try {
     await seedTrackMoodAffinities(trackId);
   } catch (err) {

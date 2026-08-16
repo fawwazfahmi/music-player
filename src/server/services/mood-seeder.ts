@@ -2,6 +2,12 @@ import { db } from "@/server/db";
 import { getAllMoods } from "@/server/services/mood-store";
 import { seedTrackMoods as ollamaSeedTrackMoods } from "@/server/services/mood-llm";
 import { analyzeEnergy as realAnalyzeEnergy } from "@/server/services/audio-features";
+import {
+  audioMoodScores,
+  blendSeedScores,
+  loadAudioFeatures as realLoadAudioFeatures,
+  type RawAudioFeatures,
+} from "@/server/services/audio-analysis";
 import { genreMoodHeuristic } from "@/lib/moods";
 
 const MIN_SCORE = 0.05; // below this, not worth storing
@@ -24,6 +30,7 @@ export interface MoodSeederDeps {
     moodNames: string[],
   ) => Promise<Record<string, number>>;
   analyzeEnergy?: (filePath: string) => Promise<number | null>;
+  loadAudioFeatures?: (trackId: string) => Promise<RawAudioFeatures | null>;
   /** Re-seed even if seeds already exist (clears the old ones first). */
   force?: boolean;
 }
@@ -38,6 +45,7 @@ export async function seedTrackMoodAffinities(
 ): Promise<string[]> {
   const seedFn = deps.seedTrackMoods ?? ollamaSeedTrackMoods;
   const analyzeEnergy = deps.analyzeEnergy ?? realAnalyzeEnergy;
+  const loadAudioFeatures = deps.loadAudioFeatures ?? realLoadAudioFeatures;
 
   const existing = await db.trackMoodSeed.count({ where: { trackId } });
   if (existing > 0) {
@@ -86,8 +94,14 @@ export async function seedTrackMoodAffinities(
   } catch {
     scores = {};
   }
-  // Fall back to the genre heuristic when the LLM gives nothing USABLE — an
-  // all-zero dict (model unsure) counts as nothing, not as a real answer.
+
+  // Blend in audio-derived scores from the pre-trained models ("hearing the
+  // song") — weighted over the LLM/lyrics where both have an opinion.
+  const audioF = await loadAudioFeatures(trackId).catch(() => null);
+  if (audioF) scores = blendSeedScores(scores, audioMoodScores(audioF));
+
+  // Fall back to the genre heuristic when nothing above is USABLE — an
+  // all-zero result (models unsure) counts as nothing, not as a real answer.
   let usable = Object.entries(scores).filter(([, s]) => s >= MIN_SCORE);
   if (usable.length === 0) {
     scores = genreMoodHeuristic(genres, moodNames);
