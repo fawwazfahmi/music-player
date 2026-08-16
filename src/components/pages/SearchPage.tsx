@@ -5,6 +5,7 @@ import { searchLibrary } from "@/server/actions/search";
 import type { SearchResults } from "@/server/services/search";
 import { useIpodStore } from "@/stores/ipod-store";
 import { usePlayerStore } from "@/stores/player-store";
+import { displayAlbum } from "@/lib/album-name";
 import { AlbumIcon, ArtistIcon, MusicNoteIcon, PlaylistIcon, SearchIcon } from "@/components/icons";
 import { buildQueueTrack } from "./_shared";
 
@@ -144,7 +145,7 @@ export function SearchPage() {
                       <div>
                         <div className="text-sm font-medium text-zinc-100">{t.title}</div>
                         <div className="text-xs text-zinc-500">
-                          {t.artistName} · {t.albumTitle}
+                          {t.artistName} · {displayAlbum(t.albumTitle)}
                         </div>
                       </div>
                     </button>
@@ -193,7 +194,7 @@ export function SearchPage() {
                         <AlbumIcon size={14} />
                       </div>
                       <div>
-                        <div className="text-sm text-zinc-100">{a.title}</div>
+                        <div className="text-sm text-zinc-100">{displayAlbum(a.title)}</div>
                         <div className="text-xs text-zinc-500">{a.artistName}</div>
                       </div>
                     </button>

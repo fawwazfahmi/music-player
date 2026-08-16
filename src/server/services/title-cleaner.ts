@@ -1,8 +1,11 @@
-import { ollamaGenerateJson } from "@/server/services/mood-llm";
+import { db } from "@/server/db";
+import { fetchYtMeta as realFetchYtMeta, type YtMeta } from "@/server/services/yt-service";
+import { tidyTitle, normalizeWidth, parseYtMusicDescription } from "@/lib/title-clean";
 
 const MAX_ARTISTS = 3;
 
 export interface CleanInput {
+  videoId: string | null;
   title: string;
   artist: string;
   album: string;
@@ -11,49 +14,161 @@ export interface CleanInput {
 export interface CleanResult {
   title: string;
   artists: string[];
+  album: string | null;
+  source: "ytmeta" | "description" | "deterministic";
 }
 
-/** Ask the local LLM to clean a re-upload's title and recover the real
-    artist(s). Conservative: returns null when nothing should change or the
-    output is unusable, so the caller only acts on genuine improvements.
-    Keeps version markers (slowed/reverb/remix). Never throws. */
-export async function cleanTrackMeta(input: CleanInput): Promise<CleanResult | null> {
-  const prompt =
-    `You clean up music track metadata from YouTube re-uploads. Given the raw ` +
-    `title, uploader, and album, return the CLEAN song title and the REAL ` +
-    `artist(s). Rules:\n` +
-    `- Fix odd letter-spacing/fonts: "H o m e" → "Home".\n` +
-    `- Remove noise: channel suffixes like "- Topic", "lyrics", "official video", ` +
-    `"HD", and stray sentences that aren't the title.\n` +
-    `- KEEP version markers in the title: (Slowed), (Reverb), (Slowed & Reverbed), ` +
-    `(Remix), (Sped Up), (Cover), (Acoustic), etc.\n` +
-    `- The artist is the performing/original artist, NOT the uploader or a lyrics ` +
-    `channel. "X - Topic" → artist "X".\n` +
-    `- If it's a remix/mashup of multiple artists' songs, list every original artist.\n` +
-    `- If the raw title is already clean, set changed=false and echo it.\n` +
-    `- Be conservative: only change what's clearly messy.\n` +
-    `Respond ONLY JSON: {"title": "...", "artists": ["..."], "changed": true|false}.\n` +
-    `Raw title: "${input.title}"\nUploader: "${input.artist}"\nAlbum: "${input.album}"`;
+export interface CleanerDeps {
+  fetchYtMeta?: (videoId: string) => Promise<YtMeta | null>;
+}
 
-  const parsed = await ollamaGenerateJson<{
-    title?: unknown;
-    artists?: unknown;
-    changed?: unknown;
-  }>(prompt);
-  if (!parsed || parsed.changed === false) return null;
+function stripTopic(name: string): string {
+  return name.replace(/\s*-\s*topic\s*$/i, "").trim();
+}
 
-  const title = typeof parsed.title === "string" ? parsed.title.trim() : "";
-  const artists = Array.isArray(parsed.artists)
-    ? Array.from(
-        new Set(
-          parsed.artists
-            .filter((a): a is string => typeof a === "string")
-            .map((a) => a.trim())
-            .filter((a) => a.length > 0),
-        ),
-      ).slice(0, MAX_ARTISTS)
-    : [];
+/**
+ * Resolve a clean title + real artist(s) for a track, GROUNDED — never guessed:
+ *   1. YouTube's own music metadata (Art Track / "- Topic") via yt-dlp.
+ *   2. The "Provided to YouTube by … Title · Artist" description credit block.
+ *   3. Deterministic text cleanup (fix fonts, drop noise, keep version markers)
+ *      with the artist taken only from the literal text ("- Topic" stripped).
+ * Always returns a best-effort clean result; the caller decides whether it
+ * differs enough to apply.
+ */
+export async function resolveCleanMeta(
+  input: CleanInput,
+  deps: CleanerDeps = {},
+): Promise<CleanResult> {
+  const fetchYtMeta = deps.fetchYtMeta ?? realFetchYtMeta;
 
-  if (!title || artists.length === 0) return null;
-  return { title, artists };
+  if (input.videoId) {
+    const meta = await fetchYtMeta(input.videoId).catch(() => null);
+    if (meta) {
+      if (meta.track && meta.artists.length > 0) {
+        return {
+          title: normalizeWidth(meta.track).trim(),
+          artists: dedupe(meta.artists).slice(0, MAX_ARTISTS),
+          album: meta.album,
+          source: "ytmeta",
+        };
+      }
+      const credits = parseYtMusicDescription(meta.description);
+      if (credits) {
+        return {
+          title: normalizeWidth(credits.title).trim(),
+          artists: dedupe(credits.artists).slice(0, MAX_ARTISTS),
+          album: credits.album,
+          source: "description",
+        };
+      }
+    }
+  }
+
+  // Deterministic: clean the title text; take the artist only from what's
+  // literally there (strip "- Topic"). Never invent.
+  return {
+    title: tidyTitle(input.title),
+    artists: [stripTopic(input.artist) || input.artist],
+    album: null,
+    source: "deterministic",
+  };
+}
+
+function dedupe(xs: string[]): string[] {
+  return Array.from(new Set(xs.map((x) => x.trim()).filter(Boolean)));
+}
+
+function artistsEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((x, i) => x.toLowerCase() === b[i]!.toLowerCase());
+}
+
+export interface ApplyDeps {
+  resolveCleanMeta?: (input: CleanInput) => Promise<CleanResult>;
+}
+
+/**
+ * Apply grounded clean metadata to a track: update its title, re-link the real
+ * primary + additional artist(s), and move it to the real album when known.
+ * Returns whether anything changed. Used by the backfill (post-approval) and
+ * automatically for new downloads. Never invents data — see resolveCleanMeta.
+ */
+export async function applyCleanMeta(
+  trackId: string,
+  deps: ApplyDeps = {},
+): Promise<{ changed: boolean; title?: string; artists?: string[]; album?: string | null }> {
+  const resolve = deps.resolveCleanMeta ?? resolveCleanMeta;
+  const track = await db.track.findUnique({
+    where: { id: trackId },
+    select: {
+      id: true,
+      title: true,
+      ytVideoId: true,
+      album: { select: { title: true } },
+      primaryArtist: { select: { name: true } },
+      additionalArtists: { select: { artist: { select: { name: true } } } },
+    },
+  });
+  if (!track) return { changed: false };
+
+  const currentArtists = [track.primaryArtist.name, ...track.additionalArtists.map((a) => a.artist.name)];
+  const r = await resolve({
+    videoId: track.ytVideoId,
+    title: track.title,
+    artist: track.primaryArtist.name,
+    album: track.album?.title ?? "",
+  });
+
+  const titleChanged = r.title.length > 0 && r.title !== track.title;
+  const artistsChanged = r.artists.length > 0 && !artistsEqual(currentArtists, r.artists);
+  const albumChanged = !!r.album && r.album !== track.album?.title;
+  if (!titleChanged && !artistsChanged && !albumChanged) return { changed: false };
+
+  if (titleChanged) {
+    await db.track.update({ where: { id: trackId }, data: { title: r.title } });
+  }
+
+  let primaryArtistId: string | null = null;
+  if (artistsChanged) {
+    const primary = await db.artist.upsert({
+      where: { name: r.artists[0]! },
+      create: { name: r.artists[0]! },
+      update: {},
+      select: { id: true },
+    });
+    primaryArtistId = primary.id;
+    await db.track.update({ where: { id: trackId }, data: { primaryArtistId: primary.id } });
+    await db.trackArtist.deleteMany({ where: { trackId } });
+    for (const name of r.artists.slice(1)) {
+      const a = await db.artist.upsert({
+        where: { name },
+        create: { name },
+        update: {},
+        select: { id: true },
+      });
+      await db.trackArtist.upsert({
+        where: { trackId_artistId: { trackId, artistId: a.id } },
+        create: { trackId, artistId: a.id, role: "artist" },
+        update: {},
+      });
+    }
+  }
+
+  if (albumChanged && r.album) {
+    // Album is unique per (artistId, title); hang it off the (possibly new)
+    // primary artist so it leaves the catch-all "YouTube" album.
+    const artistId =
+      primaryArtistId ??
+      (await db.track.findUnique({ where: { id: trackId }, select: { primaryArtistId: true } }))!
+        .primaryArtistId;
+    const album = await db.album.upsert({
+      where: { artistId_title: { artistId, title: r.album } },
+      create: { title: r.album, artistId },
+      update: {},
+      select: { id: true },
+    });
+    await db.track.update({ where: { id: trackId }, data: { albumId: album.id } });
+  }
+
+  return { changed: true, title: r.title, artists: r.artists, album: r.album };
 }

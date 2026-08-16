@@ -227,6 +227,51 @@ export async function searchYt(query: string, limit = 5): Promise<YtSearchResult
   return searchWithYtDlp(trimmed, limit);
 }
 
+export interface YtMeta {
+  track: string | null;
+  artists: string[];
+  album: string | null;
+  description: string;
+  uploader: string;
+}
+
+/** Fetch YouTube's own metadata for a video (no audio download). For Art
+    Tracks / "- Topic" uploads this yields the real track/artist(s)/album from
+    YouTube Music; for plain uploads most fields are empty. Null on failure. */
+export async function fetchYtMeta(videoId: string): Promise<YtMeta | null> {
+  try {
+    const raw = await runYtDlp([
+      "--dump-single-json",
+      "--skip-download",
+      "--no-warnings",
+      `https://www.youtube.com/watch?v=${videoId}`,
+    ]);
+    const j = JSON.parse(raw) as {
+      track?: string;
+      artist?: string;
+      artists?: string[];
+      album?: string;
+      description?: string;
+      uploader?: string;
+      channel?: string;
+    };
+    const artists = Array.isArray(j.artists)
+      ? j.artists.filter((x): x is string => typeof x === "string")
+      : typeof j.artist === "string"
+        ? j.artist.split(/,\s*/).map((s) => s.trim()).filter(Boolean)
+        : [];
+    return {
+      track: j.track ?? null,
+      artists,
+      album: j.album ?? null,
+      description: j.description ?? "",
+      uploader: j.uploader ?? j.channel ?? "",
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function resolveDirectUrl(videoId: string): Promise<string> {
   const url = `https://www.youtube.com/watch?v=${videoId}`;
   const raw = await runYtDlp(["-f", "bestaudio[ext=m4a]/bestaudio", "-g", "--no-warnings", url]);

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getAllAlbums, getTracksByAlbum } from "@/server/actions/views";
+import { displayAlbum } from "@/lib/album-name";
 import { isFavorited, toggleFavorite } from "@/server/actions/favorites";
 import { usePlayerStore } from "@/stores/player-store";
 import { HeartIcon, HeartOutlineIcon, PlayIcon } from "@/components/icons";
@@ -27,7 +28,7 @@ export function AlbumDetailPage({ albumId }: Props) {
     ]).then(([ts, albums, f]) => {
       if (cancelled) return;
       const album = albums.find((a) => a.id === albumId);
-      setTitle(album?.title ?? "Unknown");
+      setTitle(displayAlbum(album?.title) || "Unknown");
       setArtistName(album?.artist.name ?? "");
       setCoverArtHash(album?.coverArtHash ?? null);
       setTracks(ts);

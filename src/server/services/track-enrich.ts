@@ -2,8 +2,10 @@ import { db } from "@/server/db";
 import { tagTrackGenres } from "@/server/services/genre-tagger";
 import { analyzeTrackFile, storeAudioFeatures } from "@/server/services/audio-analysis";
 import { seedTrackMoodAffinities } from "@/server/services/mood-seeder";
+import { applyCleanMeta } from "@/server/services/title-cleaner";
 
 export interface EnrichExtrasDeps {
+  cleanMeta?: (trackId: string) => Promise<unknown>;
   tagGenres?: (trackId: string) => Promise<unknown>;
   analyzeFile?: (filePath: string) => Promise<Awaited<ReturnType<typeof analyzeTrackFile>>>;
   storeFeatures?: (trackId: string, feats: NonNullable<Awaited<ReturnType<typeof analyzeTrackFile>>>) => Promise<void>;
@@ -25,6 +27,7 @@ export async function enrichTrackExtras(
   opts: { force?: boolean; deps?: EnrichExtrasDeps } = {},
 ): Promise<void> {
   const d = opts.deps ?? {};
+  const cleanMeta = d.cleanMeta ?? ((id: string) => applyCleanMeta(id));
   const tagGenres = d.tagGenres ?? tagTrackGenres;
   const analyzeFile = d.analyzeFile ?? analyzeTrackFile;
   const storeFeatures = d.storeFeatures ?? storeAudioFeatures;
@@ -33,6 +36,16 @@ export async function enrichTrackExtras(
     d.getFilePath ??
     (async (id: string) =>
       (await db.track.findUnique({ where: { id }, select: { filePath: true } }))?.filePath ?? null);
+
+  // First: clean the title/artist/album from grounded sources (yt-dlp metadata,
+  // description credits, deterministic tidy). Everything below — genres, mood —
+  // then keys off the corrected title/artist, so a new add is never tagged
+  // against a garbled "H o m e (S l o w e d)" string.
+  try {
+    await cleanMeta(trackId);
+  } catch (err) {
+    console.warn("[mu] title cleaning failed:", err);
+  }
 
   try {
     await tagGenres(trackId);

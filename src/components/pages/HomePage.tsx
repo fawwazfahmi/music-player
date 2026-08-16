@@ -6,6 +6,7 @@ import { useIpodStore } from "@/stores/ipod-store";
 import { usePlayerStore } from "@/stores/player-store";
 import { AlbumIcon, ArtistIcon, MusicNoteIcon, PlayIcon } from "@/components/icons";
 import { coverUrl } from "@/lib/cover-url";
+import { displayAlbum } from "@/lib/album-name";
 import { buildQueueTrack } from "./_shared";
 import { emptyLineFor } from "@/lib/empty-lines";
 
@@ -148,7 +149,9 @@ export function HomePage() {
                         </div>
                       )}
                       <div className="min-w-0 w-full">
-                        <div className="truncate text-sm font-medium text-zinc-100">{a.title}</div>
+                        <div className="truncate text-sm font-medium text-zinc-100">
+                          {displayAlbum(a.title)}
+                        </div>
                         <div className="truncate text-xs text-zinc-500">{a.artist.name}</div>
                       </div>
                     </button>

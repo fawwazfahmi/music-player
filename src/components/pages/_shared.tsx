@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { usePlayerStore, type QueueTrack } from "@/stores/player-store";
 import { formatDuration } from "@/lib/format-duration";
+import { displayAlbum } from "@/lib/album-name";
 import { coverUrl, resolveTrackCoverHash } from "@/lib/cover-url";
 import { PlayIcon } from "@/components/icons";
 import { TrackMenu } from "@/components/player/TrackMenu";
@@ -106,13 +107,15 @@ export function SongRow({ track, index, onPlay, onDeleted, showAlbum = true, act
         <div className="truncate text-xs text-zinc-400">
           {track.artist}
           <span className="md:hidden">
-            {showAlbum && track.album ? ` · ${track.album}` : ""}
+            {showAlbum && track.album ? ` · ${displayAlbum(track.album)}` : ""}
             {` · ${formatDuration(track.duration)}`}
           </span>
         </div>
       </div>
       {showAlbum ? (
-        <div className="hidden truncate text-xs text-zinc-500 md:block">{track.album}</div>
+        <div className="hidden truncate text-xs text-zinc-500 md:block">
+          {displayAlbum(track.album)}
+        </div>
       ) : (
         <div className="hidden md:block" />
       )}

@@ -1,61 +1,86 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { resolveCleanMeta } from "@/server/services/title-cleaner";
+import type { YtMeta } from "@/server/services/yt-service";
 
-beforeEach(() => {
-  vi.resetModules();
-  vi.stubGlobal("fetch", vi.fn());
-  process.env.OLLAMA_URL = "http://127.0.0.1:11434";
-  process.env.OLLAMA_MODEL = "test-model";
+const meta = (m: Partial<YtMeta>): YtMeta => ({
+  track: null,
+  artists: [],
+  album: null,
+  description: "",
+  uploader: "",
+  ...m,
 });
-afterEach(() => vi.unstubAllGlobals());
 
-function mockOllama(json: unknown) {
-  vi.mocked(fetch).mockResolvedValueOnce({
-    ok: true,
-    status: 200,
-    json: async () => ({ response: JSON.stringify(json) }),
-  } as never);
-}
-
-describe("cleanTrackMeta", () => {
-  it("fixes spaced-out titles and keeps the version marker + real artist", async () => {
-    mockOllama({ title: "Home (Slowed & Reverbed)", artists: ["Mr.Kitty"], changed: true });
-    const { cleanTrackMeta } = await import("@/server/services/title-cleaner");
-    const r = await cleanTrackMeta({
-      title: "H o m e - Mr.  K i t t y ( S l o w e d & R e v e r b e d )",
-      artist: "HoloHarmony",
-      album: "YouTube",
+describe("resolveCleanMeta", () => {
+  it("uses YouTube Art Track metadata when present (real multi-artist + album)", async () => {
+    const r = await resolveCleanMeta(
+      { videoId: "v1", title: "It's Been a Long, Long Time", artist: "Kitty Kallen - Topic", album: "YouTube" },
+      {
+        fetchYtMeta: async () =>
+          meta({
+            track: "It's Been a Long, Long Time",
+            artists: ["Kitty Kallen", "The Harry James Orchestra"],
+            album: "The Kitty Kallen Collection 1939-62",
+          }),
+      },
+    );
+    expect(r).toEqual({
+      title: "It's Been a Long, Long Time",
+      artists: ["Kitty Kallen", "The Harry James Orchestra"],
+      album: "The Kitty Kallen Collection 1939-62",
+      source: "ytmeta",
     });
-    expect(r).toEqual({ title: "Home (Slowed & Reverbed)", artists: ["Mr.Kitty"] });
   });
 
-  it("returns null when nothing needs changing", async () => {
-    mockOllama({ title: "Blinding Lights", artists: ["The Weeknd"], changed: false });
-    const { cleanTrackMeta } = await import("@/server/services/title-cleaner");
-    expect(
-      await cleanTrackMeta({ title: "Blinding Lights", artist: "The Weeknd", album: "After Hours" }),
-    ).toBeNull();
+  it("falls back to the description credit block", async () => {
+    const r = await resolveCleanMeta(
+      { videoId: "v2", title: "raw", artist: "Some Channel", album: "YouTube" },
+      {
+        fetchYtMeta: async () =>
+          meta({
+            description:
+              "Provided to YouTube by X\n\nBlue Monday · New Order\n\nPower, Corruption & Lies\n\n℗ 1983",
+          }),
+      },
+    );
+    expect(r.source).toBe("description");
+    expect(r.title).toBe("Blue Monday");
+    expect(r.artists).toEqual(["New Order"]);
+    expect(r.album).toBe("Power, Corruption & Lies");
   });
 
-  it("supports multiple artists for a mashup, de-duped and capped", async () => {
-    mockOllama({
-      title: "After Dark x Sweater Weather",
-      artists: ["Mr.Kitty", "Mr.Kitty", "The Neighbourhood", "Extra", "More"],
-      changed: true,
-    });
-    const { cleanTrackMeta } = await import("@/server/services/title-cleaner");
-    const r = await cleanTrackMeta({ title: "After Dark x Sweater Weather", artist: "Mikeeysmind", album: "YouTube" });
-    expect(r?.artists).toEqual(["Mr.Kitty", "The Neighbourhood", "Extra"]);
+  it("deterministic: fixes fullwidth title, keeps markers, no metadata", async () => {
+    const r = await resolveCleanMeta(
+      {
+        videoId: "v3",
+        title: "Ｈｏｍｅ （Ｓｌｏｗｅｄ ＆ Ｒｅｖｅｒｂｅｄ） [Official Video]",
+        artist: "HoloHarmony",
+        album: "YouTube",
+      },
+      { fetchYtMeta: async () => null },
+    );
+    expect(r.source).toBe("deterministic");
+    expect(r.title).toBe("Home (Slowed & Reverbed)");
+    expect(r.artists).toEqual(["HoloHarmony"]);
   });
 
-  it("returns null on unusable output (empty title or no artists)", async () => {
-    mockOllama({ title: "", artists: [], changed: true });
-    const { cleanTrackMeta } = await import("@/server/services/title-cleaner");
-    expect(await cleanTrackMeta({ title: "x", artist: "y", album: "z" })).toBeNull();
+  it("deterministic: strips '- Topic' from the artist", async () => {
+    const r = await resolveCleanMeta(
+      { videoId: null, title: "Some Song", artist: "Kitty Kallen - Topic", album: "" },
+      { fetchYtMeta: vi.fn() },
+    );
+    expect(r.artists).toEqual(["Kitty Kallen"]);
+    expect(r.source).toBe("deterministic");
   });
 
-  it("returns null when Ollama is unavailable", async () => {
-    vi.mocked(fetch).mockRejectedValueOnce(new Error("down"));
-    const { cleanTrackMeta } = await import("@/server/services/title-cleaner");
-    expect(await cleanTrackMeta({ title: "x", artist: "y", album: "z" })).toBeNull();
+  it("caps artists at three and de-dupes", async () => {
+    const r = await resolveCleanMeta(
+      { videoId: "v4", title: "x", artist: "y", album: "" },
+      {
+        fetchYtMeta: async () =>
+          meta({ track: "Mashup", artists: ["A", "A", "B", "C", "D"] }),
+      },
+    );
+    expect(r.artists).toEqual(["A", "B", "C"]);
   });
 });

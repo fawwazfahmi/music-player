@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getAllAlbums } from "@/server/actions/views";
+import { displayAlbum } from "@/lib/album-name";
 import { useIpodStore } from "@/stores/ipod-store";
 import { AlbumIcon } from "@/components/icons";
 import { PageHeader } from "./_shared";
@@ -48,7 +49,9 @@ export function AlbumsPage() {
                   </div>
                 )}
                 <div className="min-w-0 w-full">
-                  <div className="truncate text-sm font-medium text-zinc-100">{a.title}</div>
+                  <div className="truncate text-sm font-medium text-zinc-100">
+                    {displayAlbum(a.title)}
+                  </div>
                   <div className="truncate text-xs text-zinc-500">{a.artist.name}</div>
                 </div>
               </button>

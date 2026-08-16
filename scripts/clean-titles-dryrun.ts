@@ -5,12 +5,13 @@
 import fs from "node:fs";
 import path from "node:path";
 import { db } from "@/server/db";
-import { cleanTrackMeta } from "@/server/services/title-cleaner";
+import { resolveCleanMeta } from "@/server/services/title-cleaner";
 
 export interface ProposedChange {
   trackId: string;
+  source: "ytmeta" | "description" | "deterministic";
   before: { title: string; artist: string };
-  after: { title: string; artists: string[] };
+  after: { title: string; artists: string[]; album: string | null };
 }
 
 const REPORT = path.join(process.cwd(), "scripts", ".title-cleanup.json");
@@ -29,6 +30,7 @@ export async function dryRun(limit?: number): Promise<ProposedChange[]> {
     select: {
       id: true,
       title: true,
+      ytVideoId: true,
       primaryArtist: { select: { name: true } },
       additionalArtists: { select: { artist: { select: { name: true } } } },
       album: { select: { title: true } },
@@ -39,21 +41,21 @@ export async function dryRun(limit?: number): Promise<ProposedChange[]> {
   for (let i = 0; i < tracks.length; i++) {
     const t = tracks[i]!;
     const extra = t.additionalArtists.map((a) => a.artist.name);
-    const r = await cleanTrackMeta({
+    const r = await resolveCleanMeta({
+      videoId: t.ytVideoId,
       title: t.title,
       artist: t.primaryArtist.name,
       album: t.album?.title ?? "",
     });
-    if (r) {
-      const titleChanged = r.title !== t.title;
-      const artistChanged = artistsDiffer(t.primaryArtist.name, extra, r.artists);
-      if (titleChanged || artistChanged) {
-        changes.push({
-          trackId: t.id,
-          before: { title: t.title, artist: [t.primaryArtist.name, ...extra].join(", ") },
-          after: { title: r.title, artists: r.artists },
-        });
-      }
+    const titleChanged = r.title !== t.title;
+    const artistChanged = artistsDiffer(t.primaryArtist.name, extra, r.artists);
+    if (titleChanged || artistChanged) {
+      changes.push({
+        trackId: t.id,
+        source: r.source,
+        before: { title: t.title, artist: [t.primaryArtist.name, ...extra].join(", ") },
+        after: { title: r.title, artists: r.artists, album: r.album },
+      });
     }
     if ((i + 1) % 15 === 0) console.log(`  …scanned ${i + 1}/${tracks.length}`);
   }
@@ -67,8 +69,9 @@ if (process.argv[1]?.endsWith("clean-titles-dryrun.ts")) {
       fs.writeFileSync(REPORT, JSON.stringify(changes, null, 2));
       console.log(`\n=== ${changes.length} proposed changes ===\n`);
       for (const c of changes) {
-        console.log(`• "${c.before.title}"  —  ${c.before.artist}`);
-        console.log(`  → "${c.after.title}"  —  ${c.after.artists.join(", ")}\n`);
+        console.log(`• [${c.source}] "${c.before.title}"  —  ${c.before.artist}`);
+        const alb = c.after.album ? `  ·  album: ${c.after.album}` : "";
+        console.log(`  → "${c.after.title}"  —  ${c.after.artists.join(", ")}${alb}\n`);
       }
       console.log(`Report saved to ${REPORT}`);
       process.exit(0);
