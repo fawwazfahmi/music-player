@@ -40,10 +40,10 @@ export function ArtistsPage() {
                   <img
                     src={a.imageUrl}
                     alt=""
-                    className="h-24 w-24 shrink-0 rounded-full object-cover shadow-lg ring-1 ring-zinc-800 transition group-hover:scale-105"
+                    className="aspect-square w-full rounded-full object-cover shadow-lg ring-1 ring-zinc-800 transition group-hover:scale-105"
                   />
                 ) : (
-                  <div className="flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-br from-zinc-700 to-zinc-900 text-zinc-500 shadow-lg ring-1 ring-zinc-800 transition group-hover:scale-105">
+                  <div className="flex aspect-square w-full items-center justify-center rounded-full bg-gradient-to-br from-zinc-700 to-zinc-900 text-zinc-500 shadow-lg ring-1 ring-zinc-800 transition group-hover:scale-105">
                     <ArtistIcon size={36} />
                   </div>
                 )}

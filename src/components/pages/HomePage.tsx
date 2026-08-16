@@ -180,9 +180,18 @@ export function HomePage() {
                       onClick={() => push({ name: "artistDetail", artistId: a.id })}
                       className="group flex flex-col items-center gap-2 rounded-lg p-2 text-center transition hover:bg-zinc-800/50"
                     >
-                      <div className="flex aspect-square w-full items-center justify-center rounded-full bg-gradient-to-br from-zinc-700 to-zinc-900 text-zinc-500 shadow">
-                        <ArtistIcon size={36} />
-                      </div>
+                      {a.imageUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={a.imageUrl}
+                          alt=""
+                          className="aspect-square w-full rounded-full object-cover shadow ring-1 ring-zinc-800 transition group-hover:scale-105"
+                        />
+                      ) : (
+                        <div className="flex aspect-square w-full items-center justify-center rounded-full bg-gradient-to-br from-zinc-700 to-zinc-900 text-zinc-500 shadow">
+                          <ArtistIcon size={36} />
+                        </div>
+                      )}
                       <div className="min-w-0 w-full">
                         <div className="truncate text-sm font-medium text-zinc-100">{a.name}</div>
                       </div>
