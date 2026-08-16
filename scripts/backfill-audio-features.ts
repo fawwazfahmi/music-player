@@ -20,7 +20,9 @@ interface Line {
 
 function analyzeChunk(paths: string[]): Promise<Line[]> {
   return new Promise((resolve) => {
-    const proc = spawn(PY, [SCRIPT, ...paths]);
+    // Ignore stderr: TensorFlow floods it, and an undrained stderr pipe fills
+    // and deadlocks the child. We only need stdout (the JSON lines).
+    const proc = spawn(PY, [SCRIPT, ...paths], { stdio: ["ignore", "pipe", "ignore"] });
     let out = "";
     proc.stdout.on("data", (d) => (out += d.toString()));
     proc.on("error", () => resolve([]));
