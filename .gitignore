@@ -53,3 +53,4 @@ next-env.d.ts
 
 # Phase 6 audio analysis: pre-trained model weights (venv lives outside the repo — see scripts/audio/setup.sh)
 models/audio/
+scripts/.title-cleanup.json
