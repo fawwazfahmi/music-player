@@ -283,29 +283,42 @@ export interface DownloadResult {
   fileFormat: string;
 }
 
+/** The yt-dlp argv for an audio download. Extracted + pure so the retry/backoff
+    flags are unit-testable. Retries + request spacing matter because YouTube
+    returns `HTTP 403` on the media fetch under burst/throttle — without them a
+    single transient 403 permanently fails the download. */
+export function buildDownloadArgs(videoId: string, destDir: string): string[] {
+  return [
+    `https://www.youtube.com/watch?v=${videoId}`,
+    "-x",
+    "--audio-format",
+    "m4a",
+    "-o",
+    `${destDir}/${videoId}.%(ext)s`,
+    "--no-warnings",
+    "--embed-metadata",
+    // Self-recover from transient 403s / throttling instead of hard-failing.
+    "--retries",
+    "10",
+    "--fragment-retries",
+    "10",
+    "--sleep-requests",
+    "1.5",
+    // --newline forces yt-dlp to emit each progress update on its own line
+    // instead of overwriting with \r, which lets our line-buffered parser see
+    // every tick.
+    "--newline",
+  ];
+}
+
 export async function downloadAudio(
   videoId: string,
   destDir: string,
-  onProgress?: (p: YtDlpProgress) => void,
+  opts: { onProgress?: (p: YtDlpProgress) => void; cookiePath?: string | null } = {},
 ): Promise<DownloadResult> {
-  const url = `https://www.youtube.com/watch?v=${videoId}`;
-  const outputTemplate = `${destDir}/${videoId}.%(ext)s`;
-  await runYtDlp(
-    [
-      url,
-      "-x",
-      "--audio-format",
-      "m4a",
-      "-o",
-      outputTemplate,
-      "--no-warnings",
-      "--embed-metadata",
-      // --newline forces yt-dlp to emit each progress update on its own line
-      // instead of overwriting with \r, which lets our line-buffered parser see
-      // every tick.
-      "--newline",
-    ],
-    { onProgress },
-  );
+  await runYtDlp(buildDownloadArgs(videoId, destDir), {
+    onProgress: opts.onProgress,
+    cookiePath: opts.cookiePath,
+  });
   return { filePath: `${destDir}/${videoId}.m4a`, fileFormat: "m4a" };
 }

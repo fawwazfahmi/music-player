@@ -24,7 +24,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { env } from "@/lib/env";
-import { NAME_COOKIE_NAME, isValidName, type AppUserName } from "@/server/auth";
+import { NAME_COOKIE_NAME, isValidName, VALID_NAMES, type AppUserName } from "@/server/auth";
 
 /** Cookie names that indicate a real logged-in YouTube session. A jar
     carrying only PREF/VISITOR_INFO1_LIVE is an anonymous jar and buys us
@@ -172,6 +172,18 @@ export async function cookieStatus(name: AppUserName): Promise<CookieStatus> {
 export async function readCookiePath(name: AppUserName): Promise<string | null> {
   const status = await cookieStatus(name);
   return status === "connected" ? cookiePathFor(name) : null;
+}
+
+/** A jar for background downloads, which have no request identity. Uses the
+    first connected jar among the app users — both share the app, so either
+    person's YouTube session is fine for authenticating a download, and having
+    ANY logged-in jar is what stops YouTube 403-ing the media fetch. */
+export async function anyConnectedCookiePath(): Promise<string | null> {
+  for (const name of VALID_NAMES) {
+    const p = await readCookiePath(name);
+    if (p) return p;
+  }
+  return null;
 }
 
 export interface CookieBearingRequest {

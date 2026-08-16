@@ -23,7 +23,7 @@ import { db } from "@/server/db";
 import { env } from "@/lib/env";
 import { downloadAudio, type YtSearchResult } from "@/server/services/yt-service";
 import { parseYtTitle } from "@/server/services/yt-title-parser";
-import { scrubCookiePaths } from "@/server/services/yt-cookies";
+import { scrubCookiePaths, anyConnectedCookiePath } from "@/server/services/yt-cookies";
 import { enrichTrackExtras } from "@/server/services/track-enrich";
 
 const CACHE_DIR = path.join(env.MUSIC_LIBRARY_PATH, ".cache", "yt");
@@ -210,10 +210,12 @@ export async function runDownloadJob(
     let lastWrite = 0;
     let lastPct = -1;
     const tDl0 = Date.now();
-    const { filePath, fileFormat } = await downloadAudio(
-      result.videoId,
-      CACHE_DIR,
-      (p) => {
+    // Authenticate the media fetch with a logged-in jar when one exists —
+    // anonymous downloads get YouTube 403s (esp. under burst/throttle).
+    const cookiePath = await anyConnectedCookiePath();
+    const { filePath, fileFormat } = await downloadAudio(result.videoId, CACHE_DIR, {
+      cookiePath,
+      onProgress: (p) => {
         const now = Date.now();
         // Always write the first tick (so client sees totalBytes ASAP) and
         // every 750ms thereafter, or whenever pct jumps >= 5 points.
@@ -234,7 +236,7 @@ export async function runDownloadJob(
             /* transient DB blip — next tick will catch up */
           });
       },
-    );
+    });
     log("download-done", { ms: Date.now() - tDl, sinceFirstTick: Date.now() - tDl0 });
 
     const sha = await sha256(filePath);
