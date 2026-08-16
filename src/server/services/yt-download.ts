@@ -49,7 +49,11 @@ export interface CreateDownloadResult {
  */
 export async function createPendingDownload(
   result: YtSearchResult,
+  opts: { ephemeral?: boolean } = {},
 ): Promise<CreateDownloadResult> {
+  // Ephemeral picks play but don't join the library until adopted. A pick that
+  // already IS a cached library track (early-return below) is never demoted.
+  const inLibrary = !(opts.ephemeral ?? false);
   const existing = await db.track.findUnique({
     where: { ytVideoId: result.videoId },
     select: { id: true, source: true, filePath: true },
@@ -93,7 +97,7 @@ export async function createPendingDownload(
     // until this fresh attempt completes.
     await db.track.update({
       where: { id: trackId },
-      data: { playable: false },
+      data: { playable: false, inLibrary },
     });
   } else {
     const newTrack = await db.track.create({
@@ -107,6 +111,7 @@ export async function createPendingDownload(
         // Hide from library lists until the m4a actually lands. Once
         // runDownloadJob finishes successfully we flip this back to true.
         playable: false,
+        inLibrary,
         discoveredAt: new Date(),
       },
       select: { id: true },
@@ -131,6 +136,7 @@ export async function createPendingDownload(
         sha256: sha,
         source: "YT_CACHED",
         playable: true,
+        inLibrary,
       },
     });
     await db.ytCacheEntry.upsert({

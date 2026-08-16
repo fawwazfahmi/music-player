@@ -1,9 +1,28 @@
 "use server";
 
 import { rm } from "node:fs/promises";
+import { revalidatePath } from "next/cache";
 import { db } from "@/server/db";
 import { env } from "@/lib/env";
 import { scanOnce, type ScanReport } from "@/server/services/library-scanner";
+
+/**
+ * Adopt an ephemeral "trying it out" YouTube pick into the library. The file is
+ * already on disk (picks download to play), so this just flips inLibrary. A no-op
+ * if the track is already in the library or doesn't exist.
+ */
+export async function adoptTrack(trackId: string): Promise<void> {
+  const t = await db.track.findUnique({ where: { id: trackId }, select: { inLibrary: true } });
+  if (!t || t.inLibrary) return;
+  await db.track.update({ where: { id: trackId }, data: { inLibrary: true } });
+  // Best-effort cache hint — only valid inside a request context (a no-op in
+  // tests / background callers).
+  try {
+    revalidatePath("/");
+  } catch {
+    /* not in a request scope */
+  }
+}
 
 export async function rescanLibrary(): Promise<ScanReport> {
   return scanOnce(env.MUSIC_LIBRARY_PATH);
