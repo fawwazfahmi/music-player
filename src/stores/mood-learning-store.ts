@@ -9,27 +9,54 @@ import { recordMoodSignal } from "@/server/actions/moods";
  * player store (below) — deliberately NOT by editing the shared playback
  * components, so this feature can't interfere with core playback.
  */
+type Verdict = "up" | "down";
+
 interface MoodLearningState {
   sessionId: string | null;
+  moodLabel: string | null;
   trackIds: Set<string>;
   /** Tracks she's already given an explicit verdict on, so passive capture
       doesn't also fire a (possibly contradictory) skip/complete for them. */
   reacted: Set<string>;
-  setSession: (sessionId: string, trackIds: string[]) => void;
+  /** Her explicit verdict per track, so the bar/nudge/menu all show the same
+      highlight. */
+  reactions: Record<string, Verdict>;
+  setSession: (sessionId: string, trackIds: string[], moodLabel?: string) => void;
   clear: () => void;
   markReacted: (trackId: string) => void;
   belongs: (trackId: string) => boolean;
+  /** One-tap rating from any surface: records the signal and lights up the
+      choice everywhere. No-op outside a mood session. */
+  rate: (trackId: string, verdict: Verdict) => void;
 }
 
 export const useMoodLearningStore = create<MoodLearningState>((set, get) => ({
   sessionId: null,
+  moodLabel: null,
   trackIds: new Set(),
   reacted: new Set(),
-  setSession: (sessionId, trackIds) =>
-    set({ sessionId, trackIds: new Set(trackIds), reacted: new Set() }),
-  clear: () => set({ sessionId: null, trackIds: new Set(), reacted: new Set() }),
+  reactions: {},
+  setSession: (sessionId, trackIds, moodLabel) =>
+    set({
+      sessionId,
+      moodLabel: moodLabel ?? null,
+      trackIds: new Set(trackIds),
+      reacted: new Set(),
+      reactions: {},
+    }),
+  clear: () =>
+    set({ sessionId: null, moodLabel: null, trackIds: new Set(), reacted: new Set(), reactions: {} }),
   markReacted: (trackId) => set((s) => ({ reacted: new Set(s.reacted).add(trackId) })),
   belongs: (trackId) => get().trackIds.has(trackId),
+  rate: (trackId, verdict) => {
+    const { sessionId } = get();
+    if (!sessionId) return;
+    set((s) => ({
+      reactions: { ...s.reactions, [trackId]: verdict },
+      reacted: new Set(s.reacted).add(trackId),
+    }));
+    void recordMoodSignal(sessionId, trackId, verdict === "up" ? "thumbUp" : "thumbDown");
+  },
 }));
 
 const COMPLETE_THRESHOLD = 0.8;

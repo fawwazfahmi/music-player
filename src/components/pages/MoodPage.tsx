@@ -66,6 +66,7 @@ export function MoodPage() {
       useMoodLearningStore.getState().setSession(
         r.sessionId,
         r.tracks.map((t) => t.id),
+        r.moodLabel,
       );
     } finally {
       setBusy(false);

@@ -5,6 +5,7 @@ import { usePlayerStore } from "@/stores/player-store";
 import { usePartyStore } from "@/stores/party-store";
 import { useFavorite } from "@/hooks/use-favorite";
 import { coverUrl } from "@/lib/cover-url";
+import { MoodThumbs } from "@/components/mood/MoodThumbs";
 import {
   ChevronUpIcon,
   HeartIcon,
@@ -137,6 +138,7 @@ export function MiniPlayer({ onOpen }: { onOpen: () => void }) {
           </span>
         </button>
 
+        {track && <MoodThumbs trackId={track.id} size={17} />}
         {track && (
           <button
             type="button"

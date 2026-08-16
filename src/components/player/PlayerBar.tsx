@@ -21,6 +21,7 @@ import {
   VolumeUpIcon,
 } from "@/components/icons";
 import { PerformanceModeDialog } from "@/components/player/PerformanceModeDialog";
+import { MoodThumbs } from "@/components/mood/MoodThumbs";
 
 // Small icon toggle in the player bar. ON → no YT iframe, no smooth-scroll
 // lyrics, no decorative animations. Designed for a user who wants the app
@@ -170,6 +171,7 @@ export function PlayerBar() {
             </>
           )}
         </div>
+        {track && <MoodThumbs trackId={track.id} />}
         {hasTrack && (
           <button
             type="button"

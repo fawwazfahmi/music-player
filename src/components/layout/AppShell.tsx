@@ -12,6 +12,7 @@ import { Sidebar } from "./Sidebar";
 import { RightPanel } from "./RightPanel";
 import { PlayerBar } from "@/components/player/PlayerBar";
 import { MiniPlayer } from "@/components/player/MiniPlayer";
+import { MoodNudge } from "@/components/mood/MoodNudge";
 import { NowPlayingSheet } from "@/components/player/NowPlayingSheet";
 import { InstallHint } from "@/components/mobile/InstallHint";
 import { MainContent } from "@/components/pages/MainContent";
@@ -379,6 +380,9 @@ export function AppShell() {
           <RightPanel />
         </div>
       </div>
+
+      {/* Mood check-in rides just above the player, on both layouts. */}
+      <MoodNudge />
 
       {/* Desktop transport. Below `md` it is replaced wholesale by the mini
           player + sheet; the swap is CSS so neither flashes on load. */}
