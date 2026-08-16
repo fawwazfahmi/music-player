@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/server/db";
+import { adoptTrack } from "@/server/actions/library";
 
 export type FavoriteKind = "TRACK" | "ALBUM" | "ARTIST";
 
@@ -18,8 +19,11 @@ export async function toggleFavorite(kind: FavoriteKind, id: string): Promise<bo
     else await db.favoriteArtist.delete({ where: { artistId: id } });
     return false;
   }
-  if (kind === "TRACK") await db.favoriteTrack.create({ data: { trackId: id } });
-  else if (kind === "ALBUM") await db.favoriteAlbum.create({ data: { albumId: id } });
+  if (kind === "TRACK") {
+    await db.favoriteTrack.create({ data: { trackId: id } });
+    // Favoriting a "trying it out" YouTube pick is a keep — adopt it in.
+    await adoptTrack(id);
+  } else if (kind === "ALBUM") await db.favoriteAlbum.create({ data: { albumId: id } });
   else await db.favoriteArtist.create({ data: { artistId: id } });
   return true;
 }

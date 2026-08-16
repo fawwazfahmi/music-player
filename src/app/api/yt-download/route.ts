@@ -33,8 +33,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "invalid_body" }, { status: 400 });
   }
 
+  // Ephemeral picks ("trying it out") play + queue but don't join the library
+  // until adopted. Read the flag off the body (isValidResult ignores extras).
+  const ephemeral = (body as unknown as Record<string, unknown>).ephemeral === true;
+
   try {
-    const { trackId, cached } = await createPendingDownload(body);
+    const { trackId, cached } = await createPendingDownload(body, { ephemeral });
 
     // Already on disk → tell the client to skip polling and play directly.
     if (cached) {

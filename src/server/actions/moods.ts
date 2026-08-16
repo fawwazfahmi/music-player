@@ -4,6 +4,7 @@ import { db } from "@/server/db";
 import { getAllMoods } from "@/server/services/mood-store";
 import { runMoodSession, type MoodSessionResult } from "@/server/services/mood-session";
 import { applyMoodSignal, type MoodSignal } from "@/server/services/mood-learning";
+import { selectMoodTracks } from "@/server/services/mood-engine";
 import { suggestYtForMood } from "@/server/services/mood-yt";
 import type { YtSearchResult } from "@/server/services/yt-service";
 import { currentListenerOr } from "@/server/current-listener";
@@ -58,17 +59,33 @@ export async function getMoodYtSuggestions(sessionId: string): Promise<YtSearchR
   try {
     const session = await db.moodSession.findUnique({
       where: { id: sessionId },
-      select: { freeText: true, mood: { select: { label: true } }, interpretation: true },
+      select: { freeText: true, listener: true, mood: { select: { label: true } }, interpretation: true },
     });
     if (!session) return [];
-    const interp = session.interpretation as { genreHints?: string[] } | null;
+    const interp = session.interpretation as {
+      weights?: Record<string, number>;
+      genreHints?: string[];
+    } | null;
     const moodLabel = session.mood?.label ?? session.freeText ?? "";
     if (!moodLabel) return [];
-    return await suggestYtForMood({
-      moodLabel,
-      genreHints: Array.isArray(interp?.genreHints) ? interp!.genreHints! : [],
-      limit: 4,
-    });
+    const genreHints = Array.isArray(interp?.genreHints) ? interp!.genreHints! : [];
+
+    // Taste seed: her highest-fit library artists for this exact mood. Formula
+    // order only (no LLM rerank) — this is a seed, not the playlist.
+    let seedArtists: string[] = [];
+    try {
+      const top = await selectMoodTracks({
+        listener: session.listener,
+        weights: interp?.weights ?? {},
+        genreHints,
+        limit: 12,
+      });
+      seedArtists = top.map((t) => t.artist);
+    } catch {
+      /* no seeds → suggestYtForMood falls back to genre/generic queries */
+    }
+
+    return await suggestYtForMood({ moodLabel, genreHints, limit: 4, seedArtists });
   } catch {
     return [];
   }

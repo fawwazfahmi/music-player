@@ -213,6 +213,7 @@ export function buildQueueTrack(t: {
   /** Per-track override chosen in the cover picker. Wins over album art. */
   trackCoverArtHash?: string | null;
   ytVideoId?: string | null;
+  ephemeral?: boolean;
 }): QueueTrack {
   return {
     id: t.id,
@@ -226,5 +227,6 @@ export function buildQueueTrack(t: {
       legacyCoverArtHash: t.coverArtHash,
     }),
     ytVideoId: t.ytVideoId ?? null,
+    ephemeral: t.ephemeral ?? false,
   };
 }
