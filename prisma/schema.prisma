@@ -104,6 +104,9 @@ model Track {
   additionalArtists TrackArtist[]
   tags              TrackTag[]
   genres            TrackGenre[]
+  moodSeeds         TrackMoodSeed[]
+  moodAffinities    TrackMoodAffinity[]
+  moodFeedback      MoodFeedback[]
   notes             SongNote[]
   history           ListeningHistory[]
   playlistEntries   PlaylistTrack[]
@@ -177,6 +180,105 @@ model TrackGenre {
 
   @@id([trackId, genreId])
   @@index([genreId])
+}
+
+// ===== Moods & self-learning =====
+
+enum MoodKind {
+  BUILTIN
+  CUSTOM
+}
+
+enum AffinitySource {
+  LLM_SEED
+  HEURISTIC
+}
+
+enum FeedbackVerdict {
+  FIT
+  MISS
+}
+
+// The fixed learning axes. Built-ins are seeded on demand. Free-text moods do
+// NOT create rows here — they live as an interpretation blend on MoodSession.
+model Mood {
+  id        String   @id @default(cuid())
+  name      String   @unique // normalized key, e.g. "chill"
+  label     String // display label, e.g. "Chill"
+  emoji     String?
+  kind      MoodKind @default(BUILTIN)
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  seeds      TrackMoodSeed[]
+  affinities TrackMoodAffinity[]
+  sessions   MoodSession[]
+}
+
+// Listener-agnostic baseline affinity from the LLM/heuristic seeder. Shared by
+// both listeners; per-listener learning lives in TrackMoodAffinity and is
+// blended on top at query time.
+model TrackMoodSeed {
+  trackId String
+  moodId  String
+  score   Float          @default(0) // 0..1
+  source  AffinitySource @default(LLM_SEED)
+  track   Track          @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  mood    Mood           @relation(fields: [moodId], references: [id], onDelete: Cascade)
+
+  @@id([trackId, moodId])
+  @@index([moodId])
+}
+
+// Per-listener learned signal. Created on first real feedback; the derived
+// `score` is recomputed from the counters.
+model TrackMoodAffinity {
+  listener   String
+  trackId    String
+  moodId     String
+  completes  Int      @default(0)
+  skips      Int      @default(0)
+  replays    Int      @default(0)
+  thumbsUp   Int      @default(0)
+  thumbsDown Int      @default(0)
+  score      Float    @default(0)
+  updatedAt  DateTime @updatedAt
+  track      Track    @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  mood       Mood     @relation(fields: [moodId], references: [id], onDelete: Cascade)
+
+  @@id([listener, trackId, moodId])
+  @@index([listener, moodId])
+  @@index([moodId])
+}
+
+// One "she asked for a mood" event. `interpretation` is the JSON blend the
+// engine used (weights over built-in moods + optional hints).
+model MoodSession {
+  id             String   @id @default(cuid())
+  listener       String
+  moodId         String?
+  freeText       String?
+  interpretation Json
+  createdAt      DateTime @default(now())
+  mood           Mood?    @relation(fields: [moodId], references: [id], onDelete: SetNull)
+  feedback       MoodFeedback[]
+
+  @@index([listener, createdAt])
+}
+
+// Explicit + derived per-track verdicts within a session. Feeds the affinity
+// counters; kept as a log so scores can be re-derived if the formula changes.
+model MoodFeedback {
+  id        String          @id @default(cuid())
+  sessionId String
+  trackId   String
+  verdict   FeedbackVerdict
+  at        DateTime        @default(now())
+  session   MoodSession     @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  track     Track           @relation(fields: [trackId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([trackId])
 }
 
 model Tag {
