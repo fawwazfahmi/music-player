@@ -8,6 +8,7 @@ import { coverUrl, resolveTrackCoverHash } from "@/lib/cover-url";
 // is the last resort.
 const repTrackSelect = {
   where: {
+    inLibrary: true,
     OR: [
       { coverArtHash: { not: null } },
       { album: { coverArtHash: { not: null } } },
@@ -36,12 +37,14 @@ function repImage(
 
 export async function getArtists() {
   const artists = await db.artist.findMany({
+    // Hide artists whose only tracks are ephemeral "trying it out" picks.
+    where: { tracks: { some: { inLibrary: true } } },
     orderBy: { sortName: "asc" },
     select: {
       id: true,
       name: true,
       bio: true,
-      _count: { select: { tracks: true, albums: true } },
+      _count: { select: { tracks: { where: { inLibrary: true } }, albums: true } },
       tracks: repTrackSelect,
     },
   });
@@ -69,6 +72,9 @@ export async function getAlbumsByArtist(artistId: string) {
 
 export async function getAllAlbums() {
   const albums = await db.album.findMany({
+    // Hide albums whose only tracks are ephemeral picks (e.g. a per-artist
+    // "YouTube" album that exists only because of a not-yet-adopted try).
+    where: { tracks: { some: { inLibrary: true } } },
     orderBy: [{ artist: { sortName: "asc" } }, { releaseDate: "asc" }],
     select: {
       id: true,
@@ -88,7 +94,7 @@ export async function getAllAlbums() {
 export async function getAllSongs() {
   const t0 = Date.now();
   const rows = await db.track.findMany({
-    where: { playable: true },
+    where: { playable: true, inLibrary: true },
     orderBy: { title: "asc" },
     select: {
       id: true,
@@ -107,7 +113,7 @@ export async function getAllSongs() {
 
 export async function getTracksByAlbum(albumId: string) {
   return db.track.findMany({
-    where: { albumId, playable: true },
+    where: { albumId, playable: true, inLibrary: true },
     orderBy: [{ discNumber: "asc" }, { trackNumber: "asc" }],
     select: {
       id: true,
@@ -124,7 +130,7 @@ export async function getTracksByAlbum(albumId: string) {
 
 export async function getTracksByArtist(artistId: string) {
   return db.track.findMany({
-    where: { primaryArtistId: artistId, playable: true },
+    where: { primaryArtistId: artistId, playable: true, inLibrary: true },
     orderBy: [{ album: { releaseDate: "asc" } }, { trackNumber: "asc" }],
     select: {
       id: true,

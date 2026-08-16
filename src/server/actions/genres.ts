@@ -22,7 +22,13 @@ export interface GenreTrackSummary {
 
 export async function getAllGenres(): Promise<GenreSummary[]> {
   const genres = await db.genre.findMany({
-    select: { id: true, name: true, _count: { select: { tracks: true } } },
+    // Count only in-library tracks; genres held solely by ephemeral picks then
+    // fall out via the trackCount > 0 filter below.
+    select: {
+      id: true,
+      name: true,
+      _count: { select: { tracks: { where: { track: { inLibrary: true } } } } },
+    },
     orderBy: { name: "asc" },
   });
   return genres
@@ -89,7 +95,7 @@ export async function getTracksByGenre(genreId: string): Promise<{
   if (!genre) return { genre: null, tracks: [] };
 
   const rows = await db.trackGenre.findMany({
-    where: { genreId },
+    where: { genreId, track: { inLibrary: true } },
     select: {
       track: {
         select: {
