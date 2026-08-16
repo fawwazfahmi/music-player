@@ -4,7 +4,6 @@ import { useEffect, useState, type FormEvent } from "react";
 import {
   getMoods,
   startMoodSession,
-  recordMoodSignal,
   getMoodYtSuggestions,
   adoptYtPickIntoMood,
   type MoodChip,
@@ -25,7 +24,6 @@ export function MoodPage() {
   const [freeText, setFreeText] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<MoodSessionResult | null>(null);
-  const [reactions, setReactions] = useState<Record<string, "up" | "down">>({});
   const [ytPicks, setYtPicks] = useState<YtSearchResult[] | null>(null);
   const [kept, setKept] = useState<Record<string, "keeping" | "kept">>({});
 
@@ -45,7 +43,6 @@ export function MoodPage() {
     try {
       const r = await startMoodSession({ ...input, limit: 30 });
       setResult(r);
-      setReactions({});
       setYtPicks(null);
       setKept({});
       // Fresh YouTube picks load lazily so the library playlist is instant.
@@ -73,13 +70,6 @@ export function MoodPage() {
     } finally {
       setBusy(false);
     }
-  }
-
-  function react(trackId: string, verdict: "up" | "down") {
-    if (!result) return;
-    setReactions((prev) => ({ ...prev, [trackId]: verdict }));
-    useMoodLearningStore.getState().markReacted(trackId);
-    void recordMoodSignal(result.sessionId, trackId, verdict === "up" ? "thumbUp" : "thumbDown");
   }
 
   // Keep a YouTube fresh pick: download it into the library (existing flow),
@@ -230,46 +220,7 @@ export function MoodPage() {
                   Nothing matched that mood yet — try another, or seed more of your library.
                 </p>
               ) : (
-                queue.map((t, i) => (
-                  <SongRow
-                    key={t.id}
-                    track={t}
-                    index={i}
-                    onPlay={play}
-                    actions={
-                      <div className="flex items-center gap-1">
-                        <button
-                          type="button"
-                          aria-label="Fits this mood"
-                          title="Fits this mood"
-                          onClick={() => react(t.id, "up")}
-                          className={
-                            "rounded-full px-1.5 py-1 text-sm transition " +
-                            (reactions[t.id] === "up"
-                              ? "bg-sky-500/20 text-sky-300"
-                              : "text-zinc-500 hover:bg-zinc-700/60 hover:text-zinc-200")
-                          }
-                        >
-                          👍
-                        </button>
-                        <button
-                          type="button"
-                          aria-label="Doesn't fit this mood"
-                          title="Doesn't fit this mood"
-                          onClick={() => react(t.id, "down")}
-                          className={
-                            "rounded-full px-1.5 py-1 text-sm transition " +
-                            (reactions[t.id] === "down"
-                              ? "bg-red-500/20 text-red-300"
-                              : "text-zinc-500 hover:bg-zinc-700/60 hover:text-zinc-200")
-                          }
-                        >
-                          👎
-                        </button>
-                      </div>
-                    }
-                  />
-                ))
+                queue.map((t, i) => <SongRow key={t.id} track={t} index={i} onPlay={play} />)
               )}
 
               {ytPicks && ytPicks.length > 0 && (

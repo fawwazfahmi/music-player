@@ -16,6 +16,8 @@ import {
 } from "@/components/icons";
 import { usePlayerStore, type QueueTrack } from "@/stores/player-store";
 import { useIpodStore } from "@/stores/ipod-store";
+import { useMoodLearningStore } from "@/stores/mood-learning-store";
+import { recordMoodSignal } from "@/server/actions/moods";
 import { deleteTrack } from "@/server/actions/library";
 import { addToPlaylist, getPlaylists } from "@/server/actions/playlists";
 import { transcribeTrack } from "@/server/actions/lyrics";
@@ -68,6 +70,13 @@ export function TrackMenu({
   const [transcribing, setTranscribing] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  // Mood feedback lives here (not cluttering every row): shown only while a
+  // mood session is active and this track belongs to it.
+  const moodSessionId = useMoodLearningStore((s) => s.sessionId);
+  const inMoodSession = useMoodLearningStore(
+    (s) => !!s.sessionId && s.trackIds.has(track.id),
+  );
 
   /**
    * Single way in and out, so controlled and uncontrolled behave identically.
@@ -172,6 +181,15 @@ export function TrackMenu({
     stop(e);
     setOpen(false);
     useIpodStore.getState().push({ name: "notes", trackId: track.id });
+  }
+
+  function handleMoodFeedback(e: React.MouseEvent, verdict: "thumbUp" | "thumbDown") {
+    stop(e);
+    if (moodSessionId) {
+      useMoodLearningStore.getState().markReacted(track.id);
+      void recordMoodSignal(moodSessionId, track.id, verdict);
+    }
+    setOpen(false);
   }
 
   async function handleReTranscribe(e: React.MouseEvent) {
@@ -284,6 +302,21 @@ export function TrackMenu({
       )}
       {open && view === "main" && panel(
         <>
+          {inMoodSession && (
+            <>
+              <MenuItem
+                icon={<span className="text-[13px] leading-none">👍</span>}
+                label="Fits my mood"
+                onClick={(e) => handleMoodFeedback(e, "thumbUp")}
+              />
+              <MenuItem
+                icon={<span className="text-[13px] leading-none">👎</span>}
+                label="Not this mood"
+                onClick={(e) => handleMoodFeedback(e, "thumbDown")}
+              />
+              <div className="my-1 border-t border-zinc-800" />
+            </>
+          )}
           <MenuItem icon={<PlayIcon size={14} />} label="Play next" onClick={handlePlayNext} />
           <MenuItem
             icon={<QueueIcon size={14} />}
