@@ -119,6 +119,8 @@ interface PlayerState {
       picks a new cover. Keeps the player bar, queue panel and now-playing in
       sync without interrupting playback. */
   setTrackCoverArt: (trackId: string, coverArtHash: string | null) => void;
+  /** Clear the ephemeral flag on a queue track once it's adopted into the library. */
+  markTrackAdopted: (trackId: string) => void;
   next: () => void;
   prev: () => void;
   togglePlay: () => void;
@@ -366,6 +368,13 @@ export const usePlayerStore = create<PlayerState>()(
             queue: s.queue.map((t) =>
               t.id === trackId ? { ...t, coverArtHash } : t,
             ),
+          };
+        }),
+      markTrackAdopted: (trackId) =>
+        set((s) => {
+          if (!s.queue.some((t) => t.id === trackId && t.ephemeral)) return s;
+          return {
+            queue: s.queue.map((t) => (t.id === trackId ? { ...t, ephemeral: false } : t)),
           };
         }),
       purgeTrack: (trackId) => {
