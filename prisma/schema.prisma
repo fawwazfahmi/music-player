@@ -77,6 +77,10 @@ model Track {
   source    TrackSource @default(LOCAL_SCAN)
   ytVideoId String?     @unique
   playable  Boolean     @default(true)
+  // Library membership, orthogonal to source/playable. Ephemeral YouTube picks
+  // ("trying it out") are playable YT_CACHED tracks with inLibrary:false — they
+  // play and queue but are hidden from every library list until adopted.
+  inLibrary Boolean     @default(true)
 
   albumId         String?
   primaryArtistId String
