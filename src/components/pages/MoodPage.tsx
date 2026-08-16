@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState, type FormEvent } from "react";
-import { getMoods, startMoodSession, type MoodChip } from "@/server/actions/moods";
+import { getMoods, startMoodSession, recordMoodSignal, type MoodChip } from "@/server/actions/moods";
 import type { MoodSessionResult } from "@/server/services/mood-session";
 import { useIdentity } from "@/hooks/use-identity";
 import { usePlayerStore } from "@/stores/player-store";
+import { useMoodLearningStore } from "@/stores/mood-learning-store";
 import { PageHeader, PageLoading, SongRow, buildQueueTrack } from "./_shared";
 import { PlayIcon } from "@/components/icons";
 
@@ -14,6 +15,7 @@ export function MoodPage() {
   const [freeText, setFreeText] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<MoodSessionResult | null>(null);
+  const [reactions, setReactions] = useState<Record<string, "up" | "down">>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -31,6 +33,7 @@ export function MoodPage() {
     try {
       const r = await startMoodSession({ ...input, limit: 30 });
       setResult(r);
+      setReactions({});
       // Drop straight into a playing playlist, like starting any playlist.
       if (r.tracks.length > 0) {
         const queue = r.tracks.map((t) =>
@@ -46,9 +49,21 @@ export function MoodPage() {
         );
         usePlayerStore.getState().setQueue(queue, 0);
       }
+      // Mark this as the active mood session so playback feeds learning.
+      useMoodLearningStore.getState().setSession(
+        r.sessionId,
+        r.tracks.map((t) => t.id),
+      );
     } finally {
       setBusy(false);
     }
+  }
+
+  function react(trackId: string, verdict: "up" | "down") {
+    if (!result) return;
+    setReactions((prev) => ({ ...prev, [trackId]: verdict }));
+    useMoodLearningStore.getState().markReacted(trackId);
+    void recordMoodSignal(result.sessionId, trackId, verdict === "up" ? "thumbUp" : "thumbDown");
   }
 
   const name = identity ? identity[0]!.toUpperCase() + identity.slice(1) : null;
@@ -152,7 +167,46 @@ export function MoodPage() {
                   Nothing matched that mood yet — try another, or seed more of your library.
                 </p>
               ) : (
-                queue.map((t, i) => <SongRow key={t.id} track={t} index={i} onPlay={play} />)
+                queue.map((t, i) => (
+                  <SongRow
+                    key={t.id}
+                    track={t}
+                    index={i}
+                    onPlay={play}
+                    actions={
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          aria-label="Fits this mood"
+                          title="Fits this mood"
+                          onClick={() => react(t.id, "up")}
+                          className={
+                            "rounded-full px-1.5 py-1 text-sm transition " +
+                            (reactions[t.id] === "up"
+                              ? "bg-sky-500/20 text-sky-300"
+                              : "text-zinc-500 hover:bg-zinc-700/60 hover:text-zinc-200")
+                          }
+                        >
+                          👍
+                        </button>
+                        <button
+                          type="button"
+                          aria-label="Doesn't fit this mood"
+                          title="Doesn't fit this mood"
+                          onClick={() => react(t.id, "down")}
+                          className={
+                            "rounded-full px-1.5 py-1 text-sm transition " +
+                            (reactions[t.id] === "down"
+                              ? "bg-red-500/20 text-red-300"
+                              : "text-zinc-500 hover:bg-zinc-700/60 hover:text-zinc-200")
+                          }
+                        >
+                          👎
+                        </button>
+                      </div>
+                    }
+                  />
+                ))
               )}
             </div>
           )}

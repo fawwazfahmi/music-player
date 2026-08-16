@@ -19,9 +19,11 @@ interface SongRowProps {
       page can drop it from its local list. */
   onDeleted?: (trackId: string) => void;
   showAlbum?: boolean;
+  /** Optional controls rendered just before the ⋮ menu (e.g. mood thumbs). */
+  actions?: React.ReactNode;
 }
 
-export function SongRow({ track, index, onPlay, onDeleted, showAlbum = true }: SongRowProps) {
+export function SongRow({ track, index, onPlay, onDeleted, showAlbum = true, actions }: SongRowProps) {
   const currentTrackId = usePlayerStore((s) => s.queue[s.currentIndex]?.id);
   const isPlaying = usePlayerStore((s) => s.isPlaying);
   const active = currentTrackId === track.id;
@@ -117,6 +119,11 @@ export function SongRow({ track, index, onPlay, onDeleted, showAlbum = true }: S
       <div className="hidden text-right text-xs text-zinc-500 tabular-nums md:block">
         {formatDuration(track.duration)}
       </div>
+      {actions && (
+        <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+          {actions}
+        </div>
+      )}
       {/* Kebab — on a mouse it fades in on hover, as always. On touch it is a
           teacher that retires: visible until the long-press has been used a few
           times, then gone. The menu stops its own click bubbling so opening it
