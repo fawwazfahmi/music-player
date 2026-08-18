@@ -4,6 +4,7 @@
 import { db } from "@/server/db";
 import { env } from "@/lib/env";
 import { sendWhatsApp } from "@/server/services/whatsapp-callmebot";
+import { displayName } from "@/lib/display-name";
 
 /** A party is auto-ended after this long with no *playing* activity. */
 export const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
@@ -247,7 +248,7 @@ async function notifyPartyStart(opts: {
   const trackLine = opts.title
     ? `${opts.title}${opts.artist ? ` — ${opts.artist}` : ""}`
     : "(picking a song)";
-  const text = `🎧 ainul started a listening party
+  const text = `🎧 ${displayName("ainul")} started a listening party
 ${trackLine}
 Join: ${joinUrl}`;
   await sendWhatsApp(text);
