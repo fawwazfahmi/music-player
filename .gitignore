@@ -58,3 +58,5 @@ scripts/.title-cleanup-snapshot.json
 scripts/.fix-mrkitty-snapshot.json
 scripts/.title-cleanup-snapshot-orig.json
 scripts/.fix-mv-artists-snapshot.json
+scripts/.yt-audit.json
+scripts/.yt-audit-snapshot.json

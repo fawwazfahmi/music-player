@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseYtTitle, cleanTitleTags, aggressivelyCleanTitle } from "@/server/services/yt-title-parser";
+import { parseYtTitle, cleanTitleTags, aggressivelyCleanTitle, stripTitleNoise } from "@/server/services/yt-title-parser";
 
 describe("parseYtTitle", () => {
   it("splits 'Artist - Title' format", () => {
@@ -121,6 +121,17 @@ describe("parseYtTitle", () => {
     });
   });
 
+  it("parses ARTIST (native) 'Song' — the label paren before the quote", () => {
+    expect(parseYtTitle("LE SSERAFIM (르세라핌) 'Smart' OFFICIAL MV", "HYBE LABELS")).toEqual({
+      artist: "LE SSERAFIM",
+      title: "Smart",
+    });
+    expect(parseYtTitle("KISS OF LIFE (키스오브라이프) 'Sticky' Official Music Video", "KISS OF LIFE")).toEqual({
+      artist: "KISS OF LIFE",
+      title: "Sticky",
+    });
+  });
+
   it("does NOT mistake a quoted album/word mid-title for artist/song", () => {
     // The quote wraps "Insomnia" inside a parenthetical — no artist prefix, so
     // the quote rule must not fire; fall back to the uploader.
@@ -135,5 +146,35 @@ describe("parseYtTitle", () => {
       artist: "NIDJI",
       title: "Rahasia Hati",
     });
+  });
+});
+
+describe("stripTitleNoise", () => {
+  it("drops a trailing junk segment after a separator", () => {
+    expect(stripTitleNoise("Wonderful Tonight - Electric Guitar Cover by Kfir Ochaion - Jamzone App")).toBe(
+      "Wonderful Tonight",
+    );
+    expect(stripTitleNoise("Hotel California | Lyric Video | Lirik Indonesia | Indo Subtitle")).toBe(
+      "Hotel California",
+    );
+    expect(stripTitleNoise("The End Of The World / HQ 1963")).toBe("The End Of The World");
+    expect(stripTitleNoise("Tears in Heaven / Lyrics")).toBe("Tears in Heaven");
+  });
+
+  it("drops bare trailing MV / lyrics tokens", () => {
+    expect(stripTitleNoise("Nirvana-Lithium Lyrics")).toBe("Nirvana-Lithium");
+    expect(stripTitleNoise("Rahasia Hati Official Music Video")).toBe("Rahasia Hati");
+  });
+
+  it("takes the opening quoted song as the title", () => {
+    expect(stripTitleNoise("'DRIP' M/V")).toBe("DRIP");
+    expect(stripTitleNoise("“Strategy”")).toBe("Strategy");
+    expect(stripTitleNoise("'LIKE THAT' EXCLUSIVE PERFORMANCE VIDEO")).toBe("LIKE THAT");
+  });
+
+  it("keeps version markers and clean titles untouched", () => {
+    expect(stripTitleNoise("Home (Slowed & Reverbed)")).toBe("Home (Slowed & Reverbed)");
+    expect(stripTitleNoise("Money for Nothing")).toBe("Money for Nothing");
+    expect(stripTitleNoise("Somebody ft. Drew Love")).toBe("Somebody ft. Drew Love");
   });
 });

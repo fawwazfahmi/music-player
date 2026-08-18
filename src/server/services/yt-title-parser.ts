@@ -1,3 +1,5 @@
+import { tidyTitle } from "@/lib/title-clean";
+
 // Parse a YouTube video title into { artist, title }.
 //
 // YouTube titles for music are usually one of:
@@ -19,7 +21,38 @@ const SEPARATORS = [" - ", " – ", " — ", " · ", " | "];
 // is the only real artist signal. The artist class excludes "(" / "[" / quotes
 // so a quote INSIDE a parenthetical — e.g. Memory (From "Insomnia" Album) —
 // doesn't match (there's a "(" before the quote → no clean artist prefix).
-export const QUOTED_RE = /^([^("'“‘[]+?)\s*['"“‘]([^'"”’]+?)['"”’]/;
+// Artist prefix, an OPTIONAL native-script name in parens (르세라핌) — but that
+// paren must not itself contain a quote, so Memory (From "Insomnia" Album) still
+// doesn't match — then the quoted song.
+export const QUOTED_RE = /^([^("'“‘[]+?)(?:\s*\([^)"'“‘’”]*\))?\s*['"“‘]([^'"”’]+?)['"”’]/;
+
+// Once a junk keyword appears after a separator (- | / ·), the rest of the title
+// is descriptive cruft ("… - Electric Guitar Cover by X", "… | Lyric Video").
+const JUNK = "cover|lyrics?|lirik|sub(?:title)?|terjemahan|official|music\\s*video|m\\/?v|mv|hd|hq|4k|8k|performance|choreography|visuali[sz]er|app|instruments?|reaction|explained";
+// Require whitespace before the separator so a word-internal hyphen
+// ("Nirvana-Lithium") is never treated as a segment break.
+const TRAILING_SEG_RE = new RegExp(`\\s+[-–—|/·]\\s*[^-–—|/·]*\\b(?:${JUNK})\\b.*$`, "i");
+// Bare trailing tokens with no separator ("… Lithium Lyrics", "… Official Music Video").
+const BARE_TAIL_RE =
+  /\s+(?:official\s*music\s*video|music\s*video|lyric\s*video|lyrics?|performance\s*video|choreography\s*video|m\/?v|mv|hd|hq|4k|8k)\s*$/i;
+
+/** Strip trailing descriptive cruft from a title without touching the artist —
+    MV/lyrics/cover-by/subtitle tails that YouTube uploaders tack on. Uses the
+    grounded tidyTitle first, so version markers (slowed/reverb/remix) are KEPT
+    while noise brackets are dropped. */
+export function stripTitleNoise(title: string): string {
+  let s = tidyTitle(title);
+  // A title that OPENS with a quoted song — 'DRIP' M/V, 'LIKE THAT' EXCLUSIVE
+  // PERFORMANCE VIDEO — is just that quoted song; everything after is cruft.
+  const lead = s.match(/^['"“‘]([^'"”’]+)['"”’]/);
+  if (lead) return lead[1]!.trim();
+  let prev: string;
+  do {
+    prev = s;
+    s = s.replace(TRAILING_SEG_RE, "").replace(BARE_TAIL_RE, "").trim();
+  } while (s !== prev);
+  return s;
+}
 
 // Parenthetical tags that should be stripped from the title (case-insensitive).
 // Matches any (...) or [...] block that CONTAINS one of these keywords anywhere
