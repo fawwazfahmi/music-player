@@ -122,3 +122,25 @@ function lrcToPlainText(lrc: string): string {
     .filter((l) => l.length > 0)
     .join("\n");
 }
+
+// A line that's purely an annotation cue, not lyrics: "(upbeat music)",
+// "[BLANK_AUDIO]", "[Music]", "♪♪♪", "(singing in foreign language)".
+const CUE_LINE_RE =
+  /^\s*(?:[\[(][^)\]]*[)\]]|[♪♫#*_\-–—\s]+|.*\b(?:blank_audio|instrumental|music|applause|silence|foreign language|inaudible|no audio)\b.*)\s*$/i;
+
+/**
+ * True when a Whisper transcript is effectively useless — empty, or dominated
+ * by annotation cues. The English-only model returns "(singing in foreign
+ * language)" for Korean/Japanese; we must not store that as lyrics. A transcript
+ * with a real majority of sung lines passes.
+ */
+export function isJunkTranscript(plainText: string): boolean {
+  const lines = plainText
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+  if (lines.length === 0) return true;
+  const real = lines.filter((l) => !CUE_LINE_RE.test(l));
+  // Junk if there's no real content, or cues outnumber real lines.
+  return real.length === 0 || real.length < lines.length / 2;
+}

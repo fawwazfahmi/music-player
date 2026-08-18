@@ -134,6 +134,7 @@ enum TrackSource {
 enum LyricsSource {
   LRCLIB_SYNCED
   LRCLIB_PLAIN
+  YT_SUBTITLE
   WHISPER
   MANUAL
 }

@@ -2,9 +2,11 @@
 
 import { db } from "@/server/db";
 import { fetchLyrics, parseSyncedLyrics, type LyricLine } from "@/server/services/lrclib";
-import { transcribeFile } from "@/server/services/whisper";
+import { transcribeFile, isJunkTranscript } from "@/server/services/whisper";
+import { fetchUploaderSubtitles } from "@/server/services/yt-subtitles";
+import { anyConnectedCookiePath } from "@/server/services/yt-cookies";
 
-export type LyricsSource = "LRCLIB_SYNCED" | "LRCLIB_PLAIN" | "WHISPER" | "MANUAL";
+export type LyricsSource = "LRCLIB_SYNCED" | "LRCLIB_PLAIN" | "YT_SUBTITLE" | "WHISPER" | "MANUAL";
 
 export interface GetLyricsResult {
   trackId: string;
@@ -99,34 +101,62 @@ export async function getLyrics(trackId: string): Promise<GetLyricsResult> {
   }
 
   // LRCLIB returned nothing. Off-canonical YT tracks (covers, demos, niche
-  // uploads) almost never have an LRCLIB match — auto-fire Whisper instead
-  // of making the user click "Transcribe with AI" every time. Only do this
-  // for tracks we have a real m4a for.
+  // uploads) and foreign-language songs rarely have an LRCLIB match. Resolve in
+  // the background (the panel polls) through: uploader subtitles (romaji /
+  // English, synced) → Whisper (English model, junk output discarded).
   const isYtSourced = track.source === "YT_CACHED" || track.source === "YT_STREAMING";
-  if (isYtSourced && track.filePath) {
+  if (isYtSourced && (track.ytVideoId || track.filePath)) {
     inFlightTranscriptions.add(trackId);
+    const videoId = track.ytVideoId;
     const filePath = track.filePath;
     void (async () => {
       try {
-        const { syncedLrc, plainText } = await transcribeFile(filePath);
-        await db.track.update({
-          where: { id: trackId },
-          data: {
-            lyricsSynced: syncedLrc,
-            lyricsPlain: plainText,
-            lyricsSource: "WHISPER",
-            lyricsFetched: new Date(),
-          },
-        });
-        console.log(`[mu] auto-transcribed ${trackId} via Whisper`);
+        // 1) Uploader-provided YouTube captions — the correct lyrics for
+        //    Korean/Japanese songs, in Latin script, and timestamped (synced).
+        if (videoId) {
+          const cookiePath = await anyConnectedCookiePath().catch(() => null);
+          const subs = await fetchUploaderSubtitles(videoId, { cookiePath });
+          if (subs) {
+            await db.track.update({
+              where: { id: trackId },
+              data: {
+                lyricsSynced: subs.syncedLrc || null,
+                lyricsPlain: subs.plain,
+                lyricsSource: "YT_SUBTITLE",
+                lyricsFetched: new Date(),
+              },
+            });
+            console.log(`[mu] lyrics from uploader subtitles (${subs.lang}) for ${trackId}`);
+            return;
+          }
+        }
+
+        // 2) Whisper — but only keep it if it's real lyrics. The English-only
+        //    model returns "(singing in foreign language)" for CJK; never store that.
+        if (filePath) {
+          const { syncedLrc, plainText } = await transcribeFile(filePath);
+          if (!isJunkTranscript(plainText)) {
+            await db.track.update({
+              where: { id: trackId },
+              data: {
+                lyricsSynced: syncedLrc,
+                lyricsPlain: plainText,
+                lyricsSource: "WHISPER",
+                lyricsFetched: new Date(),
+              },
+            });
+            console.log(`[mu] auto-transcribed ${trackId} via Whisper`);
+            return;
+          }
+          console.log(`[mu] discarded junk Whisper transcript for ${trackId}`);
+        }
+
+        // Nothing usable — mark fetched so we don't retry on every page view.
+        await db.track.update({ where: { id: trackId }, data: { lyricsFetched: new Date() } });
       } catch (e) {
-        console.error(`[mu] auto-transcribe failed for ${trackId}:`, e);
-        // Mark as fetched so we don't try LRCLIB or whisper on every page view.
+        console.error(`[mu] lyrics resolution failed for ${trackId}:`, e);
         await db.track
-          .update({
-            where: { id: trackId },
-            data: { lyricsFetched: new Date() },
-          })
+          .update({ where: { id: trackId }, data: { lyricsFetched: new Date() } })
           .catch(() => {});
       } finally {
         inFlightTranscriptions.delete(trackId);

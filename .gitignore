@@ -60,3 +60,4 @@ scripts/.title-cleanup-snapshot-orig.json
 scripts/.fix-mv-artists-snapshot.json
 scripts/.yt-audit.json
 scripts/.yt-audit-snapshot.json
+scripts/.lyrics-backfill-snapshot.json
