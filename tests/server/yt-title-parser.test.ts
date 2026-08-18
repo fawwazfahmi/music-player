@@ -92,4 +92,48 @@ describe("parseYtTitle", () => {
       title: "- Title Only",
     });
   });
+
+  // K-pop / MV titles put the artist before a quoted song title, and the
+  // uploader is a label ("JYP Entertainment") — so the quote is the only real
+  // artist signal.
+  it("parses ARTIST “Song” M/V (curly quotes), not the label uploader", () => {
+    expect(parseYtTitle('TWICE “Strategy ” M/V', "JYP Entertainment")).toEqual({
+      artist: "TWICE",
+      title: "Strategy",
+    });
+  });
+
+  it("parses ARTIST 'Song' with straight single quotes", () => {
+    expect(parseYtTitle("aespa 'Armageddon' MV", "SMTOWN")).toEqual({
+      artist: "aespa",
+      title: "Armageddon",
+    });
+  });
+
+  it("drops the redundant Korean name, keeping the romanized artist", () => {
+    expect(parseYtTitle("aespa 에스파 'Armageddon' MV (Performance Ver.)", "SMTOWN")).toEqual({
+      artist: "aespa",
+      title: "Armageddon",
+    });
+    expect(parseYtTitle("IVE 아이브 'After LIKE' MV", "STARSHIP")).toEqual({
+      artist: "IVE",
+      title: "After LIKE",
+    });
+  });
+
+  it("does NOT mistake a quoted album/word mid-title for artist/song", () => {
+    // The quote wraps "Insomnia" inside a parenthetical — no artist prefix, so
+    // the quote rule must not fire; fall back to the uploader.
+    expect(parseYtTitle('Memory (From "Insomnia" Album)', "Narvent")).toEqual({
+      artist: "Narvent",
+      title: 'Memory (From "Insomnia" Album)',
+    });
+  });
+
+  it("still prefers a dash separator over the quote rule", () => {
+    expect(parseYtTitle('NIDJI - Rahasia Hati', "NIDJI OFFICIAL")).toEqual({
+      artist: "NIDJI",
+      title: "Rahasia Hati",
+    });
+  });
 });
