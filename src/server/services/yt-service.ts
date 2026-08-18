@@ -283,10 +283,17 @@ export interface DownloadResult {
   fileFormat: string;
 }
 
-/** The yt-dlp argv for an audio download. Extracted + pure so the retry/backoff
-    flags are unit-testable. Retries + request spacing matter because YouTube
-    returns `HTTP 403` on the media fetch under burst/throttle — without them a
-    single transient 403 permanently fails the download. */
+// yt-dlp's default player client (android_vr) hands back PO-token-gated media
+// URLs that hard-403 on the byte fetch — no amount of retrying recovers it,
+// because every attempt hits the same forbidden URL (that's the "Nothing
+// downloading → FAILED: HTTP Error 403" the UI was showing). web_embedded
+// serves the ungated opus-126k audio-only stream; tv_simply and mweb are
+// fallbacks if it ever regresses. Crucially, none of these is android_vr, so
+// yt-dlp never even offers the gated format.
+const PLAYER_CLIENTS = "youtube:player_client=web_embedded,tv_simply,mweb";
+
+/** The yt-dlp argv for an audio download. Extracted + pure so the client-pin +
+    retry/backoff flags are unit-testable. */
 export function buildDownloadArgs(videoId: string, destDir: string): string[] {
   return [
     `https://www.youtube.com/watch?v=${videoId}`,
@@ -297,6 +304,9 @@ export function buildDownloadArgs(videoId: string, destDir: string): string[] {
     `${destDir}/${videoId}.%(ext)s`,
     "--no-warnings",
     "--embed-metadata",
+    // Avoid the 403-gated default client (see PLAYER_CLIENTS above).
+    "--extractor-args",
+    PLAYER_CLIENTS,
     // Self-recover from transient 403s / throttling instead of hard-failing.
     "--retries",
     "10",

@@ -16,4 +16,18 @@ describe("buildDownloadArgs", () => {
     expect(args).toContain("--fragment-retries");
     expect(args).toContain("--sleep-requests");
   });
+
+  // The default yt-dlp client (android_vr) now serves PO-token-gated media URLs
+  // that hard-403 on the fetch — retries can't recover it because every attempt
+  // hits the same forbidden URL. Pinning non-gated player clients (web_embedded
+  // first, then tv_simply/mweb fallbacks) is what actually gets bytes.
+  it("pins non-gated player clients so the media fetch doesn't 403", () => {
+    const i = args.indexOf("--extractor-args");
+    expect(i).toBeGreaterThanOrEqual(0);
+    const val = args[i + 1]!;
+    expect(val).toMatch(/^youtube:player_client=/);
+    expect(val).toContain("web_embedded");
+    // Must NOT fall back to the 403-gated default client.
+    expect(val).not.toContain("android_vr");
+  });
 });
