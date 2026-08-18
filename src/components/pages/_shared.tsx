@@ -212,7 +212,12 @@ export function buildQueueTrack(t: {
   coverArtHash?: string | null;
   /** Per-track override chosen in the cover picker. Wins over album art. */
   trackCoverArtHash?: string | null;
-  ytVideoId?: string | null;
+  /** REQUIRED, not optional. Almost no track has a coverArtHash, so the
+      YouTube thumbnail is the only art the overlay can show for most of the
+      library. When this was optional three call sites quietly omitted it and
+      the OBS now-playing overlay rendered a blank grey box. Pass `null`
+      explicitly if a source genuinely has no video id. */
+  ytVideoId: string | null | undefined;
   ephemeral?: boolean;
 }): QueueTrack {
   return {

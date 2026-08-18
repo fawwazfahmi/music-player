@@ -27,6 +27,7 @@ export function FavoritesPage() {
       primaryArtist: f.track.primaryArtist,
       album: f.track.album,
       trackCoverArtHash: f.track.coverArtHash,
+      ytVideoId: f.track.ytVideoId,
     }),
   );
 

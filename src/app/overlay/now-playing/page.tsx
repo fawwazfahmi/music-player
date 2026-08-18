@@ -27,11 +27,11 @@ interface NP {
 }
 
 const STYLE = `
-#np { --art-a:#3a1c71; --art-b:#d76d77; --art-c:#ffaf7b; --accent:#1db954; --radius:20px; --pad:1.15rem; }
+#np { --art-a:rgba(58,28,113,.32); --art-b:rgba(215,109,119,.32); --art-c:rgba(255,175,123,.32); --accent:#1db954; --radius:20px; --pad:1.15rem; }
 html { background:transparent !important; }
 body { background:transparent !important; margin:0; overflow:hidden; font-family:"Segoe UI",system-ui,-apple-system,"Helvetica Neue",sans-serif; color:#fff; }
 #np { position:absolute; inset:0; }
-#np .card { position:absolute; left:1.5rem; top:1rem; width:calc(100% - 3rem); padding:var(--pad); display:flex; gap:.83rem; align-items:center; border-radius:var(--radius); background:linear-gradient(180deg,rgba(0,0,0,.15),rgba(0,0,0,.38)),linear-gradient(135deg,var(--art-a),var(--art-b) 55%,var(--art-c)); box-shadow:0 .5rem 1.2rem rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.14); overflow:hidden; transition:opacity .5s ease, transform .5s ease, background .6s ease; }
+#np .card { position:absolute; left:1.5rem; top:1rem; width:calc(100% - 3rem); padding:var(--pad); display:flex; gap:.83rem; align-items:center; border-radius:var(--radius); background:linear-gradient(180deg,rgba(255,255,255,.15),rgba(255,255,255,.04)),linear-gradient(135deg,var(--art-a),var(--art-b) 55%,var(--art-c)),rgba(10,14,22,.55); backdrop-filter:blur(16px) saturate(120%); box-shadow:0 .5rem 1.2rem rgba(0,0,0,.42), inset 0 1px 0 rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.14); overflow:hidden; transition:opacity .5s ease, transform .5s ease, background .6s ease; }
 #np .card::after { content:""; position:absolute; inset:0; pointer-events:none; background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,0) 40%); }
 #np .card.hidden { opacity:0; transform:translateY(.8rem); }
 #np .art { width:4.5rem; height:4.5rem; flex-shrink:0; border-radius:max(6px, calc(var(--radius) - var(--pad))); box-shadow:0 .33rem 1rem rgba(0,0,0,.45); background:#222 center/cover no-repeat; }
@@ -61,6 +61,11 @@ export default function OverlayNowPlaying() {
     const who = p.get("who");
     const radius = p.get("radius");
     const accent = p.get("accent");
+    // Translucency of the album-colour tint. Matches the KyoTips overlays'
+    // glass look (~.32 over an rgba(10,14,22,.55) base) so the scene reads
+    // through the card. 1 = the old fully opaque look.
+    const alphaRaw = parseFloat(p.get("alpha") || "0.32");
+    const alpha = Number.isFinite(alphaRaw) ? Math.min(1, Math.max(0, alphaRaw)) : 0.32;
     document.documentElement.style.fontSize = `calc(100vw / ${div})`;
     if (radius) root.style.setProperty("--radius", radius);
     if (accent) root.style.setProperty("--accent", accent.startsWith("#") ? accent : `#${accent}`);
@@ -88,10 +93,13 @@ export default function OverlayNowPlaying() {
     const setGradient = (a: string, b: string, c: string) => {
       root.style.setProperty("--art-a", a); root.style.setProperty("--art-b", b); root.style.setProperty("--art-c", c);
     };
-    const resetArt = () => { artEl.style.backgroundImage = "none"; setGradient("#3a1c71", "#d76d77", "#ffaf7b"); };
+    const resetArt = () => {
+      artEl.style.backgroundImage = "none";
+      setGradient(`rgba(58,28,113,${alpha})`, `rgba(215,109,119,${alpha})`, `rgba(255,175,123,${alpha})`);
+    };
     const dist = (a: { r: number; g: number; b: number }, b: { r: number; g: number; b: number }) => Math.hypot(a.r - b.r, a.g - b.g, a.b - b.b);
     const darken = (c: { r: number; g: number; b: number }, f: number) => ({ r: Math.round(c.r * f), g: Math.round(c.g * f), b: Math.round(c.b * f) });
-    const rgb = (c: { r: number; g: number; b: number }) => `rgb(${c.r},${c.g},${c.b})`;
+    const rgb = (c: { r: number; g: number; b: number }) => `rgba(${c.r},${c.g},${c.b},${alpha})`;
     // Always three colours or nothing — the tuple says so, which is what lets
     // the caller index it without assertions.
     function extractColors(img: HTMLImageElement): [string, string, string] | null {

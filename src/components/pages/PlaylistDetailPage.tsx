@@ -41,6 +41,7 @@ export function PlaylistDetailPage({ playlistId }: Props) {
       primaryArtist: t.primaryArtist,
       album: t.album,
       trackCoverArtHash: t.coverArtHash,
+      ytVideoId: t.ytVideoId,
     }),
   );
 

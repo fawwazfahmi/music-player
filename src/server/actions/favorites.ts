@@ -38,8 +38,11 @@ export async function getFavoriteTracks() {
           title: true,
           duration: true,
           coverArtHash: true,
+          // The overlay's only art source for most of the library: barely any
+          // track has a coverArtHash, so the YouTube thumbnail carries it.
+          ytVideoId: true,
           primaryArtist: { select: { name: true } },
-          album: { select: { title: true, coverArtPath: true } },
+          album: { select: { title: true, coverArtPath: true, coverArtHash: true } },
         },
       },
     },

@@ -8,6 +8,9 @@ export interface SearchTrackResult {
   artistName: string;
   albumId: string | null;
   albumTitle: string | null;
+  coverArtHash: string | null;
+  albumCoverArtHash: string | null;
+  ytVideoId: string | null;
   score: number;
 }
 
@@ -42,6 +45,9 @@ export async function searchLibrary(query: string): Promise<SearchResults> {
       SELECT t.id, t.title, t.duration,
              ar.id AS "artistId", ar.name AS "artistName",
              al.id AS "albumId", al.title AS "albumTitle",
+             t."coverArtHash" AS "coverArtHash",
+             al."coverArtHash" AS "albumCoverArtHash",
+             t."ytVideoId" AS "ytVideoId",
              similarity(t.title, ${q}) AS score
       FROM "Track" t
       JOIN "Artist" ar ON t."primaryArtistId" = ar.id
