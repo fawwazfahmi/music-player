@@ -11,6 +11,7 @@ import os from "node:os";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { env } from "@/lib/env";
+import { romanizeLyrics } from "@/server/services/romanize";
 
 export interface SubtitleLyrics {
   syncedLrc: string;
@@ -162,8 +163,11 @@ export async function fetchUploaderSubtitles(
       );
       const vtt = await fs.readFile(path.join(dir, `s.${lang}.vtt`), "utf8").catch(() => null);
       if (!vtt) return null;
-      const { syncedLrc, plain } = vttToLrc(vtt);
-      if (!plain) return null;
+      const parsed = vttToLrc(vtt);
+      if (!parsed.plain) return null;
+      // Native-script tracks (picker's latinOnly:false) get romanized to Latin.
+      const syncedLrc = romanizeLyrics(parsed.syncedLrc);
+      const plain = romanizeLyrics(parsed.plain);
       return { syncedLrc, plain, lang };
     } finally {
       await fs.rm(dir, { recursive: true, force: true }).catch(() => {});

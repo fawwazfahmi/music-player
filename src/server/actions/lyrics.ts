@@ -186,6 +186,76 @@ function empty(trackId: string): GetLyricsResult {
   };
 }
 
+/** The user-selectable lyrics sources in the panel picker. */
+export type LyricsSourceChoice = "LRCLIB" | "YT_SUBTITLE" | "WHISPER";
+
+function toResult(
+  trackId: string,
+  synced: string | null,
+  plain: string | null,
+  lyricsSource: LyricsSource,
+): GetLyricsResult {
+  return {
+    trackId,
+    synced: synced ? parseSyncedLyrics(synced) : [],
+    plain,
+    instrumental: false,
+    source: lyricsSource.startsWith("LRCLIB") ? "lrclib" : "cache",
+    lyricsSource,
+    autoTranscribing: false,
+  };
+}
+
+/**
+ * Fetch lyrics from ONE specific source on the user's explicit request (the
+ * panel's source picker), store them, and return them. Throws a short,
+ * user-facing message when that source has nothing for this track.
+ */
+export async function resolveLyricsFrom(
+  trackId: string,
+  choice: LyricsSourceChoice,
+): Promise<GetLyricsResult> {
+  const track = await db.track.findUnique({
+    where: { id: trackId },
+    include: { primaryArtist: { select: { name: true } }, album: { select: { title: true } } },
+  });
+  if (!track) return empty(trackId);
+
+  if (choice === "LRCLIB") {
+    const r = await fetchLyrics(track.primaryArtist.name, track.title, track.album?.title, track.duration).catch(
+      () => null,
+    );
+    if (!r || !(r.syncedLyrics || r.plainLyrics)) throw new Error("No LRCLIB match for this song");
+    const src: LyricsSource = r.syncedLyrics ? "LRCLIB_SYNCED" : "LRCLIB_PLAIN";
+    await db.track.update({
+      where: { id: trackId },
+      data: { lyricsSynced: r.syncedLyrics, lyricsPlain: r.plainLyrics, lyricsSource: src, lyricsFetched: new Date() },
+    });
+    return toResult(trackId, r.syncedLyrics, r.plainLyrics, src);
+  }
+
+  if (choice === "YT_SUBTITLE") {
+    if (!track.ytVideoId) throw new Error("This track isn't from YouTube");
+    const cookiePath = await anyConnectedCookiePath().catch(() => null);
+    const s = await fetchUploaderSubtitles(track.ytVideoId, { cookiePath, latinOnly: true });
+    if (!s) throw new Error("No uploader subtitles (romaji/English) on this video");
+    await db.track.update({
+      where: { id: trackId },
+      data: { lyricsSynced: s.syncedLrc || null, lyricsPlain: s.plain, lyricsSource: "YT_SUBTITLE", lyricsFetched: new Date() },
+    });
+    return toResult(trackId, s.syncedLrc || null, s.plain, "YT_SUBTITLE");
+  }
+
+  // WHISPER — explicit user choice, so store whatever it returns.
+  if (!track.filePath) throw new Error("No local audio file to transcribe");
+  const { syncedLrc, plainText } = await transcribeFile(track.filePath);
+  await db.track.update({
+    where: { id: trackId },
+    data: { lyricsSynced: syncedLrc, lyricsPlain: plainText, lyricsSource: "WHISPER", lyricsFetched: new Date() },
+  });
+  return toResult(trackId, syncedLrc, plainText, "WHISPER");
+}
+
 export interface TranscribeResult {
   trackId: string;
   synced: LyricLine[];

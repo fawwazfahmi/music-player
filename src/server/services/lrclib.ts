@@ -1,6 +1,7 @@
 // LRCLIB is a free, open lyrics database with timestamped (LRC) and plain lyrics.
 // https://lrclib.net/docs
 import { buildLyricsQueries } from "@/server/services/lyrics-query";
+import { romanizeLyrics } from "@/server/services/romanize";
 
 const BASE = "https://lrclib.net/api";
 const UA = "Kyowave/1.0 (personal music player)";
@@ -47,9 +48,10 @@ export function pickBestMatch(
 }
 
 function toResult(r: LrcLibResponse): LrcLibResult {
+  // LRCLIB often stores CJK lyrics; romanize so the app only ever shows Latin.
   return {
-    syncedLyrics: r.syncedLyrics ?? null,
-    plainLyrics: r.plainLyrics ?? null,
+    syncedLyrics: r.syncedLyrics ? romanizeLyrics(r.syncedLyrics) : null,
+    plainLyrics: r.plainLyrics ? romanizeLyrics(r.plainLyrics) : null,
     instrumental: !!r.instrumental,
   };
 }

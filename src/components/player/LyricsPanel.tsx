@@ -5,11 +5,26 @@ import { usePlayerStore } from "@/stores/player-store";
 import { getEngine } from "@/audio/engine";
 import {
   getLyrics,
-  transcribeTrack,
+  resolveLyricsFrom,
   updateSyncedLyrics,
   type GetLyricsResult,
+  type LyricsSourceChoice,
 } from "@/server/actions/lyrics";
 import type { LyricLine } from "@/server/services/lrclib";
+
+// Picker options + how each stored lyricsSource maps back to one.
+const SOURCE_OPTIONS: { choice: LyricsSourceChoice; label: string; busy: string }[] = [
+  { choice: "LRCLIB", label: "LRCLIB", busy: "Fetching from LRCLIB…" },
+  { choice: "YT_SUBTITLE", label: "YT subtitle", busy: "Reading uploader subtitles…" },
+  { choice: "WHISPER", label: "AI · Whisper", busy: "Transcribing with Whisper…" },
+];
+
+function activeChoice(source: GetLyricsResult["lyricsSource"]): LyricsSourceChoice | null {
+  if (source === "LRCLIB_SYNCED" || source === "LRCLIB_PLAIN") return "LRCLIB";
+  if (source === "YT_SUBTITLE") return "YT_SUBTITLE";
+  if (source === "WHISPER") return "WHISPER";
+  return null;
+}
 
 function formatLrcTime(s: number): string {
   const m = Math.floor(s / 60);
@@ -28,7 +43,7 @@ export function LyricsPanel() {
   const track = queue[currentIndex] ?? null;
 
   const [data, setData] = useState<GetLyricsResult | null>(null);
-  const [transcribing, setTranscribing] = useState(false);
+  const [fetching, setFetching] = useState<LyricsSourceChoice | null>(null);
   const [error, setError] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -108,28 +123,22 @@ export function LyricsPanel() {
     }
   }, [editingIdx]);
 
-  async function handleTranscribe() {
-    if (!track) return;
-    setTranscribing(true);
+  async function pickSource(choice: LyricsSourceChoice) {
+    if (!track || fetching) return;
+    setFetching(choice);
     setError(null);
     try {
-      const result = await transcribeTrack(track.id);
-      setData({
-        trackId: result.trackId,
-        synced: result.synced,
-        plain: result.plain,
-        instrumental: false,
-        source: "cache",
-        lyricsSource: "WHISPER",
-        autoTranscribing: false,
-      });
+      const result = await resolveLyricsFrom(track.id, choice);
+      setData(result);
+      if (result.synced.length === 0 && !result.plain) {
+        setError("That source returned nothing for this song.");
+      }
     } catch (e: unknown) {
       const raw = e instanceof Error ? e.message : String(e);
-      const headline = raw.split("\n")[0]?.slice(0, 160) ?? "Transcription failed";
-      setError(headline);
-      console.error("Transcription failed:", e);
+      setError(raw.split("\n")[0]?.slice(0, 160) ?? "Couldn't fetch from that source");
+      console.error("resolveLyricsFrom failed:", e);
     } finally {
-      setTranscribing(false);
+      setFetching(null);
     }
   }
 
@@ -245,20 +254,16 @@ export function LyricsPanel() {
     );
   }
 
-  if (transcribing || data?.autoTranscribing) {
+  if (fetching || data?.autoTranscribing) {
+    const busy = fetching ? SOURCE_OPTIONS.find((o) => o.choice === fetching)?.busy : null;
+    const isWhisperBusy = fetching === "WHISPER" || (!fetching && data?.autoTranscribing);
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 text-center text-sm text-zinc-400">
         <div className="h-1.5 w-32 overflow-hidden rounded-full bg-zinc-800">
           <div className="h-full w-1/2 animate-pulse rounded-full bg-sky-500" />
         </div>
-        <span>
-          {data?.autoTranscribing ? "Auto-transcribing with Whisper…" : "Transcribing with Whisper…"}
-        </span>
-        <span className="text-xs text-zinc-600">
-          {data?.autoTranscribing
-            ? "No LRCLIB match — Whisper is taking it from here. Usually 20-60s."
-            : "This usually takes 20–60s"}
-        </span>
+        <span>{busy ?? "Finding the best lyrics…"}</span>
+        {isWhisperBusy && <span className="text-xs text-zinc-600">Whisper runs locally — usually 20–60s</span>}
       </div>
     );
   }
@@ -275,21 +280,23 @@ export function LyricsPanel() {
 
   if (!hasLyrics) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-3 px-6 text-center text-sm text-zinc-500">
-        <div className="flex flex-col gap-1">
-          <span>No lyrics found</span>
-          <span className="text-xs text-zinc-600">via LRCLIB</span>
+      <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center text-sm text-zinc-500">
+        <span>No lyrics yet — pick a source:</span>
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {SOURCE_OPTIONS.map((o) => (
+            <button
+              key={o.choice}
+              type="button"
+              onClick={() => void pickSource(o.choice)}
+              className="rounded-full bg-zinc-800 px-4 py-1.5 text-xs font-semibold text-zinc-100 transition hover:bg-sky-600"
+            >
+              {o.label}
+            </button>
+          ))}
         </div>
-        <button
-          type="button"
-          onClick={handleTranscribe}
-          className="rounded-full bg-sky-600 px-4 py-1.5 text-xs font-semibold text-white transition hover:bg-sky-500"
-        >
-          Transcribe with AI
-        </button>
         {error && <span className="max-w-xs text-xs text-red-400">{error}</span>}
         <span className="max-w-xs text-[10px] text-zinc-700">
-          Uses Whisper running locally on your machine
+          LRCLIB & YouTube subtitles are romanized to romaji/English · Whisper runs locally
         </span>
       </div>
     );
@@ -301,7 +308,7 @@ export function LyricsPanel() {
   if (data && data.synced.length > 0) {
     return (
       <div className="flex h-full flex-col">
-        <LyricsHeader source={data.lyricsSource} onReTranscribe={handleTranscribe} />
+        <SourcePicker source={data.lyricsSource} onPick={pickSource} />
         <div
           ref={containerRef}
           className="min-h-0 flex-1 overflow-y-auto px-6 py-12 scrollbar-thin scrollbar-thumb-zinc-700"
@@ -378,7 +385,7 @@ export function LyricsPanel() {
   // Plain text fallback
   return (
     <div className="flex h-full flex-col">
-      <LyricsHeader source={data?.lyricsSource ?? null} onReTranscribe={handleTranscribe} />
+      <SourcePicker source={data?.lyricsSource ?? null} onPick={pickSource} />
       <div className="min-h-0 flex-1 overflow-y-auto whitespace-pre-wrap px-6 py-8 text-base leading-relaxed text-zinc-400">
         {data?.plain}
       </div>
@@ -387,33 +394,46 @@ export function LyricsPanel() {
   );
 }
 
-function LyricsHeader({
+// The current source is shown on the left; the three options on the right let
+// the user switch where lyrics come from (LRCLIB / YouTube subtitle / Whisper).
+function SourcePicker({
   source,
-  onReTranscribe,
+  onPick,
 }: {
   source: GetLyricsResult["lyricsSource"];
-  onReTranscribe: () => void;
+  onPick: (choice: LyricsSourceChoice) => void;
 }) {
-  const isWhisper = source === "WHISPER";
+  const active = activeChoice(source);
+  const currentLabel =
+    source === "MANUAL"
+      ? "Edited"
+      : (SOURCE_OPTIONS.find((o) => o.choice === active)?.label ?? "—");
   return (
-    <div className="flex items-center justify-between border-b border-zinc-800/60 px-4 py-2 text-[10px] uppercase tracking-wider">
-      <span
-        className={
-          isWhisper
-            ? "rounded-full bg-sky-500/15 px-2 py-0.5 font-semibold text-sky-300"
-            : "text-zinc-500"
-        }
-      >
-        {isWhisper ? "AI-generated · Whisper" : "LRCLIB"}
+    <div className="flex items-center justify-between gap-2 border-b border-zinc-800/60 px-3 py-2">
+      <span className="shrink-0 rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-sky-300">
+        {currentLabel}
       </span>
-      <button
-        type="button"
-        onClick={onReTranscribe}
-        className="rounded-full px-2 py-0.5 font-medium text-zinc-500 transition hover:bg-zinc-800 hover:text-zinc-200"
-        title="Replace these lyrics with a fresh Whisper transcription"
-      >
-        Re-transcribe
-      </button>
+      <div className="flex items-center gap-1">
+        {SOURCE_OPTIONS.map((o) => {
+          const isActive = o.choice === active;
+          return (
+            <button
+              key={o.choice}
+              type="button"
+              onClick={() => onPick(o.choice)}
+              title={`Get lyrics from ${o.label}`}
+              className={
+                "rounded-full px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider transition " +
+                (isActive
+                  ? "bg-zinc-100 text-zinc-900"
+                  : "text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200")
+              }
+            >
+              {o.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
