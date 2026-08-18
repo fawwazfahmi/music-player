@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  launchd job: weekly Kyowave download-health probe.
+
+  Runs scripts/health-check-download.sh once a week (Mondays 09:00 local).
+  The script does one REAL yt-dlp audio download; if it fails — almost
+  always YouTube gating the pinned player_client into an HTTP 403 — it fires
+  a macOS notification and exits non-zero so the failure is impossible to
+  miss. Green runs are silent (just a log line).
+
+  Install:
+    cp deploy/launchd/com.kyowave.health-download.plist ~/Library/LaunchAgents/
+    launchctl load -w ~/Library/LaunchAgents/com.kyowave.health-download.plist
+
+  Run on demand (without waiting for Monday):
+    launchctl start com.kyowave.health-download
+    tail -f ~/Library/Logs/Kyowave/health-download.out.log
+
+  RunAtLoad is false on purpose — we only want the weekly run, not a probe
+  every time the Mac boots.
+-->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.kyowave.health-download</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/fwzfhmy/Projects/music-player/scripts/health-check-download.sh</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/fwzfhmy/Projects/music-player</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>RunAtLoad</key>
+    <false/>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Weekday</key>
+        <integer>1</integer>
+        <key>Hour</key>
+        <integer>9</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/fwzfhmy/Library/Logs/Kyowave/health-download.out.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/fwzfhmy/Library/Logs/Kyowave/health-download.err.log</string>
+</dict>
+</plist>
