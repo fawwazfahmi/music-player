@@ -9,6 +9,7 @@ import { PATCH_NOTES } from "@/lib/patch-notes";
 import { useIsTouch } from "@/hooks/use-media-query";
 import { useMenuPrefs } from "@/hooks/use-menu-prefs";
 import { LEARNED_AFTER, type MenuButtonPref } from "@/lib/mobile";
+import { displayName } from "@/lib/display-name";
 
 type CookieStatus = "none" | "connected" | "stale";
 
@@ -101,13 +102,13 @@ function YouTubeCookiesSection() {
       ? { text: "No YouTube connected — downloads may hit 403s", cls: "text-amber-400", dot: "bg-amber-400" }
       : coveredBy === name
         ? { text: "Downloads authenticated — via your connection", cls: "text-zinc-400", dot: "bg-emerald-400" }
-        : { text: `Downloads authenticated — via ${coveredBy}'s connection`, cls: "text-zinc-400", dot: "bg-emerald-400" };
+        : { text: `Downloads authenticated — via ${displayName(coveredBy)}'s connection`, cls: "text-zinc-400", dot: "bg-emerald-400" };
 
   return (
     <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-zinc-100">
-          Connect YouTube{name ? ` · ${name}` : ""}
+          Connect YouTube{name ? ` · ${displayName(name)}` : ""}
         </h3>
         <span
           className={`flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-semibold ${badge.cls}`}

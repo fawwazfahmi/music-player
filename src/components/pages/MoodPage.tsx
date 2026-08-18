@@ -10,6 +10,7 @@ import {
 import type { MoodSessionResult } from "@/server/services/mood-session";
 import type { YtSearchResult } from "@/server/services/yt-service";
 import { useIdentity } from "@/hooks/use-identity";
+import { displayName } from "@/lib/display-name";
 import { usePlayerStore } from "@/stores/player-store";
 import { useMoodLearningStore } from "@/stores/mood-learning-store";
 import { PageHeader, PageLoading, SongRow, buildQueueTrack } from "./_shared";
@@ -109,7 +110,7 @@ export function MoodPage() {
     }
   }
 
-  const name = identity ? identity[0]!.toUpperCase() + identity.slice(1) : null;
+  const name = identity ? displayName(identity) : null;
 
   const queue =
     result?.tracks.map((t) =>

@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { WaveIcon } from "@/components/icons";
+import { displayName } from "@/lib/display-name";
 
 const NAMES = ["ainul", "fawwaz"] as const;
 type Name = (typeof NAMES)[number];
@@ -83,7 +84,7 @@ export default function LoginPage() {
                     : "border-zinc-800 bg-zinc-950/60 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200")
                 }
               >
-                {n}
+                {displayName(n)}
               </button>
             ))}
           </div>

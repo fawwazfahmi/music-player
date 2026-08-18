@@ -2,6 +2,7 @@
 
 import { useIdentity } from "@/hooks/use-identity";
 import { usePartyStore } from "@/stores/party-store";
+import { displayName } from "@/lib/display-name";
 
 // Top-of-app banner for both sides of a listening party:
 //   ainul (broadcaster):
@@ -40,7 +41,7 @@ export function PartyBanner() {
                 Listening with{" "}
                 {others.map((n, i) => (
                   <span key={n} className="font-semibold capitalize">
-                    {n}
+                    {displayName(n)}
                     {i < others.length - 1 ? ", " : ""}
                   </span>
                 ))}
@@ -64,7 +65,7 @@ export function PartyBanner() {
             aria-hidden
           />
           <span className="text-zinc-100">
-            <span className="font-semibold capitalize">{remote.startedBy}</span> started a
+            <span className="font-semibold capitalize">{displayName(remote.startedBy)}</span> started a
             listening party
           </span>
         </div>
@@ -87,7 +88,7 @@ export function PartyBanner() {
           aria-hidden
         />
         <span className="text-zinc-100">
-          Listening with <span className="font-semibold capitalize">{remote?.startedBy ?? "ainul"}</span>
+          Listening with <span className="font-semibold capitalize">{displayName(remote?.startedBy ?? "ainul")}</span>
           {!remote?.active && " · party ended"}
         </span>
       </div>
