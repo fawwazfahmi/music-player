@@ -99,6 +99,9 @@ model Track {
   lyricsPlain   String?
   lyricsSource  LyricsSource?
   lyricsFetched DateTime?
+  // Per-song sync nudge for synced lyrics. Positive = show lyrics earlier
+  // (fixes "lyrics are delayed"); negative = later. Applied to the highlight.
+  lyricsOffsetMs Int @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

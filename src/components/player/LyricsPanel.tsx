@@ -7,6 +7,7 @@ import {
   getLyrics,
   resolveLyricsFrom,
   updateSyncedLyrics,
+  setLyricsOffset,
   type GetLyricsResult,
   type LyricsSourceChoice,
 } from "@/server/actions/lyrics";
@@ -45,6 +46,7 @@ export function LyricsPanel() {
   const [data, setData] = useState<GetLyricsResult | null>(null);
   const [fetching, setFetching] = useState<LyricsSourceChoice | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [offsetMs, setOffsetMs] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Inline-edit state
@@ -77,6 +79,7 @@ export function LyricsPanel() {
         .then((r) => {
           if (cancelled) return;
           setData(r);
+          setOffsetMs(r.offsetMs);
           if (r.autoTranscribing) {
             schedulePoll();
           }
@@ -130,6 +133,7 @@ export function LyricsPanel() {
     try {
       const result = await resolveLyricsFrom(track.id, choice);
       setData(result);
+      setOffsetMs(result.offsetMs);
       if (result.synced.length === 0 && !result.plain) {
         setError("That source returned nothing for this song.");
       }
@@ -140,6 +144,13 @@ export function LyricsPanel() {
     } finally {
       setFetching(null);
     }
+  }
+
+  function nudgeSync(deltaMs: number) {
+    if (!track) return;
+    const next = Math.max(-10_000, Math.min(10_000, offsetMs + deltaMs));
+    setOffsetMs(next); // optimistic — the highlight shifts immediately
+    void setLyricsOffset(track.id, next).catch((e) => console.error("[mu] setLyricsOffset failed", e));
   }
 
   function onContextMenu(e: React.MouseEvent, idx: number) {
@@ -193,16 +204,18 @@ export function LyricsPanel() {
     }
   }
 
-  // Find the active line index based on current position
+  // Find the active line index based on current position + the sync nudge.
+  // Positive offset makes lyrics advance earlier (fixes "lyrics are delayed").
   const activeIndex = useMemo(() => {
     if (!data || data.synced.length === 0) return -1;
+    const effective = position + offsetMs / 1000;
     let lo = 0;
     let hi = data.synced.length - 1;
     let result = -1;
     while (lo <= hi) {
       const mid = (lo + hi) >> 1;
       const t = data.synced[mid]!.time;
-      if (t <= position) {
+      if (t <= effective) {
         result = mid;
         lo = mid + 1;
       } else {
@@ -210,7 +223,7 @@ export function LyricsPanel() {
       }
     }
     return result;
-  }, [data, position]);
+  }, [data, position, offsetMs]);
 
   // Auto-scroll the active line into view — but never while editing, since
   // scrolling under an open input is jarring. In performance mode we use
@@ -230,8 +243,11 @@ export function LyricsPanel() {
   function jumpTo(line: number) {
     const seconds = data?.synced[line]?.time;
     if (typeof seconds !== "number") return;
-    getEngine().seek(seconds);
-    usePlayerStore.setState({ position: seconds });
+    // The line highlights at (time - offset), so seek there to keep click-to-jump
+    // consistent with the nudge.
+    const target = Math.max(0, seconds - offsetMs / 1000);
+    getEngine().seek(target);
+    usePlayerStore.setState({ position: target });
   }
 
   if (!track) {
@@ -308,7 +324,11 @@ export function LyricsPanel() {
   if (data && data.synced.length > 0) {
     return (
       <div className="flex h-full flex-col">
-        <SourcePicker source={data.lyricsSource} onPick={pickSource} />
+        <SourcePicker
+          source={data.lyricsSource}
+          onPick={pickSource}
+          sync={{ offsetMs, onNudge: nudgeSync }}
+        />
         <div
           ref={containerRef}
           className="min-h-0 flex-1 overflow-y-auto px-6 py-12 scrollbar-thin scrollbar-thumb-zinc-700"
@@ -394,46 +414,93 @@ export function LyricsPanel() {
   );
 }
 
-// The current source is shown on the left; the three options on the right let
-// the user switch where lyrics come from (LRCLIB / YouTube subtitle / Whisper).
+function formatOffset(ms: number): string {
+  if (ms === 0) return "in sync";
+  return `${ms > 0 ? "+" : "−"}${(Math.abs(ms) / 1000).toFixed(2)}s`;
+}
+
+// Top row: current source (left) + the three source options (right). When the
+// view is synced, a second row exposes the per-song sync nudge.
 function SourcePicker({
   source,
   onPick,
+  sync,
 }: {
   source: GetLyricsResult["lyricsSource"];
   onPick: (choice: LyricsSourceChoice) => void;
+  sync?: { offsetMs: number; onNudge: (deltaMs: number) => void };
 }) {
   const active = activeChoice(source);
   const currentLabel =
     source === "MANUAL"
       ? "Edited"
       : (SOURCE_OPTIONS.find((o) => o.choice === active)?.label ?? "—");
+  const STEP = 250;
   return (
-    <div className="flex items-center justify-between gap-2 border-b border-zinc-800/60 px-3 py-2">
-      <span className="shrink-0 rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-sky-300">
-        {currentLabel}
-      </span>
-      <div className="flex items-center gap-1">
-        {SOURCE_OPTIONS.map((o) => {
-          const isActive = o.choice === active;
-          return (
-            <button
-              key={o.choice}
-              type="button"
-              onClick={() => onPick(o.choice)}
-              title={`Get lyrics from ${o.label}`}
-              className={
-                "rounded-full px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider transition " +
-                (isActive
-                  ? "bg-zinc-100 text-zinc-900"
-                  : "text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200")
-              }
-            >
-              {o.label}
-            </button>
-          );
-        })}
+    <div className="flex flex-col gap-1.5 border-b border-zinc-800/60 px-3 py-2">
+      <div className="flex items-center justify-between gap-2">
+        <span className="shrink-0 rounded-full bg-sky-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-sky-300">
+          {currentLabel}
+        </span>
+        <div className="flex items-center gap-1">
+          {SOURCE_OPTIONS.map((o) => {
+            const isActive = o.choice === active;
+            return (
+              <button
+                key={o.choice}
+                type="button"
+                onClick={() => onPick(o.choice)}
+                title={`Get lyrics from ${o.label}`}
+                className={
+                  "rounded-full px-2.5 py-0.5 text-[10px] font-medium uppercase tracking-wider transition " +
+                  (isActive
+                    ? "bg-zinc-100 text-zinc-900"
+                    : "text-zinc-500 hover:bg-zinc-800 hover:text-zinc-200")
+                }
+              >
+                {o.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
+
+      {sync && (
+        <div className="flex items-center justify-between gap-2 text-[10px] text-zinc-500">
+          <span className="uppercase tracking-wider">Sync</span>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => sync.onNudge(-STEP)}
+              title="Lyrics later (audio is ahead)"
+              className="rounded px-1.5 py-0.5 font-medium text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-100"
+            >
+              −0.25s
+            </button>
+            <span className="min-w-[3.5rem] text-center tabular-nums text-zinc-300">
+              {formatOffset(sync.offsetMs)}
+            </span>
+            <button
+              type="button"
+              onClick={() => sync.onNudge(STEP)}
+              title="Lyrics earlier (lyrics are delayed)"
+              className="rounded px-1.5 py-0.5 font-medium text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-100"
+            >
+              +0.25s
+            </button>
+            {sync.offsetMs !== 0 && (
+              <button
+                type="button"
+                onClick={() => sync.onNudge(-sync.offsetMs)}
+                title="Reset sync"
+                className="rounded px-1.5 py-0.5 font-medium text-zinc-500 transition hover:bg-zinc-800 hover:text-zinc-200"
+              >
+                reset
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

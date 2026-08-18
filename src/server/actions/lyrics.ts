@@ -22,6 +22,9 @@ export interface GetLyricsResult {
       transcription. The lyrics panel polls getLyrics again every few seconds
       while this is set. */
   autoTranscribing: boolean;
+  /** Per-song sync nudge in ms (positive = lyrics earlier). Applied to the
+      highlight so mistimed LRCLIB lyrics can be lined up with our audio. */
+  offsetMs: number;
 }
 
 // Module-level lock so concurrent getLyrics calls for the same track don't
@@ -51,6 +54,7 @@ export async function getLyrics(trackId: string): Promise<GetLyricsResult> {
       source: "cache",
       lyricsSource: track.lyricsSource as LyricsSource | null,
       autoTranscribing: false,
+      offsetMs: track.lyricsOffsetMs,
     };
   }
 
@@ -97,6 +101,7 @@ export async function getLyrics(trackId: string): Promise<GetLyricsResult> {
       source: "lrclib",
       lyricsSource,
       autoTranscribing: false,
+      offsetMs: track.lyricsOffsetMs,
     };
   }
 
@@ -183,6 +188,7 @@ function empty(trackId: string): GetLyricsResult {
     source: "none",
     lyricsSource: null,
     autoTranscribing: false,
+    offsetMs: 0,
   };
 }
 
@@ -194,6 +200,7 @@ function toResult(
   synced: string | null,
   plain: string | null,
   lyricsSource: LyricsSource,
+  offsetMs = 0,
 ): GetLyricsResult {
   return {
     trackId,
@@ -203,7 +210,15 @@ function toResult(
     source: lyricsSource.startsWith("LRCLIB") ? "lrclib" : "cache",
     lyricsSource,
     autoTranscribing: false,
+    offsetMs,
   };
+}
+
+/** Persist a per-song lyrics sync nudge (ms, positive = lyrics earlier).
+    Clamped to ±10s — a sane manual-nudge range. */
+export async function setLyricsOffset(trackId: string, offsetMs: number): Promise<void> {
+  const clamped = Math.max(-10_000, Math.min(10_000, Math.round(offsetMs)));
+  await db.track.update({ where: { id: trackId }, data: { lyricsOffsetMs: clamped } });
 }
 
 /**
@@ -231,7 +246,7 @@ export async function resolveLyricsFrom(
       where: { id: trackId },
       data: { lyricsSynced: r.syncedLyrics, lyricsPlain: r.plainLyrics, lyricsSource: src, lyricsFetched: new Date() },
     });
-    return toResult(trackId, r.syncedLyrics, r.plainLyrics, src);
+    return toResult(trackId, r.syncedLyrics, r.plainLyrics, src, track.lyricsOffsetMs);
   }
 
   if (choice === "YT_SUBTITLE") {
@@ -243,7 +258,7 @@ export async function resolveLyricsFrom(
       where: { id: trackId },
       data: { lyricsSynced: s.syncedLrc || null, lyricsPlain: s.plain, lyricsSource: "YT_SUBTITLE", lyricsFetched: new Date() },
     });
-    return toResult(trackId, s.syncedLrc || null, s.plain, "YT_SUBTITLE");
+    return toResult(trackId, s.syncedLrc || null, s.plain, "YT_SUBTITLE", track.lyricsOffsetMs);
   }
 
   // WHISPER — explicit user choice, so store whatever it returns.
@@ -253,7 +268,7 @@ export async function resolveLyricsFrom(
     where: { id: trackId },
     data: { lyricsSynced: syncedLrc, lyricsPlain: plainText, lyricsSource: "WHISPER", lyricsFetched: new Date() },
   });
-  return toResult(trackId, syncedLrc, plainText, "WHISPER");
+  return toResult(trackId, syncedLrc, plainText, "WHISPER", track.lyricsOffsetMs);
 }
 
 export interface TranscribeResult {
