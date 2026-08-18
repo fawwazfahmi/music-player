@@ -11,6 +11,15 @@ export const dynamic = "force-dynamic";
 
 const HEADERS = { "access-control-allow-origin": "*", "cache-control": "no-store" };
 
+/** Changes on every server start, i.e. every deploy.
+ *
+ * An OBS browser source caches the page and will happily render months-old CSS
+ * until someone right-clicks "Refresh cache" — which is not something you can
+ * ask for mid-broadcast. The overlay already polls this endpoint every second,
+ * so it can notice a new generation and reload itself. KyoTips solves the same
+ * problem by pushing a `reload` frame down its SSE stream. */
+const GENERATION = String(Date.now());
+
 /** Fill in art the pushing tab did not send.
  *
  * Presence is only as good as the QueueTrack the player tab holds, and a queue
@@ -32,21 +41,35 @@ async function resolveArt(p: {
     return { coverArtHash: p.coverArtHash, ytVideoId: p.ytVideoId };
   }
   try {
-    const t = await db.track.findFirst({
-      where: { title: p.title },
-      select: {
-        coverArtHash: true,
-        ytVideoId: true,
-        album: { select: { coverArtHash: true } },
-      },
-      // Prefer a real library track over an ephemeral pick with the same title.
-      orderBy: { inLibrary: "desc" },
-    });
+    // Titles do not always match exactly. The library stores cleaned metadata
+    // ("After LIKE") while a queue built from a YouTube pick carries the raw
+    // title ("IVE 아이브 'After LIKE' MV"), so an equality check misses. Try, in
+    // order: an exact hit, then the longest library title *contained* in the
+    // pushed one, then a trigram match — the same similarity() search used by
+    // the library search. Longest-first matters: it stops a short generic title
+    // from claiming a track that a more specific one should own.
+    const rows = await db.$queryRaw<
+      { coverArtHash: string | null; ytVideoId: string | null; albumCoverArtHash: string | null }[]
+    >`
+      SELECT t."coverArtHash", t."ytVideoId", al."coverArtHash" AS "albumCoverArtHash"
+      FROM "Track" t
+      LEFT JOIN "Album" al ON t."albumId" = al.id
+      WHERE t.title = ${p.title}
+         OR (length(t.title) >= 5 AND ${p.title} ILIKE '%' || t.title || '%')
+         OR similarity(t.title, ${p.title}) > 0.35
+      ORDER BY (t.title = ${p.title}) DESC,
+               (${p.title} ILIKE '%' || t.title || '%') DESC,
+               length(t.title) DESC,
+               similarity(t.title, ${p.title}) DESC,
+               t."inLibrary" DESC
+      LIMIT 1
+    `;
+    const t = rows[0];
     if (!t) return { coverArtHash: null, ytVideoId: null };
     return {
       coverArtHash: resolveTrackCoverHash({
         trackCoverArtHash: t.coverArtHash,
-        albumCoverArtHash: t.album?.coverArtHash,
+        albumCoverArtHash: t.albumCoverArtHash,
       }),
       ytVideoId: t.ytVideoId ?? null,
     };
@@ -68,6 +91,7 @@ export async function GET(req: Request) {
   return NextResponse.json(
     {
       found: true,
+      gen: GENERATION,
       playing: p.isPlaying,
       title: p.title,
       artist: p.artist,
